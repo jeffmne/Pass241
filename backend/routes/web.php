@@ -5,6 +5,7 @@ use App\Livewire\Auth\Login;
 use App\Livewire\Auth\Register;
 use App\Livewire\Dashboard\Events\Form as EventForm;
 use App\Livewire\Dashboard\Events\Index as EventIndex;
+use App\Livewire\Dashboard\Events\TicketTypes as EventTicketTypes;
 use App\Livewire\Dashboard\Overview;
 use App\Livewire\Organizations\Create as CreateOrganization;
 use App\Livewire\Organizations\Settings as OrganizationSettings;
@@ -56,5 +57,6 @@ Route::middleware('auth')->group(function () {
         Route::get('/evenements', EventIndex::class)->name('events.index');
         Route::get('/evenements/nouveau', EventForm::class)->name('events.create');
         Route::get('/evenements/{event}/modifier', EventForm::class)->name('events.edit');
+        Route::get('/evenements/{event}/billets', EventTicketTypes::class)->name('events.ticket-types');
     });
 });

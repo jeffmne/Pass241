@@ -123,6 +123,36 @@ class DatabaseSeeder extends Seeder
                     'address' => 'Boulevard Triomphal',
                     'city' => 'Libreville',
                 ]);
+
+                // Trois tarifs, dont un presque epuise : c'est le cas ou le
+                // hold de la section 17.1 se declenche, et le seul moyen de le
+                // voir a l'oeuvre sans monter un scenario a la main.
+                $event->ticketTypes()->createMany([
+                    [
+                        'name' => 'Standard',
+                        'description' => 'Acces general a l\'evenement.',
+                        'price' => 10_000,
+                        'quantity' => 300,
+                        'max_per_order' => 5,
+                        'position' => 0,
+                    ],
+                    [
+                        'name' => 'VIP',
+                        'description' => 'Acces general, espace reserve et boisson de bienvenue.',
+                        'price' => 50_000,
+                        'quantity' => 40,
+                        'max_per_order' => 4,
+                        'position' => 1,
+                    ],
+                    [
+                        'name' => 'Derniere place',
+                        'description' => 'Il n\'en reste qu\'une.',
+                        'price' => 15_000,
+                        'quantity' => 1,
+                        'max_per_order' => 1,
+                        'position' => 2,
+                    ],
+                ]);
             });
         }
 

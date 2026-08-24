@@ -63,6 +63,32 @@
         </div>
     @endif
 
+    {{-- Les billets ont leur propre ecran : ce formulaire porte deja
+         l'evenement, y ajouter la gestion des tarifs et du stock en ferait une
+         page interminable. --}}
+    @if ($isEditing)
+        <a href="{{ route('events.ticket-types', $event) }}" wire:navigate
+           class="surface mb-5 flex items-center justify-between gap-4 p-4 transition-colors hover:border-azure-300 sm:p-5">
+            <span class="flex min-w-0 items-center gap-3.5">
+                <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-azure-100 text-azure-700">
+                    <x-lucide-ticket class="size-5" stroke-width="1.5" />
+                </span>
+                <span class="min-w-0">
+                    <span class="block font-display text-base font-bold text-ink">Billets</span>
+                    <span class="mt-0.5 block text-sm text-grey-500">
+                        @php $ticketTypeCount = $event->ticketTypes()->count(); @endphp
+                        @if ($ticketTypeCount === 0)
+                            Aucun billet configure — indispensable pour vendre
+                        @else
+                            {{ $ticketTypeCount }} type{{ $ticketTypeCount > 1 ? 's' : '' }} de billet configure{{ $ticketTypeCount > 1 ? 's' : '' }}
+                        @endif
+                    </span>
+                </span>
+            </span>
+            <x-lucide-chevron-right class="size-5 shrink-0 text-grey-400" stroke-width="1.75" />
+        </a>
+    @endif
+
     @if ($locked)
         <div class="mb-5 flex items-start gap-2.5 rounded-xl border border-grey-200 bg-white px-4 py-3 text-sm text-grey-500">
             <x-lucide-lock class="mt-0.5 size-4 shrink-0" stroke-width="1.75" />

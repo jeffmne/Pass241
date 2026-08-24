@@ -93,13 +93,21 @@
 
 ## JALON 3 — Billets, stock et commande (Phase 3)
 
-- [ ] `TicketType`, `Ticket`, `Order`, `OrderItem`
-- [ ] Gestion du stock et `StockHoldService` (Redis, TTL 5 minutes)
-- [ ] Formulaire d'achat (section 15) — email facultatif
-- [ ] Validation serveur du préfixe opérateur / numéro (section 16.1)
-- [ ] Jobs `ExpireOrderIfUnpaid` et `ReleaseStockHold`
+- [x] `TicketType`, `Order`, `OrderItem`, `Ticket`
+- [x] Gestion du stock et `StockHoldService` (Redis, TTL aligné sur le délai de paiement)
+- [x] Écran de gestion des types de billets dans le dashboard
+- [x] Parcours d'achat public (section 15) — sans compte, email facultatif
+- [x] Validation serveur du numéro et de sa cohérence avec l'opérateur (section 16.1)
+- [x] Jobs `ExpireOrderIfUnpaid` et `ReleaseStockHold`
+- [x] Montants en entiers XAF, contraints en base, figés à l'achat
 
-*Vérification : commande créée, stock réservé, expiration automatique prouvée par test.*
+*Vérification : `/e/concert-afro-2026` — trois tarifs dont une dernière place, qui déclenche le hold.*
+
+**Points ouverts, à trancher avant la mise en vente réelle :**
+- [ ] **Préfixes opérateurs à confirmer** auprès d'Airtel Gabon et Moov Gabon (`config/payments.php`). Tant que les listes sont vides, le format du numéro est vérifié mais pas son appartenance à l'opérateur.
+- [ ] **Risque de survente au-delà du dernier billet.** La section 17.1 limite le hold au dernier billet restant ; plusieurs commandes simultanées peuvent donc s'ouvrir sur le même stock abondant. La garantie de non-dépassement sera posée à la confirmation du paiement (jalon 4), par une vérification atomique avant émission des billets.
+- [ ] Émission des billets et QR signés — au moment de la confirmation du paiement (jalon 4)
+- [ ] Passage automatique en `SOLD_OUT` quand tous les types sont épuisés
 
 ---
 

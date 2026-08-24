@@ -179,25 +179,23 @@
          un visiteur qui clique dans le vide perd confiance.
     ---------------------------------------------------------------- --}}
     <section id="billets" class="mx-auto w-full max-w-5xl scroll-mt-20 px-5 pb-10 sm:px-6">
-        <div class="glass-inset p-6 sm:p-8">
-            <h2 class="font-display text-xl font-extrabold text-ink sm:text-2xl">Billets</h2>
-
-            @if ($cancelled)
+        @if ($event->allowsPurchase())
+            {{-- Le parcours d'achat est un composant a part : il porte son
+                 propre etat, et la page de l'evenement reste un document
+                 rendu cote serveur, donc indexable (section 60.1). --}}
+            <livewire:public.checkout :event="$event" />
+        @else
+            <div class="glass-inset p-6 sm:p-8">
+                <h2 class="font-display text-xl font-extrabold text-ink sm:text-2xl">Billets</h2>
                 <p class="mt-3 leading-relaxed text-grey-500">
-                    La vente est fermee : cet evenement a ete annule.
+                    @if ($cancelled)
+                        La vente est fermee : cet evenement a ete annule.
+                    @else
+                        La vente n'est pas ouverte pour le moment.
+                    @endif
                 </p>
-            @elseif (! $event->allowsPurchase())
-                <p class="mt-3 leading-relaxed text-grey-500">
-                    La vente n'est pas ouverte pour le moment.
-                </p>
-            @else
-                <p class="mt-3 leading-relaxed text-grey-500">
-                    La billetterie de cet evenement ouvre prochainement.
-                    Le paiement se fera par Airtel Money ou Moov Money, et votre
-                    billet s'affichera immediatement apres confirmation.
-                </p>
-            @endif
-        </div>
+            </div>
+        @endif
     </section>
 
     {{-- ---------------------------------------------------------------

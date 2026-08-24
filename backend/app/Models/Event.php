@@ -11,7 +11,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 
@@ -90,6 +92,41 @@ class Event extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function ticketTypes(): HasMany
+    {
+        return $this->hasMany(TicketType::class)->orderBy('position')->orderBy('id');
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Types de billets proposes au public.
+     *
+     * Les types masques restent vendables par un autre canal (invitation, lien
+     * direct) mais n'apparaissent pas sur la page de l'evenement (section 17).
+     *
+     * La portee par organisation est levee : la page publique est lue par des
+     * visiteurs qui n'appartiennent a aucune organisation. Il n'y a aucune
+     * fuite possible, la requete etant deja bornee aux billets de CET
+     * evenement.
+     *
+     * @return Collection<int, TicketType>
+     */
+    public function publicTicketTypes()
+    {
+        return $this->ticketTypes()
+            ->acrossOrganizations()
+            ->publiclyListed()
+            ->get()
+            // L'evenement est deja charge ici : le rattacher evite que chaque
+            // type de billet le recharge par une requete scopee, qui ne
+            // renverrait rien hors contexte — et le rendrait invendable.
+            ->each(fn (TicketType $ticketType) => $ticketType->setRelation('event', $this));
     }
 
     /*
