@@ -2,9 +2,7 @@
 
 use App\Enums\PermissionName;
 use App\Enums\RoleName;
-use App\Models\Organization;
 use App\Models\OrganizationMember;
-use App\Models\User;
 
 /*
  * Roles et permissions (section 10).
@@ -14,28 +12,9 @@ use App\Models\User;
  * obligatoires listes en section 74.
  */
 
-/**
- * Ajoute un membre a une organisation avec le role demande, par le meme chemin
- * que l'application : appartenance en base, puis role attribue dans le contexte
- * de cette organisation.
- */
-function addMemberTo(Organization $organization, RoleName $role): User
-{
-    $user = User::factory()->create();
-
-    OrganizationMember::create([
-        'organization_id' => $organization->id,
-        'user_id' => $user->id,
-        'joined_at' => now(),
-    ]);
-
-    $user->forceFill(['current_organization_id' => $organization->id])->save();
-
-    setPermissionsTeamId($organization->id);
-    $user->assignRole($role->value);
-
-    return $user->fresh();
-}
+// `addMemberTo()` vit dans tests/Pest.php : plusieurs suites en ont besoin, et
+// une fonction definie dans un fichier de test ne serait chargee que si ce
+// fichier l'est — donc absente quand on execute une suite seule.
 
 beforeEach(function () {
     [$this->owner, $this->organization] = organizerWithOrganization();

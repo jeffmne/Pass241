@@ -173,26 +173,32 @@
      * plastifie qu'on incline pour capter la lumiere.
      *
      * Portee par un pseudo-element : aucune propriete de mise en page n'est
-     * animee, seul l'opacite et la position d'un degrade.
+     * animee, seuls l'opacite et la position d'un degrade.
+     *
+     * Reserve aux appareils dotes d'un vrai pointeur. Au doigt, il n'y a rien
+     * a suivre : l'effet se reduirait a une tache lumineuse posee la ou on a
+     * touche, qui reste sous le doigt et se voit comme un defaut.
      */
-    .glass-specular::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity var(--duration-state) var(--ease-out-quart);
-        background: radial-gradient(
-            18rem 18rem at var(--spec-x, 50%) var(--spec-y, 0%),
-            rgba(255, 255, 255, 0.75),
-            rgba(255, 255, 255, 0.18) 38%,
-            transparent 68%
-        );
-    }
+    @media (hover: hover) and (pointer: fine) {
+        .glass-specular::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity var(--duration-state) var(--ease-out-quart);
+            background: radial-gradient(
+                18rem 18rem at var(--spec-x, 50%) var(--spec-y, 0%),
+                rgba(255, 255, 255, 0.75),
+                rgba(255, 255, 255, 0.18) 38%,
+                transparent 68%
+            );
+        }
 
-    .glass-specular[data-lit='true']::after {
-        opacity: 1;
+        .glass-specular[data-lit='true']::after {
+            opacity: 1;
+        }
     }
 
     /* Le reflet ne survit pas a la degradation : c'est le premier luxe a
@@ -434,6 +440,62 @@
             opacity: 1;
             transform: translate3d(0, 0, 0);
         }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Heros d'evenement
+     * ---------------------------------------------------------------------
+     *
+     * Banniere pleine largeur, titre pose dessus, fondu vers la page en bas.
+     * L'affiche devient le sujet de l'ecran : c'est elle que le visiteur a vue
+     * dans l'apercu du lien, et c'est elle qui lui dit s'il a envie de rester.
+     *
+     * Le voile sombre n'est pas une decoration. Sans lui, la lisibilite du
+     * titre dependrait de la photo choisie par l'organisateur — donc de rien
+     * de maitrisable. Il est teinte vers l'encre du produit plutot que vers le
+     * noir pur, pour rester dans la meme famille que le reste (section 70.1).
+     */
+    .event-hero {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+
+    .event-hero-image {
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        /* Cadrage haut : sur un visuel d'evenement, le sujet et le titre sont
+           presque toujours dans la moitie superieure. Un centrage couperait
+           les tetes sur une banniere large. */
+        background-position: center 28%;
+    }
+
+    /*
+     * Deux degrades superposes, chacun avec son role :
+     * - vertical, pour fondre le bas de l'image dans la page ;
+     * - horizontal, pour assombrir le cote ou vit le texte sans noircir tout
+     *   le visuel.
+     */
+    .event-hero-scrim {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(
+                to top,
+                var(--color-canvas) 0%,
+                color-mix(in srgb, var(--color-canvas) 92%, transparent) 8%,
+                color-mix(in srgb, var(--color-ink) 25%, transparent) 42%,
+                color-mix(in srgb, var(--color-ink) 45%, transparent) 100%
+            ),
+            linear-gradient(
+                to right,
+                color-mix(in srgb, var(--color-ink) 72%, transparent) 0%,
+                color-mix(in srgb, var(--color-ink) 45%, transparent) 45%,
+                color-mix(in srgb, var(--color-ink) 12%, transparent) 100%
+            );
     }
 
     .ticket-notch {

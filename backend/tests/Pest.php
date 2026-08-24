@@ -2,7 +2,9 @@
 
 use App\Actions\Organizations\CreateOrganization;
 use App\Enums\OrganizationType;
+use App\Enums\RoleName;
 use App\Models\Organization;
+use App\Models\OrganizationMember;
 use App\Models\User;
 use App\Support\Tenancy\OrganizationContext;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -84,4 +86,47 @@ function actAsOrganization(Organization $organization): void
 {
     app(OrganizationContext::class)->set($organization);
     setPermissionsTeamId($organization->getKey());
+}
+
+/**
+ * Cree des donnees dans le contexte d'une organisation precise, puis restaure
+ * le contexte precedent.
+ *
+ * Indispensable des qu'un test manipule plusieurs organisations : le trait
+ * BelongsToOrganization refuse toute creation hors contexte, ou visant une
+ * autre organisation que celle en cours. Passer par ici plutot que de forcer
+ * `organization_id` garantit que les tests empruntent le meme chemin que
+ * l'application (section 9).
+ *
+ * @template TReturn
+ *
+ * @param  callable(): TReturn  $callback
+ * @return TReturn
+ */
+function forOrganization(Organization $organization, callable $callback): mixed
+{
+    return app(OrganizationContext::class)->runFor($organization, $callback);
+}
+
+/**
+ * Ajoute un membre a une organisation avec le role demande, par le meme chemin
+ * que l'application : appartenance en base, puis role attribue dans le contexte
+ * de cette organisation.
+ */
+function addMemberTo(Organization $organization, RoleName $role): User
+{
+    $user = User::factory()->create();
+
+    OrganizationMember::create([
+        'organization_id' => $organization->getKey(),
+        'user_id' => $user->getKey(),
+        'joined_at' => now(),
+    ]);
+
+    $user->forceFill(['current_organization_id' => $organization->getKey()])->save();
+
+    setPermissionsTeamId($organization->getKey());
+    $user->assignRole($role->value);
+
+    return $user->fresh();
 }

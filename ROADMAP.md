@@ -71,14 +71,23 @@
 
 ## JALON 2 — Événement et page publique (Phase 2)
 
-- [ ] `Event`, `EventLocation`, les sept statuts (section 12)
-- [ ] Slug stable, lisible, SEO-friendly (section 13)
-- [ ] Création, modification, publication depuis le dashboard
-- [ ] Page publique `/e/{slug}` (section 7)
-- [ ] SEO, OpenGraph, aperçu de partage (section 14)
-- [ ] Design system : palette bleu azurin, liquid glass avec modération (section 70)
+- [x] `Event`, `EventLocation`, les sept statuts et leurs transitions (section 12)
+- [x] Slug stable, lisible, unique sur la plateforme, figé après publication (section 13)
+- [x] Création, modification, publication, retour au brouillon, annulation motivée
+- [x] Conditions de publication annoncées avant le clic, pas découvertes après
+- [x] Affiche et bannière sur disque public, limitées à 4 Mo
+- [x] Catégories, visibilité référençable ou privée, capacité maximale
+- [x] Liste des événements : recherche, filtre par statut, état vide, lien public copiable
+- [x] Page publique `/e/{slug}` avec héros pleine largeur (section 7)
+- [x] SEO, OpenGraph, données structurées schema.org, canonique (section 14)
+- [x] Design system appliqué : palette azurine, verre avec modération (section 70)
 
-*Vérification : un événement publié, son lien ouvert sur téléphone, l'aperçu correct sur WhatsApp.*
+*Vérification : `/e/concert-afro-2026` et `/e/gala-des-entrepreneurs` sont créés par le seeder.*
+
+**Reporté, faute d'entité concernée à ce stade :**
+- [ ] Passage automatique en `ONGOING` puis `COMPLETED` — demande une tâche planifiée, à traiter avec les autres travaux périodiques
+- [ ] Passage automatique en `SOLD_OUT` — dépend du stock des types de billets (jalon 3)
+- [ ] `EventDelegate` : délégation limitée à un événement précis (section 10)
 
 ---
 

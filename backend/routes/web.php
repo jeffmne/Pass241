@@ -3,12 +3,28 @@
 use App\Http\Controllers\Auth\LogoutController;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\Register;
+use App\Livewire\Dashboard\Events\Form as EventForm;
+use App\Livewire\Dashboard\Events\Index as EventIndex;
 use App\Livewire\Dashboard\Overview;
 use App\Livewire\Organizations\Create as CreateOrganization;
 use App\Livewire\Organizations\Settings as OrganizationSettings;
+use App\Livewire\Public\EventPage;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+/*
+ * Page publique d'un evenement (section 6).
+ *
+ * Volontairement hors de tout groupe d'authentification et hors du middleware
+ * d'organisation : c'est un lien partage sur WhatsApp, ouvert par des gens qui
+ * n'ont aucun compte. L'isolation multi-tenant y est assuree par le slug
+ * lui-meme, unique sur la plateforme, et par `Event::publicBySlug()` qui
+ * n'expose que les evenements ayant une page publique.
+ *
+ * L'adresse reste courte et lisible pour tenir sur une affiche imprimee.
+ */
+Route::get('/e/{slug}', EventPage::class)->name('events.public');
 
 Route::middleware('guest')->group(function () {
     Route::get('/connexion', Login::class)->name('login');
@@ -36,5 +52,9 @@ Route::middleware('auth')->group(function () {
     Route::middleware('organization')->group(function () {
         Route::get('/dashboard', Overview::class)->name('dashboard');
         Route::get('/parametres', OrganizationSettings::class)->name('organization.settings');
+
+        Route::get('/evenements', EventIndex::class)->name('events.index');
+        Route::get('/evenements/nouveau', EventForm::class)->name('events.create');
+        Route::get('/evenements/{event}/modifier', EventForm::class)->name('events.edit');
     });
 });

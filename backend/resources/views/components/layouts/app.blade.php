@@ -11,7 +11,7 @@
      */
     $navigation = [
         ['label' => 'Vue generale', 'icon' => 'layout-dashboard', 'route' => 'dashboard', 'ready' => true],
-        ['label' => 'Evenements', 'icon' => 'calendar-days', 'route' => null, 'ready' => false],
+        ['label' => 'Evenements', 'icon' => 'calendar-days', 'route' => 'events.index', 'match' => 'events.*', 'ready' => true, 'permission' => PermissionName::EventsView->value],
         ['label' => 'Billetterie', 'icon' => 'ticket', 'route' => null, 'ready' => false],
         ['label' => 'Controle d\'acces', 'icon' => 'scan-line', 'route' => null, 'ready' => false],
         ['label' => 'Collectes', 'icon' => 'hand-coins', 'route' => null, 'ready' => false],
@@ -49,8 +49,8 @@
                         <a href="{{ route($item['route']) }}"
                            @class([
                                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
-                               'bg-azure-100 text-azure-700' => request()->routeIs($item['route']),
-                               'text-grey-500 hover:bg-azure-50 hover:text-azure-700' => ! request()->routeIs($item['route']),
+                               'bg-azure-100 text-azure-700' => request()->routeIs($item['match'] ?? $item['route']),
+                               'text-grey-500 hover:bg-azure-50 hover:text-azure-700' => ! request()->routeIs($item['match'] ?? $item['route']),
                            ])>
                             <x-dynamic-component :component="'lucide-' . $item['icon']" class="size-5" stroke-width="1.5" />
                             {{ $item['label'] }}
@@ -100,8 +100,8 @@
                             <a href="{{ route($item['route']) }}"
                                @class([
                                    'flex min-h-14 flex-col items-center justify-center gap-1 px-1 text-[11px] font-medium',
-                                   'text-azure-600' => request()->routeIs($item['route']),
-                                   'text-grey-500' => ! request()->routeIs($item['route']),
+                                   'text-azure-600' => request()->routeIs($item['match'] ?? $item['route']),
+                                   'text-grey-500' => ! request()->routeIs($item['match'] ?? $item['route']),
                                ])>
                                 <x-dynamic-component :component="'lucide-' . $item['icon']" class="size-5" stroke-width="1.5" />
                                 <span class="truncate">{{ $item['label'] }}</span>

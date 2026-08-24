@@ -73,11 +73,17 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
  * seul ecouteur, quel que soit le nombre de surfaces. Les coordonnees ne sont
  * ecrites que dans une variable CSS, donc aucun recalcul de mise en page.
  *
- * Sur ecran tactile, il n'y a pas de survol : la nappe s'allume brievement au
- * contact, ce qui donne le meme signal sans occuper la main.
+ * Rien ne s'installe sur un ecran tactile : sans pointeur a suivre, l'effet se
+ * reduirait a une tache lumineuse figee sous le doigt, qui se lit comme un
+ * defaut d'affichage. La regle CSS correspondante est bornee par la meme
+ * requete media.
  */
 function initSpecular() {
     if (root.dataset.quality === 'reduced') {
+        return;
+    }
+
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
         return;
     }
 
@@ -127,25 +133,6 @@ function initSpecular() {
         { passive: true }
     );
 
-    window.addEventListener(
-        'pointerdown',
-        (event) => {
-            if (event.pointerType === 'mouse') return;
-
-            const surface = event.target.closest?.('.glass-specular');
-            if (!surface) return;
-
-            const box = surface.getBoundingClientRect();
-            surface.style.setProperty('--spec-x', `${((event.clientX - box.left) / box.width) * 100}%`);
-            surface.style.setProperty('--spec-y', `${((event.clientY - box.top) / box.height) * 100}%`);
-            surface.dataset.lit = 'true';
-
-            setTimeout(() => {
-                surface.dataset.lit = 'false';
-            }, 900);
-        },
-        { passive: true }
-    );
 }
 
 /* -------------------------------------------------------------------------
