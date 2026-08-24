@@ -18,7 +18,7 @@ use Livewire\Component;
  * sans organisation n'a aucun usage, et demander deux etapes separees ajoute
  * une friction inutile a l'entree du parcours.
  */
-#[Layout('components.layouts.guest')]
+#[Layout('components.layouts.guest', ['width' => 'wide'])]
 class Register extends Component
 {
     #[Validate('required|string|min:2|max:120')]
