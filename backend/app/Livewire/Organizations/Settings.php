@@ -43,12 +43,34 @@ class Settings extends Component
         $this->contactPhone = $organization->contact_phone ?? '';
     }
 
+    /**
+     * Taille maximale d'une piece justificative, en kilo-octets.
+     *
+     * La meme valeur borne le televersement temporaire de Livewire
+     * (config/livewire.php) : un fichier trop lourd est ainsi refuse des le
+     * depart, sans avoir ete transfere en entier. Sur une connexion mobile
+     * gabonaise, la difference est concrete.
+     */
+    public const MAX_DOCUMENT_KILOBYTES = 2048;
+
     protected function rules(): array
     {
         return [
-            // 8 Mo : au-dela, une photo de piece d'identite prise au telephone
-            // devient penible a televerser sur une connexion mobile gabonaise.
-            'documents.*' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:8192'],
+            'documents.*' => [
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:'.self::MAX_DOCUMENT_KILOBYTES,
+            ],
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'documents.*.max' => 'Chaque piece doit peser 2 Mo au maximum.',
+            'documents.*.mimes' => 'Formats acceptes : JPG, PNG ou PDF.',
+            'documents.*.file' => 'Le fichier envoye est invalide.',
         ];
     }
 

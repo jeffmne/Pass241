@@ -96,6 +96,14 @@
 
         @if ($canSubmitKyc && $canManage)
             <form wire:submit="submitKyc" class="mt-5 space-y-4">
+                {{-- La contrainte est annoncee avant les champs : la decouvrir
+                     apres l'echec d'un televersement sur une connexion mobile
+                     serait la pire facon de l'apprendre. --}}
+                <p class="flex items-start gap-2 text-xs text-grey-500">
+                    <x-lucide-info class="mt-0.5 size-4 shrink-0" stroke-width="1.5" />
+                    <span>Formats acceptes : JPG, PNG ou PDF. Chaque piece doit peser 2 Mo au maximum.</span>
+                </p>
+
                 @foreach ($requiredDocuments as $document)
                     @php $existing = $uploadedDocuments[$document->value] ?? null; @endphp
                     <div>

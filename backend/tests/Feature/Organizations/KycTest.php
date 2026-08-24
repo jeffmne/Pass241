@@ -5,11 +5,13 @@ use App\Actions\Organizations\SubmitKyc;
 use App\Enums\AuditAction;
 use App\Enums\KycStatus;
 use App\Enums\OrganizationType;
+use App\Livewire\Organizations\Settings;
 use App\Models\AuditLog;
 use App\Models\OrganizationDocument;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 
 /*
  * Verification d'identite (section 10.1).
@@ -23,6 +25,7 @@ beforeEach(function () {
     Storage::fake('local');
     [$this->owner, $this->organization] = organizerWithOrganization('Association test');
     actAsOrganization($this->organization);
+    $this->actingAs($this->owner);
 });
 
 it('demarre en attente et sans droit au reversement', function () {
@@ -71,6 +74,46 @@ it('n exige qu une piece d identite pour un particulier', function () {
     ]);
 
     expect($organization->fresh()->kyc_status)->toBe(KycStatus::Submitted);
+});
+
+it('refuse une piece de plus de 2 Mo des le televersement', function () {
+    // La limite est appliquee par la regle de televersement temporaire de
+    // Livewire, donc au moment du `set` : le fichier est refuse avant meme
+    // d'avoir ete transfere en entier, ce qui compte sur une connexion mobile.
+    $component = Livewire::test(Settings::class)
+        ->set('documents.IDENTITY', UploadedFile::fake()->create('cni.pdf', 2049, 'application/pdf'));
+
+    $component->assertHasErrors(['documents.IDENTITY']);
+
+    expect($component->errors()->first('documents.IDENTITY'))
+        // Le message doit etre lisible en francais, pas la cle de traduction.
+        ->not->toContain('validation.')
+        ->toContain('2048');
+
+    $component->call('submitKyc');
+
+    expect($this->organization->fresh()->kyc_status)->toBe(KycStatus::Pending)
+        ->and(OrganizationDocument::count())->toBe(0);
+});
+
+it('accepte une piece a la limite exacte de 2 Mo', function () {
+    // La limite PHP (upload_max_filesize) est volontairement plus haute que la
+    // limite metier : un fichier de taille limite doit passer la validation, et
+    // non etre rejete en amont par PHP sans message lisible.
+    Livewire::test(Settings::class)
+        ->set('documents.IDENTITY', UploadedFile::fake()->create('cni.pdf', 2048, 'application/pdf'))
+        ->set('documents.RCCM', UploadedFile::fake()->create('rccm.pdf', 2048, 'application/pdf'))
+        ->call('submitKyc')
+        ->assertHasNoErrors();
+
+    expect($this->organization->fresh()->kyc_status)->toBe(KycStatus::Submitted);
+});
+
+it('refuse un format de fichier non prevu', function () {
+    Livewire::test(Settings::class)
+        ->set('documents.IDENTITY', UploadedFile::fake()->create('piece.exe', 10, 'application/octet-stream'))
+        ->call('submitKyc')
+        ->assertHasErrors(['documents.IDENTITY']);
 });
 
 it('stocke les pieces sur un disque prive', function () {

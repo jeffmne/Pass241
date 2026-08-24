@@ -27,6 +27,8 @@ RUN install-php-extensions \
         pcntl \
         opcache
 
+COPY php.ini /usr/local/etc/php/conf.d/pass241.ini
+
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh
