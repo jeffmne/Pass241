@@ -50,6 +50,25 @@
 
 ---
 
+## HORS JALON — Identité visuelle des surfaces publiques
+
+*Travail demandé en cours de jalon 1, exécuté entre le jalon 1 et le jalon 2. Consigné ici pour que la feuille de route reflète ce qui a réellement été fait.*
+
+- [x] Design system appliqué : nappe ambiante, verre liquide, boutons pilule en dégradé, Manrope et Inter, icônes Lucide
+- [x] Page d'accueil refondue à partir d'une maquette de référence fournie
+- [x] Connexion et inscription refondues, inscription adaptée aux grands écrans
+- [x] Composant `x-glass-ticket` — élément signature de la section 70.5, réutilisable au jalon 5
+- [x] `QrRenderer` (SVG, correction d'erreur haute) — réutilisable au jalon 5
+- [x] Qualité adaptative selon les capacités de l'appareil (décision D-014)
+- [x] Suppression des `wire:model.live` servant un simple état visuel (décision D-015)
+
+**Reste à faire sur ce chantier, non bloquant :**
+- [ ] Coordonnées réelles dans le pied de page — volontairement laissées vides plutôt qu'inventées
+- [ ] Vérification du rendu sur un vrai téléphone d'entrée de gamme
+- [ ] Dashboard organisateur : non retouché, la lisibilité y prime sur l'expression
+
+---
+
 ## JALON 2 — Événement et page publique (Phase 2)
 
 - [ ] `Event`, `EventLocation`, les sept statuts (section 12)
