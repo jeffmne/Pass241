@@ -1,0 +1,110 @@
+name: pass241
+
+services:
+  app:
+    build:
+      context: ./docker/php
+    container_name: pass241-app
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [pass241]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: pass241-nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [app]
+    networks: [pass241]
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: pass241-postgres
+    environment:
+      POSTGRES_DB: pass241
+      POSTGRES_USER: pass241
+      POSTGRES_PASSWORD: secret
+    # 5432 et 5433 sont deja occupes sur la machine hote
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pass241 -d pass241"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [pass241]
+
+  redis:
+    image: redis:7-alpine
+    container_name: pass241-redis
+    # 6379 est deja occupe sur la machine hote
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [pass241]
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: pass241-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks: [pass241]
+
+  # Services actives une fois Laravel installe :
+  #   docker compose --profile workers up -d
+  horizon:
+    build:
+      context: ./docker/php
+    container_name: pass241-horizon
+    command: php artisan horizon
+    restart: unless-stopped
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles: [workers]
+    networks: [pass241]
+
+  reverb:
+    build:
+      context: ./docker/php
+    container_name: pass241-reverb
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles: [workers]
+    networks: [pass241]
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  pass241:
+    driver: bridge

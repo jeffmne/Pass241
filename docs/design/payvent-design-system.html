@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Pass241 — Design system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --azure-50:#F2F8FE; --azure-100:#E4F1FD; --azure-300:#7DB6EF;
+    --azure-500:#2F8FE6; --azure-600:#1D6FC4; --azure-700:#14549B;
+    --offwhite:#F3F5F8; --white:#FFFFFF;
+    --grey-200:#E1E5EB; --grey-400:#9AA3B2; --grey-500:#6B7280;
+    --ink:#10131A;
+    --success:#1FAE68; --warning:#F2A93B; --danger:#E5484D;
+    --font-display:'Manrope',sans-serif; --font-body:'Inter',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:var(--font-body); color:var(--ink);
+    background-color:var(--offwhite);
+    background-image:
+      radial-gradient(680px 480px at 8% -8%, rgba(47,143,230,0.22), transparent 60%),
+      radial-gradient(620px 520px at 92% 10%, rgba(125,182,239,0.28), transparent 60%),
+      radial-gradient(700px 600px at 50% 95%, rgba(47,143,230,0.14), transparent 60%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px 100px;}
+
+  /* --- nav --- */
+  nav{
+    position:sticky; top:16px; z-index:10; margin:16px auto 60px; max-width:1080px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px; border-radius:20px;
+    background:linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.38));
+    backdrop-filter:blur(20px) saturate(180%); -webkit-backdrop-filter:blur(20px) saturate(180%);
+    border:1px solid rgba(255,255,255,0.65);
+    box-shadow:0 8px 32px rgba(20,84,155,0.10);
+  }
+  .logo{display:flex; align-items:center; gap:9px; font-family:var(--font-display); font-weight:800; font-size:19px;}
+  .logo-dot{width:11px;height:11px;border-radius:50%;background:var(--azure-500); box-shadow:0 0 0 5px var(--azure-100);}
+  .nav-links{display:flex; gap:26px; font-size:14px; font-weight:500; color:var(--grey-500);}
+  .nav-links a{color:var(--grey-500); text-decoration:none;}
+  .nav-cta{
+    padding:9px 18px; border-radius:12px; font-size:14px; font-weight:600; color:#fff;
+    background:linear-gradient(135deg, var(--azure-500), var(--azure-600));
+    box-shadow:0 6px 16px rgba(29,111,196,0.35);
+  }
+
+  h1{font-family:var(--font-display); font-weight:800; font-size:40px; line-height:1.15; margin:0 0 12px;}
+  .lede{color:var(--grey-500); font-size:16px; max-width:560px; margin:0 0 46px; line-height:1.6;}
+  h2{font-family:var(--font-display); font-weight:700; font-size:20px; margin:0 0 18px;}
+  .section{margin-bottom:56px;}
+
+  /* --- palette --- */
+  .swatches{display:grid; grid-template-columns:repeat(5,1fr); gap:12px;}
+  .swatch{border-radius:14px; overflow:hidden; border:1px solid var(--grey-200); background:var(--white);}
+  .swatch-color{height:64px;}
+  .swatch-label{padding:8px 10px; font-size:12px;}
+  .swatch-name{font-weight:600; display:block;}
+  .swatch-hex{color:var(--grey-500); font-family:var(--font-body);}
+
+  /* --- cards grid --- */
+  .cards{display:grid; grid-template-columns:1.1fr 0.9fr; gap:24px; align-items:start;}
+  @media (max-width:760px){ .cards{grid-template-columns:1fr;} .swatches{grid-template-columns:repeat(3,1fr);} }
+
+  /* --- liquid glass ticket --- */
+  .glass{
+    position:relative; overflow:hidden; border-radius:26px;
+    background:linear-gradient(135deg, rgba(255,255,255,0.68), rgba(255,255,255,0.30));
+    backdrop-filter:blur(22px) saturate(180%); -webkit-backdrop-filter:blur(22px) saturate(180%);
+    border:1px solid rgba(255,255,255,0.65);
+    box-shadow:0 18px 40px rgba(20,84,155,0.16), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .glass::before{
+    content:""; position:absolute; top:-60%; left:-70%; width:55%; height:220%;
+    background:linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 100%);
+    transform:rotate(18deg); pointer-events:none;
+  }
+  .ticket{padding:26px;}
+  .ticket-top{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px;}
+  .ticket-kind{
+    font-size:11px; font-weight:700; letter-spacing:0.04em; color:var(--azure-700);
+    background:var(--azure-100); padding:5px 10px; border-radius:8px; display:inline-block;
+  }
+  .ticket-event{font-family:var(--font-display); font-weight:800; font-size:23px; margin:12px 0 4px;}
+  .ticket-meta{font-size:13px; color:var(--grey-500);}
+  .ticket-body{display:flex; gap:20px; align-items:center; margin-top:22px;}
+  .qr{
+    width:96px; height:96px; background:var(--white); border-radius:14px; flex:none;
+    display:grid; grid-template-columns:repeat(7,1fr); grid-template-rows:repeat(7,1fr);
+    padding:8px; gap:2px; box-shadow:0 2px 10px rgba(16,19,26,0.08);
+  }
+  .qr div{background:var(--ink); border-radius:1px;}
+  .qr div.off{background:transparent;}
+  .holder{font-size:13px; color:var(--grey-500); line-height:1.6;}
+  .holder b{display:block; color:var(--ink); font-size:15px; font-weight:600;}
+  .ticket-note{margin-top:18px; font-size:11px; color:var(--grey-500); border-top:1px solid rgba(16,19,26,0.08); padding-top:12px;}
+
+  /* --- stat glass card --- */
+  .stat{padding:22px; margin-bottom:18px;}
+  .stat-label{font-size:12px; color:var(--grey-500); margin-bottom:6px;}
+  .stat-value{font-family:var(--font-display); font-weight:800; font-size:28px;}
+  .stat-value.success{color:var(--success);}
+  .stat-sub{font-size:12px; color:var(--success); font-weight:600; margin-top:4px;}
+
+  /* --- flat table example (no glass, per rules) --- */
+  .flat-card{
+    background:var(--white); border:1px solid var(--grey-200); border-radius:16px; padding:18px 20px;
+  }
+  .flat-card h3{font-size:13px; font-weight:600; margin:0 0 12px; color:var(--grey-500);}
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  td{padding:9px 0; border-top:1px solid var(--grey-200);}
+  td:last-child{text-align:right; font-weight:600; font-variant-numeric:tabular-nums;}
+  .badge{font-size:11px; font-weight:700; padding:3px 9px; border-radius:7px;}
+  .badge.success{background:#E5F7EE; color:var(--success);}
+  .badge.warning{background:#FDF1DC; color:#B9790C;}
+  .rule-note{font-size:12px; color:var(--grey-500); margin-top:14px; line-height:1.6;}
+
+  .type-row{display:flex; align-items:baseline; gap:18px; margin-bottom:14px;}
+  .type-tag{font-size:11px; color:var(--grey-500); width:90px; flex:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <nav>
+    <div class="logo"><span class="logo-dot"></span>Pass241</div>
+    <div class="nav-links">
+      <a href="#">Billetterie</a><a href="#">Collectes</a><a href="#">Tableau de bord</a>
+    </div>
+    <div class="nav-cta">Se connecter</div>
+  </nav>
+
+  <h1>Identité visuelle Pass241</h1>
+  <p class="lede">Bleu azurin, blanc cassé, surfaces en verre liquide utilisées avec discernement — jamais sur les données financières ni sur le QR Code.</p>
+
+  <div class="section">
+    <h2>Palette</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="swatch-color" style="background:var(--azure-500)"></div><div class="swatch-label"><span class="swatch-name">Azure 500</span><span class="swatch-hex">#2F8FE6</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--azure-600)"></div><div class="swatch-label"><span class="swatch-name">Azure 600</span><span class="swatch-hex">#1D6FC4</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--azure-100)"></div><div class="swatch-label"><span class="swatch-name">Azure 100</span><span class="swatch-hex">#E4F1FD</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--offwhite);border-bottom:1px solid var(--grey-200)"></div><div class="swatch-label"><span class="swatch-name">Off-white</span><span class="swatch-hex">#F3F5F8</span></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ink)"></div><div class="swatch-label"><span class="swatch-name">Ink</span><span class="swatch-hex">#10131A</span></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Typographie</h2>
+    <div class="type-row"><span class="type-tag">Manrope 800</span><span style="font-family:var(--font-display);font-weight:800;font-size:26px;">Concert Afro Nights</span></div>
+    <div class="type-row"><span class="type-tag">Manrope 600</span><span style="font-family:var(--font-display);font-weight:600;font-size:18px;">1 284 billets vendus</span></div>
+    <div class="type-row"><span class="type-tag">Inter 500</span><span style="font-family:var(--font-body);font-weight:500;font-size:15px;">Jean Dupont — Billet VIP</span></div>
+    <div class="type-row"><span class="type-tag">Inter 400</span><span style="font-family:var(--font-body);font-weight:400;font-size:14px;color:var(--grey-500);">Airtel Money • +241 XX XX XX XX</span></div>
+  </div>
+
+  <div class="section">
+    <h2>Liquid glass — où l'utiliser</h2>
+    <div class="cards">
+      <div class="glass ticket">
+        <div class="ticket-top">
+          <div>
+            <span class="ticket-kind">VIP</span>
+            <div class="ticket-event">Concert Afro Nights</div>
+            <div class="ticket-meta">24 septembre 2026 · Libreville</div>
+          </div>
+        </div>
+        <div class="ticket-body">
+          <div class="qr">
+            <div></div><div></div><div></div><div class="off"></div><div></div><div></div><div></div>
+            <div></div><div class="off"></div><div></div><div class="off"></div><div></div><div class="off"></div><div></div>
+            <div></div><div></div><div></div><div class="off"></div><div></div><div></div><div></div>
+            <div class="off"></div><div class="off"></div><div class="off"></div><div class="off"></div><div class="off"></div><div class="off"></div><div class="off"></div>
+            <div></div><div></div><div></div><div class="off"></div><div></div><div></div><div></div>
+            <div></div><div class="off"></div><div></div><div class="off"></div><div></div><div class="off"></div><div></div>
+            <div></div><div></div><div></div><div class="off"></div><div></div><div></div><div></div>
+          </div>
+          <div class="holder"><b>Jean Dupont</b>Commande #PYV-48213<br>Généré le 20 août 2026</div>
+        </div>
+        <div class="ticket-note">Encart QR toujours sur fond blanc opaque — jamais flouté, pour garantir le scan à l'entrée.</div>
+      </div>
+
+      <div>
+        <div class="glass stat">
+          <div class="stat-label">Revenus (30 jours)</div>
+          <div class="stat-value">2 340 500 FCFA</div>
+          <div class="stat-sub">+18 % vs période précédente</div>
+        </div>
+        <div class="glass stat">
+          <div class="stat-label">Billets vendus</div>
+          <div class="stat-value">1 284</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Où éviter le verre — tableaux et données denses</h2>
+    <div class="flat-card">
+      <h3>Commandes récentes — surface pleine, sans flou</h3>
+      <table>
+        <tr><td>Marie Ondo — 2× VIP</td><td><span class="badge success">Payé</span></td><td>45 000 FCFA</td></tr>
+        <tr><td>Paul Nzé — 1× Standard</td><td><span class="badge warning">En attente</span></td><td>15 000 FCFA</td></tr>
+        <tr><td>Aïcha Bongo — 4× Early Bird</td><td><span class="badge success">Payé</span></td><td>48 000 FCFA</td></tr>
+      </table>
+      <div class="rule-note">Les montants et statuts doivent rester parfaitement lisibles : fond <code>--white</code>, bordure <code>--grey-200</code>, aucune transparence.</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

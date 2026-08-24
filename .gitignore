@@ -1,0 +1,38 @@
+# Environnement
+.env
+.env.*
+!.env.example
+
+# Dépendances
+/backend/vendor
+/backend/node_modules
+/mobile/node_modules
+
+# Build
+/backend/public/build
+/backend/public/hot
+/backend/public/storage
+/backend/storage/*.key
+/backend/storage/pail
+
+# Outils
+.phpunit.result.cache
+/backend/.phpunit.cache
+
+# Système
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Éditeurs
+/.idea
+/.vscode
+*.swp
+
+# Docker
+/docker/data
+
+# Skills tierces : reinstallables depuis skills-lock.json, qui lui est versionne.
+# .claude/skills ne contient que des liens symboliques vers .agents/skills.
+/.agents/skills
+/.claude/skills
