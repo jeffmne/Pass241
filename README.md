@@ -23,9 +23,17 @@ Première installation uniquement :
 cp backend/.env.example backend/.env
 docker compose run --rm app composer install
 docker compose run --rm app php artisan key:generate
-docker compose run --rm app php artisan migrate
+docker compose run --rm app php artisan migrate --seed
 cd backend && npm install && npm run build
 ```
+
+`vendor/` vit dans un volume Docker et non sur le disque Windows : les itérateurs
+de dossiers de PHP y tronquent silencieusement les grands répertoires
+(décision D-013). Composer s'exécute donc toujours dans le conteneur.
+
+Comptes de développement créés par le seeder (mot de passe `password`) :
+`awa@pass241.test`, `paul@pass241.test` — deux organisations distinctes, pour
+vérifier l'isolation à la main — et `admin@pass241.test` pour le Super Admin.
 
 Le `TICKET_TOKEN_SIGNING_KEY` doit être généré séparément de `APP_KEY` : une rotation de `APP_KEY` ne doit jamais invalider les billets déjà vendus.
 

@@ -118,3 +118,34 @@ L'image PHP a un entrypoint qui applique `chmod -R a+rwX` sur `storage` et `boot
 **Raison** : le code est monté depuis Windows, les fichiers appartiennent donc à `root`, alors que les workers PHP-FPM tournent en `www-data`. Sans cet ajustement, Blade ne peut pas écrire ses vues compilées et **toute page pas encore compilée renvoie une erreur 500** (`tempnam(): file created in the system's temporary directory`). Le symptôme est trompeur : les pages déjà compilées par une commande CLI continuent de fonctionner, ce qui laisse croire que l'environnement est sain.
 
 **Portée** : développement local uniquement. L'image de production devra fixer proprement l'utilisateur propriétaire à la construction, sans `chmod` au démarrage.
+
+---
+
+## D-012 — Composants Livewire classiques, sans emoji dans les noms de fichiers
+**2026-08-24**
+
+`config/livewire.php` : `make_command.type = 'class'` et `make_command.emoji = false`.
+
+**Raison** : Livewire 4 génère par défaut des composants mono-fichier nommés `⚡nom.blade.php`. Deux problèmes. D'abord la règle 80.6 interdit tout emoji dans le logiciel, et un nom de fichier en fait partie. Ensuite la section 61 décrit une arborescence de classes (`Livewire/Public/`, `Livewire/Dashboard/`, `Livewire/Components/`) que le mode mono-fichier ne produit pas.
+
+**Conséquence** : les composants vivent dans `app/Livewire/`, leurs vues dans `resources/views/livewire/`.
+
+---
+
+## D-013 — `vendor/` dans un volume Docker, hors du montage Windows
+**2026-08-24**
+
+Le dossier `vendor/` n'est plus monté depuis Windows : il vit dans un volume Docker nommé.
+
+**Raison** : sur un montage de fichiers Windows vers un conteneur Linux, les itérateurs SPL de PHP tronquent silencieusement la lecture des grands dossiers. Mesuré sur le dossier d'icônes Lucide, 2025 fichiers réels :
+
+| API PHP | Fichiers vus |
+|---|---|
+| `scandir`, `opendir`/`readdir` | 2025 — correct |
+| `DirectoryIterator` | 1201 |
+| `FilesystemIterator` | 1201 |
+| `RecursiveDirectoryIterator` | 1201 |
+
+Symfony Finder, `File::allFiles()`, la génération du classmap par Composer et la découverte de fichiers par de nombreux paquets reposent sur ces itérateurs. Le symptôme observé était une icône déclarée introuvable alors que son fichier existait ; la cause aurait pu produire bien pire, par exemple un classmap incomplet.
+
+**Conséquence** : `composer install` s'exécute dans le conteneur et remplit le volume. Le dossier `vendor/` n'apparaît plus côté Windows, donc l'éditeur perd l'autocomplétion sur les classes du framework. À reconsidérer si cette gêne devient réelle — l'alternative propre serait de déplacer tout le projet dans le système de fichiers WSL2.

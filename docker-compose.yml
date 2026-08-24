@@ -7,6 +7,14 @@ services:
     container_name: pass241-app
     volumes:
       - ./backend:/var/www/html
+      # vendor/ vit dans un volume Docker, pas sur le montage Windows.
+      # Les iterateurs SPL de PHP (DirectoryIterator, FilesystemIterator,
+      # RecursiveDirectoryIterator, donc Symfony Finder et File::allFiles)
+      # tronquent silencieusement la lecture des dossiers de plus d'un millier
+      # d'entrees sur ce type de montage : 1201 fichiers vus sur 2025 reels.
+      # Cela fausse la generation du classmap Composer et la decouverte de
+      # fichiers par les paquets. Voir docs/00-decisions.md, decision D-013.
+      - vendor:/var/www/html/vendor
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,6 +85,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./backend:/var/www/html
+      - vendor:/var/www/html/vendor
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +104,7 @@ services:
       - "8080:8080"
     volumes:
       - ./backend:/var/www/html
+      - vendor:/var/www/html/vendor
     depends_on:
       redis:
         condition: service_healthy
@@ -104,6 +114,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  vendor:
 
 networks:
   pass241:

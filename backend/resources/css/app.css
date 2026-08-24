@@ -2,8 +2,181 @@
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../../app/Livewire';
 
+/*
+ * Design system Pass241 — section 70, detail dans docs/10-design-system.md.
+ * Aucun emoji nulle part (regle 80.6) : les familles de secours pour emoji
+ * sont volontairement absentes des piles de polices.
+ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+    /* Bleu azurin — seule couleur de marque a usage large (section 70.1) */
+    --color-azure-50: #f2f8fe;
+    --color-azure-100: #e4f1fd;
+    --color-azure-300: #7db6ef;
+    --color-azure-500: #2f8fe6;
+    --color-azure-600: #1d6fc4;
+    --color-azure-700: #14549b;
+
+    /* Fond de page en blanc casse, jamais blanc pur : c'est ce qui donne au
+       verre liquide de quoi se detacher (section 70.1) */
+    --color-offwhite: #f3f5f8;
+
+    --color-grey-200: #e1e5eb;
+    --color-grey-400: #9aa3b2;
+    --color-grey-500: #6b7280;
+    --color-ink: #10131a;
+
+    /* Couleurs semantiques : jamais remplacees par de l'azur, meme sur un
+       ecran tres bleute — un statut de paiement doit se lire d'un coup d'oeil */
+    --color-success: #1fae68;
+    --color-warning: #f2a93b;
+    --color-danger: #e5484d;
+}
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        background-color: var(--color-offwhite);
+        color: var(--color-ink);
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+    }
+
+    /* Chiffres tabulaires : indispensable pour aligner des montants dans les
+       tableaux et les exports (section 70.2) */
+    table,
+    .tabular {
+        font-variant-numeric: tabular-nums;
+    }
+
+    h1,
+    h2,
+    h3 {
+        font-family: var(--font-display);
+        letter-spacing: -0.02em;
+    }
+}
+
+@layer components {
+    /*
+     * Verre liquide (section 70.3). A poser uniquement sur un fond qui a de la
+     * matiere — sur un aplat uni l'effet est invisible et coute du rendu pour
+     * rien. Jamais sur un tableau dense, jamais derriere un QR Code (70.4).
+     */
+    .glass {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.32));
+        backdrop-filter: blur(20px) saturate(180%);
+        -webkit-backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 24px;
+        box-shadow:
+            0 8px 32px rgba(20, 84, 155, 0.12),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+
+    /* Surface pleine : formulaires de montants, tableaux, donnees financieres */
+    .surface {
+        background-color: #ffffff;
+        border: 1px solid var(--color-grey-200);
+        border-radius: 16px;
+    }
+
+    /*
+     * Lavis azur pose derriere les surfaces en verre. Deux taches douces
+     * suffisent : le verre a besoin de quelque chose a refracter.
+     */
+    .azure-wash {
+        background-color: var(--color-offwhite);
+        background-image:
+            radial-gradient(60rem 40rem at 15% -10%, rgba(47, 143, 230, 0.18), transparent 60%),
+            radial-gradient(45rem 35rem at 110% 10%, rgba(125, 182, 239, 0.22), transparent 55%);
+    }
+
+    .field {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--color-grey-200);
+        background-color: #ffffff;
+        padding: 0.75rem 0.875rem;
+        /* 16px : en dessous, iOS zoome automatiquement au focus. L'application
+           est mobile-first, ce detail se voit tout de suite sur le terrain. */
+        font-size: 1rem;
+        color: var(--color-ink);
+    }
+
+    .field::placeholder {
+        color: var(--color-grey-400);
+    }
+
+    .field:focus {
+        outline: 2px solid var(--color-azure-500);
+        outline-offset: 1px;
+        border-color: transparent;
+    }
+
+    .field[aria-invalid='true'] {
+        border-color: var(--color-danger);
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        /* 44px de haut : cible tactile confortable, mobile-first (section 70) */
+        min-height: 2.75rem;
+        padding: 0.6875rem 1.25rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        transition:
+            background-color 150ms ease,
+            transform 150ms ease;
+    }
+
+    .btn:active {
+        transform: translateY(1px);
+    }
+
+    .btn-primary {
+        background-color: var(--color-azure-500);
+        color: #ffffff;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--color-azure-600);
+    }
+
+    .btn-primary:disabled {
+        background-color: var(--color-azure-300);
+        cursor: not-allowed;
+    }
+
+    .btn-ghost {
+        color: var(--color-azure-700);
+        background-color: transparent;
+    }
+
+    .btn-ghost:hover {
+        background-color: var(--color-azure-100);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Section 70.4 : le reflet speculaire anime est desactive pour les
+       utilisateurs qui le demandent */
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

@@ -30,16 +30,23 @@
 
 ## JALON 1 — Fondations multi-tenant (extrait Phase 1)
 
-- [ ] Migrations `users`, `organizations`, `organization_members`
-- [ ] Rôles et permissions Spatie en mode `teams` (scope organisation)
-- [ ] `kycStatus` sur `Organization` (`PENDING`, `SUBMITTED`, `VERIFIED`, `REJECTED`)
-- [ ] Inscription et connexion organisateur
-- [ ] Middleware `EnsureOrganizationContext`
-- [ ] Trait de scoping automatique par organisation
-- [ ] `AuditLog` et les premiers événements journalisés (section 68)
-- [ ] Tests d'isolation organisation A / organisation B (section 74)
+- [x] Migrations `users`, `organizations`, `organization_members`, `organization_documents`
+- [x] Rôles et permissions Spatie en mode `teams` (scope organisation)
+- [x] `kycStatus` sur `Organization` (`PENDING`, `SUBMITTED`, `VERIFIED`, `REJECTED`)
+- [x] Dépôt des pièces justificatives sur disque privé, décision de vérification réservée au Super Admin
+- [x] Inscription et connexion organisateur, limitation des tentatives
+- [x] Middleware `EnsureOrganizationContext`
+- [x] Trait de scoping automatique par organisation, fermé par défaut hors contexte
+- [x] `AuditLog` en ajout seul, protégé par déclencheurs PostgreSQL (section 68)
+- [x] Dashboard, changement d'organisation, écran de paramètres — mobile-first
+- [x] Design system appliqué : palette azurine, Manrope et Inter, icônes Lucide
+- [x] Tests d'isolation organisation A / organisation B (section 74)
 
-*Vérification : deux organisations créées, aucune fuite de données entre elles, prouvé par test.*
+*Vérification : deux organisations créées, aucune fuite de données entre elles, prouvé par 72 tests.*
+
+**Reporté au jalon où l'entité concernée existera :**
+- `EventDelegate` et le rôle CO_ORGANIZER limité à un événement (section 10) — le rôle et ses permissions existent, le rattachement à un événement précis attend le jalon 2.
+- Écran de gestion des membres de l'organisation — la permission `members.manage` existe et est testée, l'interface attend d'avoir des membres à gérer.
 
 ---
 
