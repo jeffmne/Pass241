@@ -43,6 +43,7 @@ it('n exige aucune verification d identite pour s inscrire', function () {
     Livewire::test(Register::class)
         ->set('name', 'Paul Obame')
         ->set('email', 'paul@example.test')
+        ->set('phone', '074000001')
         ->set('organizationName', 'Studio Obame')
         ->set('organizationType', 'COMPANY')
         ->set('password', 'motdepasse123')
@@ -61,6 +62,7 @@ it('distingue deux organisations portant le meme nom', function () {
         Livewire::test(Register::class)
             ->set('name', 'Organisateur')
             ->set('email', $email)
+            ->set('phone', '074000002')
             ->set('organizationName', 'BDE')
             ->set('organizationType', 'ASSOCIATION')
             ->set('password', 'motdepasse123')
@@ -70,6 +72,71 @@ it('distingue deux organisations portant le meme nom', function () {
     }
 
     expect(Organization::pluck('slug')->all())->toBe(['bde', 'bde-2']);
+});
+
+it('exige un numero de telephone', function () {
+    Livewire::test(Register::class)
+        ->set('name', 'Sans telephone')
+        ->set('email', 'sans@example.test')
+        ->set('phone', '')
+        ->set('organizationName', 'Une organisation')
+        ->set('organizationType', 'ASSOCIATION')
+        ->set('password', 'motdepasse123')
+        ->set('passwordConfirmation', 'motdepasse123')
+        ->call('register')
+        ->assertHasErrors(['phone']);
+
+    expect(User::count())->toBe(0)
+        ->and(Organization::count())->toBe(0);
+});
+
+it('refuse un numero de telephone qui n en est pas un', function () {
+    Livewire::test(Register::class)
+        ->set('name', 'Test')
+        ->set('email', 'test@example.test')
+        ->set('phone', 'appelez-moi')
+        ->set('organizationName', 'Une organisation')
+        ->set('organizationType', 'ASSOCIATION')
+        ->set('password', 'motdepasse123')
+        ->set('passwordConfirmation', 'motdepasse123')
+        ->call('register')
+        ->assertHasErrors(['phone']);
+});
+
+it('accepte les formats courants de numero gabonais', function () {
+    // Volontairement permissif : refuser ici un numero valide empecherait
+    // simplement quelqu'un de creer son compte. La validation stricte par
+    // prefixe d'operateur appartient au parcours de paiement (section 16.1).
+    foreach (['074000000', '074 00 00 00', '+241 74 00 00 00', '241740000000'] as $index => $number) {
+        Livewire::test(Register::class)
+            ->set('name', 'Organisateur')
+            ->set('email', "format{$index}@example.test")
+            ->set('phone', $number)
+            ->set('organizationName', "Organisation {$index}")
+            ->set('organizationType', 'ASSOCIATION')
+            ->set('password', 'motdepasse123')
+            ->set('passwordConfirmation', 'motdepasse123')
+            ->call('register')
+            ->assertHasNoErrors('phone');
+    }
+});
+
+it('enregistre le telephone sur le compte et sur l organisation', function () {
+    Livewire::test(Register::class)
+        ->set('name', 'Awa Ndong')
+        ->set('email', 'awa@example.test')
+        ->set('phone', '  074 00 00 00  ')
+        ->set('organizationName', 'Association des jeunes')
+        ->set('organizationType', 'ASSOCIATION')
+        ->set('password', 'motdepasse123')
+        ->set('passwordConfirmation', 'motdepasse123')
+        ->call('register')
+        ->assertHasNoErrors();
+
+    $user = User::where('email', 'awa@example.test')->firstOrFail();
+
+    expect($user->phone)->toBe('074 00 00 00')
+        ->and(Organization::firstOrFail()->contact_phone)->toBe('074 00 00 00');
 });
 
 it('refuse un email deja utilise', function () {
@@ -135,6 +202,7 @@ it('journalise la creation de l organisation', function () {
     Livewire::test(Register::class)
         ->set('name', 'Awa Ndong')
         ->set('email', 'awa@example.test')
+        ->set('phone', '074000003')
         ->set('organizationName', 'Association des jeunes')
         ->set('organizationType', 'ASSOCIATION')
         ->set('password', 'motdepasse123')

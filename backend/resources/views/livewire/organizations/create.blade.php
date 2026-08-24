@@ -1,4 +1,4 @@
-<div class="glass p-6 sm:p-8">
+<div class="glass glass-panel glass-specular p-6 sm:p-8">
     <h1 class="text-xl font-bold text-ink">
         {{ $hasOrganizations ? 'Nouvelle organisation' : 'Creez votre organisation' }}
     </h1>
@@ -19,17 +19,22 @@
             @error('name') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
         </div>
 
-        <fieldset>
+        {{-- Selection geree en local par Alpine : un `wire:model.live` ferait
+             un aller-retour reseau a chaque clic, juste pour repeindre un
+             bouton. --}}
+        <fieldset x-data="{ selected: $wire.type }">
             <legend class="mb-1.5 block text-sm font-medium text-ink">Type d'organisation</legend>
             <div class="grid gap-2 sm:grid-cols-3">
                 @foreach ($organizationTypes as $organizationType)
-                    <label @class([
-                        'flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition',
-                        'border-azure-500 bg-azure-50 text-azure-700 font-medium' => $type === $organizationType->value,
-                        'border-grey-200 bg-white text-grey-500' => $type !== $organizationType->value,
-                    ])>
-                        <input type="radio" wire:model.live="type" value="{{ $organizationType->value }}"
-                               class="size-4 text-azure-500" name="type">
+                    <label
+                        class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition-colors"
+                        :class="selected === '{{ $organizationType->value }}'
+                            ? 'border-azure-500 bg-azure-50 font-semibold text-azure-700'
+                            : 'border-grey-200 bg-white/80 text-grey-500 hover:border-azure-300'">
+                        <input type="radio" name="type" value="{{ $organizationType->value }}"
+                               wire:model="type"
+                               @change="selected = '{{ $organizationType->value }}'"
+                               class="size-4">
                         {{ $organizationType->label() }}
                     </label>
                 @endforeach
@@ -37,7 +42,7 @@
             @error('type') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
         </fieldset>
 
-        <button type="submit" class="btn btn-primary w-full" wire:loading.attr="disabled">
+        <button type="submit" class="btn btn-primary btn-pill w-full" wire:loading.attr="disabled">
             <span wire:loading.remove wire:target="save">Creer l'organisation</span>
             <span wire:loading wire:target="save" class="flex items-center gap-2">
                 <x-lucide-loader-circle class="size-4 animate-spin" stroke-width="2" />

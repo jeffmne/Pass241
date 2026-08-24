@@ -1,1 +1,249 @@
-//
+/*
+ * Comportements visuels de Pass241.
+ *
+ * Trois regles ont guide ce fichier :
+ *
+ * 1. Aucune dependance. Tout tient en API natives — le poids envoye sur une
+ *    connexion mobile gabonaise est un cout reel (section 72).
+ * 2. Le contenu est visible par defaut. Ce script ajoute des effets ; il ne
+ *    conditionne jamais la lisibilite de la page. S'il ne se charge pas,
+ *    l'utilisateur ne voit pas la difference sur ce qui compte.
+ * 3. Rien ne s'execute a chaque image sans raison. Les evenements frequents
+ *    passent par requestAnimationFrame et les observateurs se debranchent
+ *    des qu'ils ont fini leur travail.
+ */
+
+const root = document.documentElement;
+
+/* -------------------------------------------------------------------------
+ * Qualite adaptative
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Decide si l'appareil peut se permettre le verre flou et le reflet.
+ *
+ * On se fie aux capacites annoncees plutot qu'a une detection de modele :
+ * peu de coeurs, peu de memoire, ou une connexion lente ou economisee. Le
+ * doute profite a la fluidite — un effet manquant ne se remarque pas, un
+ * defilement saccade se remarque immediatement.
+ */
+function prefersReducedQuality() {
+    const cores = navigator.hardwareConcurrency;
+    if (typeof cores === 'number' && cores > 0 && cores < 4) {
+        return true;
+    }
+
+    const memory = navigator.deviceMemory;
+    if (typeof memory === 'number' && memory > 0 && memory < 4) {
+        return true;
+    }
+
+    const connection = navigator.connection;
+    if (connection) {
+        if (connection.saveData === true) {
+            return true;
+        }
+        if (['slow-2g', '2g', '3g'].includes(connection.effectiveType)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function applyQuality() {
+    root.dataset.quality = prefersReducedQuality() ? 'reduced' : 'full';
+}
+
+applyQuality();
+
+// Le passage en mode economie de donnees peut arriver en cours de session.
+navigator.connection?.addEventListener?.('change', applyQuality);
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/* -------------------------------------------------------------------------
+ * Reflet speculaire du verre
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Deplace la nappe de lumiere sur les surfaces en verre.
+ *
+ * Le pointeur est suivi au niveau du document, pas element par element : un
+ * seul ecouteur, quel que soit le nombre de surfaces. Les coordonnees ne sont
+ * ecrites que dans une variable CSS, donc aucun recalcul de mise en page.
+ *
+ * Sur ecran tactile, il n'y a pas de survol : la nappe s'allume brievement au
+ * contact, ce qui donne le meme signal sans occuper la main.
+ */
+function initSpecular() {
+    if (root.dataset.quality === 'reduced') {
+        return;
+    }
+
+    const surfaces = () => document.querySelectorAll('.glass-specular');
+    let pending = false;
+    let lastEvent = null;
+
+    function paint() {
+        pending = false;
+        if (!lastEvent) return;
+
+        for (const surface of surfaces()) {
+            const box = surface.getBoundingClientRect();
+
+            // Marge de 120px : la lumiere s'annonce avant que le pointeur
+            // n'atteigne la surface, comme un reflet qui approche.
+            const near =
+                lastEvent.clientX > box.left - 120 &&
+                lastEvent.clientX < box.right + 120 &&
+                lastEvent.clientY > box.top - 120 &&
+                lastEvent.clientY < box.bottom + 120;
+
+            if (!near) {
+                surface.dataset.lit = 'false';
+                continue;
+            }
+
+            const x = ((lastEvent.clientX - box.left) / box.width) * 100;
+            const y = ((lastEvent.clientY - box.top) / box.height) * 100;
+
+            surface.style.setProperty('--spec-x', `${x.toFixed(1)}%`);
+            surface.style.setProperty('--spec-y', `${y.toFixed(1)}%`);
+            surface.dataset.lit = 'true';
+        }
+    }
+
+    window.addEventListener(
+        'pointermove',
+        (event) => {
+            if (event.pointerType !== 'mouse') return;
+            lastEvent = event;
+            if (!pending) {
+                pending = true;
+                requestAnimationFrame(paint);
+            }
+        },
+        { passive: true }
+    );
+
+    window.addEventListener(
+        'pointerdown',
+        (event) => {
+            if (event.pointerType === 'mouse') return;
+
+            const surface = event.target.closest?.('.glass-specular');
+            if (!surface) return;
+
+            const box = surface.getBoundingClientRect();
+            surface.style.setProperty('--spec-x', `${((event.clientX - box.left) / box.width) * 100}%`);
+            surface.style.setProperty('--spec-y', `${((event.clientY - box.top) / box.height) * 100}%`);
+            surface.dataset.lit = 'true';
+
+            setTimeout(() => {
+                surface.dataset.lit = 'false';
+            }, 900);
+        },
+        { passive: true }
+    );
+}
+
+/* -------------------------------------------------------------------------
+ * Revelation au defilement
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Revele les elements marques `data-reveal` a leur entree dans l'ecran.
+ *
+ * `data-reveal="on"` n'est pose sur <html> qu'ici : tant que ce script n'a pas
+ * tourne, la regle CSS qui masque les elements ne s'applique pas et la page
+ * reste entierement lisible.
+ *
+ * Chaque element est oublie par l'observateur des qu'il a ete revele : rien ne
+ * continue a s'evaluer pendant le reste du defilement.
+ */
+function initReveal() {
+    const targets = document.querySelectorAll('[data-reveal]');
+    if (targets.length === 0) return;
+
+    if (reducedMotion.matches || !('IntersectionObserver' in window)) {
+        return;
+    }
+
+    root.dataset.reveal = 'on';
+
+    const observer = new IntersectionObserver(
+        (entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) continue;
+
+                // Decalage en cascade uniquement quand l'element appartient a
+                // une vraie sequence : l'ordre de lecture porte alors une
+                // information, ce qui n'est pas le cas d'une section isolee.
+                const step = Number(entry.target.dataset.revealStep ?? 0);
+                entry.target.style.transitionDelay = `${Math.min(step, 4) * 70}ms`;
+                entry.target.classList.add('is-revealed');
+
+                observer.unobserve(entry.target);
+            }
+        },
+        { rootMargin: '0px 0px -12% 0px', threshold: 0.1 }
+    );
+
+    for (const target of targets) {
+        observer.observe(target);
+    }
+}
+
+/* -------------------------------------------------------------------------
+ * En-tete au defilement
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Donne sa matiere a l'en-tete des que la page a quitte le haut.
+ *
+ * Le verre n'apparait qu'a ce moment : en haut de page il n'aurait rien a
+ * refracter, et un `backdrop-filter` permanent coute cher pour rien.
+ *
+ * L'etat est calcule par un IntersectionObserver sur une sentinelle plutot
+ * que par un ecouteur de defilement : aucun code ne tourne pendant le
+ * defilement lui-meme.
+ */
+function initStickyHeader() {
+    const header = document.querySelector('[data-sticky-header]');
+    if (!header) return;
+
+    const sentinel = document.createElement('div');
+    sentinel.setAttribute('aria-hidden', 'true');
+    sentinel.style.cssText = 'position:absolute;top:0;left:0;height:1px;width:1px;';
+    document.body.prepend(sentinel);
+
+    const observer = new IntersectionObserver(
+        ([entry]) => {
+            header.dataset.stuck = entry.isIntersecting ? 'false' : 'true';
+        },
+        { threshold: 0 }
+    );
+
+    observer.observe(sentinel);
+}
+
+/* -------------------------------------------------------------------------
+ * Amorcage
+ * ---------------------------------------------------------------------- */
+
+function boot() {
+    initSpecular();
+    initReveal();
+    initStickyHeader();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+} else {
+    boot();
+}
+
+// Livewire remplace le contenu sans recharger la page : les observateurs
+// doivent etre reinstalles sur le nouveau document.
+document.addEventListener('livewire:navigated', boot);

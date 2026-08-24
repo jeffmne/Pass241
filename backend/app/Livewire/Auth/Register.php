@@ -27,7 +27,19 @@ class Register extends Component
     #[Validate('required|email|max:255|unique:users,email')]
     public string $email = '';
 
-    #[Validate('nullable|string|max:20')]
+    /*
+     * Le telephone est obligatoire pour un organisateur.
+     *
+     * C'est le canal de contact reel sur ce marche : c'est par la qu'on joint
+     * quelqu'un le soir d'un evenement, et c'est aussi ce qui rattachera plus
+     * tard le compte au reversement de ses recettes (section 21.2).
+     *
+     * La regle de format reste volontairement permissive : elle accepte les
+     * espaces, un prefixe +241 ou 241, et 8 a 9 chiffres. La validation stricte
+     * par prefixe d'operateur appartient au parcours de paiement (section 16.1),
+     * ou elle a une consequence — refuser ici un numero valide empecherait
+     * simplement quelqu'un de creer son compte.
+     */
     public string $phone = '';
 
     #[Validate('required|string|min:2|max:120')]
@@ -50,6 +62,15 @@ class Register extends Component
         return [
             'password' => ['required', 'string', 'confirmed:passwordConfirmation', Password::min(8)],
             'organizationType' => ['required', 'in:'.implode(',', array_column(OrganizationType::cases(), 'value'))],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^(\+?241)?[\s.-]*\d(?:[\s.-]*\d){7,8}$/'],
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return [
+            'phone.required' => 'Le numero de telephone est obligatoire.',
+            'phone.regex' => 'Entrez un numero de telephone valide, par exemple 074 00 00 00.',
         ];
     }
 
@@ -67,6 +88,14 @@ class Register extends Component
 
     public function register(RegisterOrganizer $registerOrganizer): void
     {
+        // Normalisation avant validation : un numero recopie depuis un contact
+        // ou colle depuis WhatsApp arrive souvent avec des espaces autour. Les
+        // refuser pour cette raison serait incomprehensible pour l'utilisateur.
+        $this->phone = trim($this->phone);
+        $this->email = trim($this->email);
+        $this->name = trim($this->name);
+        $this->organizationName = trim($this->organizationName);
+
         $this->validate();
 
         $user = $registerOrganizer->handle(
@@ -75,7 +104,7 @@ class Register extends Component
             password: $this->password,
             organizationName: $this->organizationName,
             organizationType: OrganizationType::from($this->organizationType),
-            phone: $this->phone !== '' ? $this->phone : null,
+            phone: $this->phone,
         );
 
         event(new Registered($user));

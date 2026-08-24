@@ -121,6 +121,37 @@ L'image PHP a un entrypoint qui applique `chmod -R a+rwX` sur `storage` et `boot
 
 ---
 
+## D-014 — Qualité visuelle adaptative
+**2026-08-24**
+
+Les effets coûteux — flou du verre liquide, reflet spéculaire, révélations au défilement — sont désactivés automatiquement sur les appareils modestes. `resources/js/app.js` pose `data-quality="reduced"` sur `<html>` avant le premier rendu, en se fiant à `hardwareConcurrency`, `deviceMemory` et `navigator.connection` (mode économie de données, réseau 2G/3G). Le verre garde alors sa teinte et sa bordure, mais perd son flou.
+
+**Raison** : `backdrop-filter` est l'effet le plus coûteux du web, et la cible prioritaire est le téléphone Android d'entrée de gamme sur connexion mobile (sections 70.4, 72). Sans dégradation, le défilement devient saccadé exactement chez le public que le produit vise en premier. Le doute profite à la fluidité : un effet manquant ne se remarque pas, un défilement saccadé se remarque immédiatement.
+
+**Axe distinct de `prefers-reduced-motion`**, qui reste respecté séparément : on y retire le déplacement spatial mais on garde l'opacité et les changements d'état, sinon l'interface paraît cassée.
+
+---
+
+## D-015 — Aucun `wire:model.live` pour un simple état visuel
+**2026-08-24**
+
+Les groupes de boutons radio (type d'organisation) utilisent Alpine en local pour la sélection visuelle, et un `wire:model` différé pour la valeur envoyée au serveur.
+
+**Raison** : `wire:model.live` déclenche un aller-retour réseau à chaque clic, uniquement pour repeindre un bouton. Sur une connexion mobile gabonaise, cela se voit immédiatement sous forme de latence sur un geste qui devrait être instantané.
+
+**Règle générale** : `wire:model.live` est réservé aux cas où le serveur a réellement quelque chose à dire (validation croisée, recalcul de prix, recherche). Jamais pour un état d'affichage.
+
+---
+
+## D-016 — Accordéons et menus en HTML natif
+**2026-08-24**
+
+Les blocs dépliables et le menu d'actions de la page publique sont des `<details>`/`<summary>`, pas des composants JavaScript.
+
+**Raison** : ouverts au clavier, annoncés correctement par un lecteur d'écran, fonctionnels même si aucun script ne se charge, et sans un octet supplémentaire à télécharger. La maquette de référence utilisait des `div` avec un chevron décoratif qui ne s'ouvraient pas.
+
+---
+
 ## D-012 — Composants Livewire classiques, sans emoji dans les noms de fichiers
 **2026-08-24**
 
