@@ -107,3 +107,14 @@ Un dépôt unique : `/backend` (Laravel), `/mobile` (React Native, à venir en P
 Aucune cible retenue. Le code reste agnostique : toute donnée d'environnement passe par des variables (section 73), aucun chemin ni service codé en dur.
 
 **À trancher avant** : la mise en ligne. Le point de vigilance sera Reverb, qui exige un processus long et un WebSocket persistant — contrainte à vérifier avant de choisir une plateforme serverless.
+
+---
+
+## D-011 — Entrypoint Docker corrigeant les droits sur `storage`
+**2026-08-24**
+
+L'image PHP a un entrypoint qui applique `chmod -R a+rwX` sur `storage` et `bootstrap/cache` au démarrage du conteneur.
+
+**Raison** : le code est monté depuis Windows, les fichiers appartiennent donc à `root`, alors que les workers PHP-FPM tournent en `www-data`. Sans cet ajustement, Blade ne peut pas écrire ses vues compilées et **toute page pas encore compilée renvoie une erreur 500** (`tempnam(): file created in the system's temporary directory`). Le symptôme est trompeur : les pages déjà compilées par une commande CLI continuent de fonctionner, ce qui laisse croire que l'environnement est sain.
+
+**Portée** : développement local uniquement. L'image de production devra fixer proprement l'utilisateur propriétaire à la construction, sans `chmod` au démarrage.
