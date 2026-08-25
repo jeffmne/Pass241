@@ -7,7 +7,6 @@ use App\Models\Event;
 use App\Models\Order;
 use App\Models\TicketType;
 use App\Support\Tenancy\OrganizationContext;
-use Illuminate\Support\Facades\Redis;
 use Livewire\Livewire;
 
 /*
@@ -37,8 +36,6 @@ beforeEach(function () {
     app(OrganizationContext::class)->forget();
     setPermissionsTeamId(null);
 });
-
-afterEach(fn () => Redis::flushdb());
 
 it('affiche les billets sur la page publique de l evenement', function () {
     $this->get('/e/concert-afro-2026')

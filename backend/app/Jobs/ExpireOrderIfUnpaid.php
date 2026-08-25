@@ -6,21 +6,25 @@ use App\Enums\AuditAction;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Services\Audit\AuditLogger;
-use App\Services\Ticketing\StockHoldService;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Fait expirer une commande restee impayee (section 21.1).
  *
  * Les webhooks mobile money arrivent en retard, ou pas du tout, selon
- * l'operateur. Ce job est le filet : passe le delai, la commande bascule en
- * FAILED et le stock est libere, sans dependre d'un evenement exterieur.
+ * l'operateur. Ce job marque alors la commande en echec, pour que l'acheteur
+ * comme l'organisateur lisent un etat clair, et pour laisser une trace au
+ * journal.
  *
- * Idempotent : rejoue plusieurs fois, il ne fait rien de plus. C'est
- * indispensable, une file d'attente pouvant relivrer un message.
+ * Il ne libere aucun stock, et c'est volontaire : depuis la decision D-017, la
+ * reservation expire d'elle-meme avec la commande. Le stock redevient
+ * disponible a l'echeance, que ce job s'execute ou non — un worker arrete ne
+ * peut plus fausser un decompte.
+ *
+ * Idempotent : rejoue plusieurs fois, il ne fait rien de plus. Indispensable,
+ * une file d'attente pouvant relivrer un message.
  */
 class ExpireOrderIfUnpaid implements ShouldQueue
 {
@@ -28,31 +32,16 @@ class ExpireOrderIfUnpaid implements ShouldQueue
 
     public function __construct(public readonly int $orderId) {}
 
-    public function handle(StockHoldService $holds, AuditLogger $audit, OrganizationContext $context): void
+    public function handle(AuditLogger $audit, OrganizationContext $context): void
     {
-        // La commande est retrouvee hors portee : un worker de file d'attente
-        // n'a aucun contexte d'organisation.
+        // Un worker de file d'attente n'a aucun contexte d'organisation : la
+        // commande est donc retrouvee hors portee.
         $order = Order::query()->acrossOrganizations()->find($this->orderId);
 
         if (! $order) {
             return;
         }
 
-        /*
-         * Le reste s'execute DANS le contexte de l'organisation de la commande.
-         *
-         * Sans cela, le chargement des types de billets passerait par la portee
-         * globale et ne renverrait rien : aucun hold ne serait jamais libere,
-         * et le dernier billet resterait bloque jusqu'a l'expiration du TTL
-         * Redis — silencieusement.
-         */
-        $context->runFor($order->organization, function () use ($order, $holds, $audit) {
-            $this->expire($order->load('items.ticketType'), $holds, $audit);
-        });
-    }
-
-    private function expire(Order $order, StockHoldService $holds, AuditLogger $audit): void
-    {
         // Le paiement a pu etre confirme entre-temps : dans ce cas il n'y a
         // rien a faire, et surtout rien a annuler.
         if (! $order->isPending()) {
@@ -65,19 +54,11 @@ class ExpireOrderIfUnpaid implements ShouldQueue
             return;
         }
 
-        DB::transaction(function () use ($order) {
-            $order->forceFill([
-                'status' => OrderStatus::Failed,
-                'failed_at' => now(),
-                'failure_reason' => 'Paiement non confirme dans le delai imparti.',
-            ])->save();
-        });
-
-        foreach ($order->items as $item) {
-            if ($item->ticketType) {
-                $holds->release($item->ticketType, $order->reference);
-            }
-        }
+        $order->forceFill([
+            'status' => OrderStatus::Failed,
+            'failed_at' => now(),
+            'failure_reason' => 'Paiement non confirme dans le delai imparti.',
+        ])->save();
 
         $audit->log(
             AuditAction::PaymentFailed,

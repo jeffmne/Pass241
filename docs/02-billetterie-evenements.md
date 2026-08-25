@@ -123,29 +123,44 @@ Chaque type possède : nom, description, prix, quantité, période de vente, lim
 
 Un billet peut être gratuit ou payant. Ne jamais dépasser la quantité disponible.
 
-### 17.1 Réservation temporaire (hold)
+### 17.1 Réservation temporaire
 
-Le hold ne s'applique que lorsqu'il ne reste **qu'un seul billet disponible** pour un type donné (pour ne pas bloquer inutilement du stock abondant).
+Toute création de commande entraîne une réservation temporaire des billets concernés. Les billets réservés sont **immédiatement déduits du stock disponible** et remis en vente automatiquement à l'expiration de la réservation sans paiement confirmé.
+
+**La durée de la réservation est égale au délai de validation du paiement défini en section 21.1** — les deux valeurs ne doivent jamais diverger.
+
+La confirmation du paiement et l'émission des billets sont soumises à une **vérification transactionnelle et atomique du stock**, qui garantit l'absence de survente. **Un paiement confirmé après l'expiration de la réservation est accepté si le stock le permet encore ; sinon il est remboursé.**
+
+La réservation est déduite de l'état des commandes en base, et non d'un mécanisme externe : la justesse du stock ne doit dépendre d'aucun service annexe ni d'aucune tâche de fond.
 
 ```
-Stock TicketType = 1 restant
+Création de commande (n billets)
         │
         ▼
-Acheteur A entame le paiement
+Réservation posée — billets retirés du stock disponible
         │
-        ▼
-Hold posé (TTL 10 minutes) — billet retiré du stock affiché
-        │
-   ┌────┴────┐
-   ▼         ▼
-Paiement    Timeout / échec
-confirmé    → hold relâché automatiquement, billet redevient disponible
+   ┌────┴──────────────────┐
+   ▼                       ▼
+Paiement confirmé      Expiration sans paiement
+   │                       │
+   ▼                       ▼
+Vérification atomique   Commande FAILED
+du stock                Billets remis en vente
    │
-   ▼
-Billet émis, stock définitivement décrémenté
+   ├── stock disponible → billets émis, stock définitivement consommé
+   └── stock épuisé     → remboursement (section 24)
 ```
 
-Implémentation via TTL Redis plutôt qu'un verrou base de données bloquant.
+```
+disponible = quantité − vendus − réservés
+
+vendus   = Σ quantités des commandes PAID
+réservés = Σ quantités des commandes PENDING dont l'expiration n'est pas atteinte
+```
+
+**Pourquoi cette formulation.** Deux inconvénients s'opposaient : afficher « complet » alors qu'il reste des places, ou vendre plus de billets qu'il n'y en a. Le premier fait perdre une vente possible pendant quelques minutes ; le second oblige à annoncer à quelqu'un qui a **déjà payé** qu'il n'a pas de place. Les deux ne se valent pas.
+
+**Pourquoi deux niveaux de protection.** La réservation traite le cas courant. La vérification atomique couvre ce qu'elle ne peut pas couvrir : un webhook qui arrive après l'expiration parce que l'acheteur a validé à la dernière seconde, un traitement différé en retard, une horloge décalée, une confirmation empruntant un autre chemin. Ce sont des modes de défaillance distincts — ne jamais supprimer l'un en pensant que l'autre suffit.
 
 ---
 

@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
-use App\Services\Ticketing\StockHoldService;
+use App\Services\Ticketing\StockLedger;
 use App\Support\Money;
 use Database\Factories\TicketTypeFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -71,53 +71,33 @@ class TicketType extends Model
      */
 
     /**
-     * Nombre de billets deja vendus.
+     * Billets deja vendus.
      *
-     * Seules les commandes effectivement payees comptent. Une commande en
-     * attente n'a rien consomme : elle peut encore echouer ou expirer, et
-     * decompter son contenu ferait afficher « complet » pour des billets qui
-     * redeviendront disponibles cinq minutes plus tard.
+     * Le calcul vit dans StockLedger, pas ici : il est lu par la page publique
+     * — ou le visiteur n'appartient a aucune organisation — comme par les
+     * traitements differes, et doit donner le meme resultat partout,
+     * independamment de toute portee (section 17.1, decision D-017).
      */
     public function soldCount(): int
     {
-        /*
-         * La portee par organisation est levee sur la sous-requete.
-         *
-         * Ce compte est lu par la page publique, ou le visiteur n'appartient a
-         * aucune organisation. Sans cette levee, la sous-requete ne renverrait
-         * aucune commande, le nombre de ventes serait de zero, et un evenement
-         * complet afficherait des places disponibles.
-         *
-         * Aucune fuite possible : le decompte est deja borne aux lignes de CE
-         * type de billet.
-         */
-        return (int) $this->orderItems()
-            ->whereHas('order', fn (Builder $query) => $query->acrossOrganizations()->paid())
-            ->sum('quantity');
-    }
-
-    /** Billets encore disponibles a la vente. */
-    public function remainingStock(): int
-    {
-        return max(0, $this->quantity - $this->soldCount());
+        return app(StockLedger::class)->sold($this);
     }
 
     /**
-     * Disponibilite reelle vue par un acheteur.
+     * Billets immobilises par des commandes en cours de paiement.
      *
-     * Retire le dernier billet quand quelqu'un d'autre est en train de le
-     * payer (section 17.1) : afficher « 1 restant » a un second acheteur qui
-     * ne pourra pas aller au bout serait pire que d'afficher « complet ».
+     * Section 17.1 : toute commande reserve ses billets, et la reservation
+     * expire d'elle-meme avec la commande.
      */
+    public function reservedCount(): int
+    {
+        return app(StockLedger::class)->reserved($this);
+    }
+
+    /** Ce qu'un acheteur peut encore prendre, maintenant. */
     public function availableStock(): int
     {
-        $remaining = $this->remainingStock();
-
-        if ($remaining === 1 && app(StockHoldService::class)->isHeld($this)) {
-            return 0;
-        }
-
-        return $remaining;
+        return app(StockLedger::class)->available($this);
     }
 
     public function isSoldOut(): bool

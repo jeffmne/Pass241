@@ -10,7 +10,6 @@ use App\Models\Event;
 use App\Models\Order;
 use App\Models\TicketType;
 use App\Services\Audit\AuditLogger;
-use App\Services\Ticketing\StockHoldService;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -24,12 +23,13 @@ use RuntimeException;
  * (section 80.4).
  *
  * Rien n'est encaisse ici. La commande nait en PENDING avec une echeance, et
- * le module de paiement prend le relais (jalon suivant).
+ * cette commande EST la reservation : ses billets sortent aussitot du stock
+ * disponible, et y reviennent seuls a l'expiration (decision D-017). Il n'y a
+ * aucun verrou a poser ni a relacher.
  */
 class CreateOrder
 {
     public function __construct(
-        private readonly StockHoldService $holds,
         private readonly AuditLogger $audit,
         private readonly OrganizationContext $context,
     ) {}
@@ -67,83 +67,62 @@ class CreateOrder
         return $this->context->runFor($event->organization, function () use (
             $event, $quantities, $firstName, $lastName, $email, $provider, $payerPhone, $ipAddress
         ) {
-            $reference = $this->uniqueReference();
-            $held = [];
+            $order = DB::transaction(function () use (
+                $event, $quantities, $firstName, $lastName, $email,
+                $provider, $payerPhone, $ipAddress
+            ) {
+                $lines = [];
+                $total = 0;
 
-            try {
-                $order = DB::transaction(function () use (
-                    $event, $quantities, $firstName, $lastName, $email,
-                    $provider, $payerPhone, $ipAddress, $reference, &$held
-                ) {
-                    $lines = [];
-                    $total = 0;
+                foreach ($quantities as $ticketTypeId => $quantity) {
+                    $ticketType = $this->resolveTicketType($event, (int) $ticketTypeId);
 
-                    foreach ($quantities as $ticketTypeId => $quantity) {
-                        $ticketType = $this->resolveTicketType($event, (int) $ticketTypeId);
+                    $this->assertPurchasable($ticketType, $quantity);
 
-                        $this->assertPurchasable($ticketType, $quantity);
+                    // Instantane du prix : la commande doit continuer a dire ce
+                    // qui a ete paye, meme si le tarif change ensuite.
+                    $subtotal = $ticketType->price * $quantity;
+                    $total += $subtotal;
 
-                        // Section 17.1 : le hold ne concerne que le dernier
-                        // billet. Au-dela, il n'y a rien a proteger.
-                        if (! $this->holds->tryHold($ticketType, $reference, $quantity)) {
-                            throw new RuntimeException(sprintf(
-                                'Le dernier billet « %s » vient d\'etre reserve par quelqu\'un d\'autre.',
-                                $ticketType->name
-                            ));
-                        }
-
-                        $held[] = $ticketType;
-
-                        // Instantane du prix : la commande doit continuer a
-                        // dire ce qui a ete paye, meme si le tarif change.
-                        $subtotal = $ticketType->price * $quantity;
-                        $total += $subtotal;
-
-                        $lines[] = [
-                            'ticket_type_id' => $ticketType->getKey(),
-                            'ticket_type_name' => $ticketType->name,
-                            'quantity' => $quantity,
-                            'unit_price' => $ticketType->price,
-                            'subtotal' => $subtotal,
-                        ];
-                    }
-
-                    $order = new Order([
-                        'event_id' => $event->getKey(),
-                        'first_name' => $firstName,
-                        'last_name' => $lastName,
-                        'email' => $email,
-                        'payment_provider' => $provider,
-                        'payer_phone' => $payerPhone,
-                        'amount' => $total,
-                        'expires_at' => now()->addSeconds($this->holds->ttlSeconds()),
-                        'ip_address' => $ipAddress,
-                    ]);
-
-                    $order->reference = $reference;
-                    $order->status = OrderStatus::Pending;
-                    $order->save();
-
-                    $order->items()->createMany($lines);
-
-                    return $order;
-                });
-            } catch (RuntimeException $e) {
-                // La transaction est annulee, mais les holds vivent dans Redis
-                // et lui survivraient : sans ce nettoyage, un echec en cours de
-                // panier bloquerait le dernier billet pendant cinq minutes.
-                foreach ($held as $ticketType) {
-                    $this->holds->release($ticketType, $reference);
+                    $lines[] = [
+                        'ticket_type_id' => $ticketType->getKey(),
+                        'ticket_type_name' => $ticketType->name,
+                        'quantity' => $quantity,
+                        'unit_price' => $ticketType->price,
+                        'subtotal' => $subtotal,
+                    ];
                 }
 
-                throw $e;
-            }
+                $order = new Order([
+                    'event_id' => $event->getKey(),
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $email,
+                    'payment_provider' => $provider,
+                    'payer_phone' => $payerPhone,
+                    'amount' => $total,
+                    // Section 17.1 : la duree de reservation est celle du delai
+                    // de validation du paiement. Les deux ne doivent jamais
+                    // diverger, d'ou une source unique.
+                    'expires_at' => now()->addSeconds((int) config('payments.timeout_seconds')),
+                    'ip_address' => $ipAddress,
+                ]);
 
-            // Filet de securite : le webhook du provider reste la voie normale,
-            // mais une commande ne doit jamais rester en attente parce qu'un
-            // callback n'est pas arrive (section 21.1).
+                $order->reference = $this->uniqueReference();
+                $order->status = OrderStatus::Pending;
+                $order->save();
+
+                $order->items()->createMany($lines);
+
+                return $order;
+            });
+
+            // Filet de securite : la commande doit basculer en echec meme si
+            // aucun callback n'arrive (section 21.1). Le stock, lui, n'en
+            // depend pas — il redevient disponible a l'echeance, que ce job
+            // s'execute ou non (decision D-017).
             ExpireOrderIfUnpaid::dispatch($order->getKey())
-                ->delay(now()->addSeconds($this->holds->ttlSeconds() + 30));
+                ->delay($order->expires_at->addSeconds(30));
 
             $this->audit->log(
                 AuditAction::PaymentCreated,
@@ -193,12 +172,14 @@ class CreateOrder
             ));
         }
 
-        if ($quantity > $ticketType->availableStock()) {
+        $available = $ticketType->availableStock();
+
+        if ($quantity > $available) {
             throw new RuntimeException(sprintf(
                 '« %s » : il ne reste que %d billet%s.',
                 $ticketType->name,
-                $ticketType->availableStock(),
-                $ticketType->availableStock() > 1 ? 's' : ''
+                $available,
+                $available > 1 ? 's' : ''
             ));
         }
     }

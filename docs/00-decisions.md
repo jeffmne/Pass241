@@ -152,6 +152,31 @@ Les blocs dépliables et le menu d'actions de la page publique sont des `<detail
 
 ---
 
+## D-017 — Réservation à chaque commande, stock déduit de la base
+**2026-08-25** — amende la section 17.1
+
+La section 17.1 limitait la réservation au **dernier billet restant**, pour ne pas bloquer du stock abondant. Elle a été réécrite : **toute commande réserve ses billets**, et la confirmation du paiement passe par une vérification atomique du stock.
+
+**Raison.** L'ancienne règle laissait plusieurs commandes s'ouvrir simultanément sur le même stock dès qu'il restait plus d'un billet. Avec 10 places et 15 acheteurs simultanés, 15 paiements pouvaient aboutir. Les deux inconvénients en balance ne se valent pas : afficher « complet » quelques minutes fait perdre une vente possible, tandis qu'une survente oblige à annoncer à quelqu'un qui a déjà payé qu'il n'a pas de place.
+
+La crainte d'origine résiste d'ailleurs mal au calcul : pour qu'une réservation fasse paraître un tarif complet, il faut autant de commandes en attente simultanées qu'il reste de places. Sur 300 billets, cela signifie 300 personnes en train de payer dans la même fenêtre — l'événement se remplit réellement, et la disponibilité réduite est alors exacte.
+
+**Conséquence technique : Redis sort du chemin critique.** La réservation est déjà modélisée en base — une commande `PENDING` dont l'expiration n'est pas atteinte. Le stock se calcule donc directement :
+
+```
+disponible = quantité − vendus − réservés
+```
+
+Aucun état séparé à synchroniser, aucune expiration à orchestrer : la condition sur la date d'expiration fait expirer les réservations d'elle-même. **Si Redis tombe ou si la file d'attente s'arrête, le stock reste juste** — ce qui n'était pas le cas avec les verrous Redis. Cela supprime la catégorie de bugs rencontrée deux fois au jalon 3, où des verrous n'étaient pas libérés faute de contexte d'organisation dans les workers.
+
+`ExpireOrderIfUnpaid` reste nécessaire pour marquer la commande en échec et l'auditer, mais n'est plus porteur de l'exactitude du stock.
+
+**Conséquence sur le paiement tardif.** Un paiement confirmé après l'expiration est accepté si le stock le permet encore, sinon remboursé. C'est ce que la vérification atomique rend possible, et c'est le meilleur résultat pour l'acheteur dans la grande majorité des cas.
+
+**Supprimé** : `StockHoldService` et les verrous Redis associés.
+
+---
+
 ## D-012 — Composants Livewire classiques, sans emoji dans les noms de fichiers
 **2026-08-24**
 

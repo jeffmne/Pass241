@@ -9,10 +9,9 @@ use App\Models\AuditLog;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\TicketType;
-use App\Services\Ticketing\StockHoldService;
+use App\Services\Ticketing\StockLedger;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\Redis;
 
 /*
  * Creation d'une commande (sections 15, 16, 17.1, 20).
@@ -50,8 +49,6 @@ beforeEach(function () {
         payerPhone: $overrides['payerPhone'] ?? '074000000',
     );
 });
-
-afterEach(fn () => Redis::flushdb());
 
 it('cree une commande en attente sans aucun compte', function () {
     $order = ($this->place)([$this->standard->id => 2]);
@@ -190,42 +187,67 @@ it('refuse la vente sur un evenement non publie', function () {
     ))->toThrow(RuntimeException::class);
 });
 
-it('reserve le dernier billet le temps du paiement', function () {
+it('retire du stock disponible les billets qu elle reserve', function () {
+    // Section 17.1 : toute commande reserve ses billets, quel que soit le
+    // stock restant. La commande elle-meme EST la reservation (decision D-017).
+    ($this->place)([$this->standard->id => 3]);
+
+    expect(app(StockLedger::class)->available($this->standard))->toBe(47);
+});
+
+it('empeche deux acheteurs de se partager le meme dernier billet', function () {
     $last = forOrganization($this->organization, fn () => TicketType::factory()
         ->for($this->event)->lastOne()->create(['name' => 'Derniere place']));
 
-    $order = ($this->place)([$last->id => 1]);
+    ($this->place)([$last->id => 1]);
 
-    expect(app(StockHoldService::class)->holder($last))->toBe($order->reference);
-
-    // Un second acheteur ne peut plus l'obtenir (section 17.1).
+    // C'etait le seul cas couvert par l'ancienne regle. Il l'est toujours,
+    // mais desormais par le meme mecanisme que tous les autres.
     expect(fn () => ($this->place)([$last->id => 1]))
         ->toThrow(RuntimeException::class);
 });
 
-it('ne bloque aucun stock quand il reste plusieurs billets', function () {
-    ($this->place)([$this->standard->id => 1]);
+it('empeche aussi la survente sur du stock abondant', function () {
+    $limited = forOrganization($this->organization, fn () => TicketType::factory()
+        ->for($this->event)->create(['name' => 'Serie limitee', 'quantity' => 4, 'max_per_order' => 3]));
 
-    expect(app(StockHoldService::class)->isHeld($this->standard))->toBeFalse();
+    ($this->place)([$limited->id => 3]);
 
-    // Deux acheteurs peuvent avancer en parallele sur du stock abondant.
-    $second = ($this->place)([$this->standard->id => 1]);
-
-    expect($second->status)->toBe(OrderStatus::Pending);
-});
-
-it('relache les reservations quand la commande echoue en cours de route', function () {
-    $last = forOrganization($this->organization, fn () => TicketType::factory()
-        ->for($this->event)->lastOne()->create());
-
-    // Deuxieme ligne volontairement invalide : la transaction est annulee
-    // apres que le hold de la premiere ligne a ete pose.
-    expect(fn () => ($this->place)([$last->id => 1, $this->vip->id => 999]))
+    // C'est precisement ce que l'ancienne regle laissait passer : au-dessus
+    // d'un billet restant, plusieurs commandes s'ouvraient sur le meme stock.
+    expect(fn () => ($this->place)([$limited->id => 3]))
         ->toThrow(RuntimeException::class);
 
-    // Sans nettoyage, ce billet resterait bloque cinq minutes pour rien.
-    expect(app(StockHoldService::class)->isHeld($last))->toBeFalse()
-        ->and(Order::query()->acrossOrganizations()->count())->toBe(0);
+    // Il reste bien une place, et une seule.
+    expect(app(StockLedger::class)->available($limited))->toBe(1);
+});
+
+it('rend le stock des qu une reservation expire', function () {
+    $limited = forOrganization($this->organization, fn () => TicketType::factory()
+        ->for($this->event)->create(['quantity' => 2, 'max_per_order' => 2]));
+
+    ($this->place)([$limited->id => 2]);
+
+    expect(app(StockLedger::class)->available($limited))->toBe(0);
+
+    // Aucun job n'a besoin de tourner : la reservation cesse d'etre comptee
+    // a la seconde ou elle expire.
+    $this->travel(6)->minutes();
+
+    expect(app(StockLedger::class)->available($limited))->toBe(2);
+});
+
+it('n enregistre rien quand une ligne de la commande est invalide', function () {
+    $limited = forOrganization($this->organization, fn () => TicketType::factory()
+        ->for($this->event)->create(['quantity' => 5]));
+
+    // Deuxieme ligne volontairement invalide : la transaction est annulee.
+    expect(fn () => ($this->place)([$limited->id => 1, $this->vip->id => 999]))
+        ->toThrow(RuntimeException::class);
+
+    // Aucune commande, donc aucune reservation fantome : le stock est intact.
+    expect(Order::query()->acrossOrganizations()->count())->toBe(0)
+        ->and(app(StockLedger::class)->available($limited))->toBe(5);
 });
 
 it('donne a chaque commande une reference unique et dictable', function () {
