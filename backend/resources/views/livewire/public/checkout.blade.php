@@ -3,52 +3,7 @@
 @endphp
 
 <div>
-    @if ($placedOrder)
-        {{--
-            Commande creee, paiement en attente.
-
-            Le module de paiement arrive au jalon suivant : plutot qu'un faux
-            bouton « Payer », l'ecran dit exactement ou en est la commande et
-            donne la reference. Un bouton qui ne fait rien ferait perdre plus
-            de confiance qu'une attente annoncee.
-        --}}
-        <div class="glass-inset p-6 text-center sm:p-8">
-            <x-lucide-clock class="mx-auto size-8 text-warning" stroke-width="1.5" />
-
-            <h2 class="mt-3 font-display text-xl font-extrabold text-ink">Commande enregistree</h2>
-
-            <p class="mx-auto mt-2 max-w-md leading-relaxed text-grey-500">
-                Votre commande est reservee. Le paiement par
-                {{ $placedOrder->payment_provider->label() }} sera active tres prochainement.
-            </p>
-
-            <dl class="mx-auto mt-6 max-w-xs space-y-2 text-sm">
-                <div class="flex justify-between gap-4">
-                    <dt class="text-grey-500">Reference</dt>
-                    <dd class="font-display font-bold text-ink tabular">{{ $placedOrder->reference }}</dd>
-                </div>
-                <div class="flex justify-between gap-4">
-                    <dt class="text-grey-500">Billets</dt>
-                    <dd class="font-semibold text-ink tabular">{{ $placedOrder->totalTickets() }}</dd>
-                </div>
-                <div class="flex justify-between gap-4 border-t border-grey-200/70 pt-2">
-                    <dt class="text-grey-500">Total</dt>
-                    <dd class="font-display text-base font-bold text-ink tabular">
-                        {{ $placedOrder->formattedAmount() }}
-                    </dd>
-                </div>
-            </dl>
-
-            <p class="mx-auto mt-5 max-w-sm text-xs leading-relaxed text-grey-400">
-                Notez cette reference : elle permet de retrouver votre commande.
-            </p>
-
-            <button type="button" wire:click="startOver" class="btn btn-ghost mt-5">
-                Commander a nouveau
-            </button>
-        </div>
-
-    @elseif ($ticketTypes->isEmpty())
+    @if ($ticketTypes->isEmpty())
         <div class="glass-inset p-6 sm:p-8">
             <h2 class="font-display text-xl font-extrabold text-ink sm:text-2xl">Billets</h2>
             <p class="mt-3 leading-relaxed text-grey-500">

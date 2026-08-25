@@ -113,15 +113,23 @@
 
 ## JALON 4 — Paiement de bout en bout (Phase 4)
 
-- [ ] `PaymentProviderInterface`
-- [ ] `FakeProvider` de développement (valider / refuser / timeout)
-- [ ] Webhook sécurisé et idempotent (sections 22, 23)
-- [ ] `ProcessPaymentWebhook`, polling de secours `checkPaymentStatus()`
-- [ ] `CommissionCalculationService` avec snapshot du taux (5 %)
-- [ ] Entité `Commission`
-- [ ] Tests : succès, échec, timeout, double webhook
+- [x] `PaymentProviderInterface` et `PaymentManager`
+- [x] `FakeProvider` de développement (valider / refuser / ne rien renvoyer)
+- [x] Webhook signé et idempotent, idempotence portée par une contrainte de base (sections 22, 23)
+- [x] `ProcessPaymentWebhook`, polling de secours pendant l'attente (section 21.1)
+- [x] `ConfirmPayment` : vérification atomique du stock, émission des billets, tout ou rien
+- [x] `CommissionCalculator` et entité `Commission`, en ajout seul, taux figé à la transaction
+- [x] Écran de suivi de commande avec compte à rebours, sur lien signé
+- [x] Vérification du montant : un callback au montant divergent ne confirme rien
+- [x] Tests : succès, échec, montant divergent, double webhook, signature forgée, paiement tardif
 
-*Vérification : un paiement simulé confirme la commande et enregistre la commission.*
+*Vérification : `/e/concert-afro-2026` — l'écran de simulation reproduit les trois issues de la section 21.1.*
+
+**Points ouverts :**
+- [ ] **Préfixes opérateurs à confirmer** auprès d'Airtel Gabon et Moov Gabon (`config/payments.php`)
+- [ ] **Remboursement automatique** quand un paiement tardif ne trouve plus de stock. Le cas est détecté, tracé et retrouvable (`payment_webhooks.outcome`), mais le remboursement reste manuel tant que le module de la section 24 n'existe pas.
+- [ ] Reversement à l'organisateur (`CommissionSettlementStrategy`, section 21.2) — dépend des capacités réelles des opérateurs
+- [ ] Airtel Money et Moov Money réels, dès obtention des accès
 
 ---
 

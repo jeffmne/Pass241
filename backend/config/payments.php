@@ -17,6 +17,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Adresse interne de l'application
+    |--------------------------------------------------------------------------
+    |
+    | Utilisee uniquement par l'ecran de simulation, qui s'envoie a lui-meme un
+    | webhook pour emprunter exactement le chemin de production.
+    |
+    | APP_URL est l'adresse vue depuis le navigateur (http://localhost:8000) ;
+    | depuis le conteneur applicatif, elle ne mene nulle part, le serveur web
+    | etant un conteneur voisin. D'ou ce reglage distinct.
+    |
+    */
+
+    'internal_base_url' => env('APP_INTERNAL_URL', env('APP_URL')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Delai de validation d'un paiement
     |--------------------------------------------------------------------------
     |

@@ -187,7 +187,7 @@ it('accepte tout numero bien forme tant que les prefixes ne sont pas renseignes'
         ->assertHasNoErrors();
 });
 
-it('affiche la reference de la commande apres validation', function () {
+it('renvoie vers le suivi de commande apres validation', function () {
     Livewire::test(Checkout::class, ['event' => $this->event])
         ->call('increment', $this->standard->id)
         ->set('firstName', 'Awa')
@@ -196,8 +196,27 @@ it('affiche la reference de la commande apres validation', function () {
         ->set('payerPhone', '074000000')
         ->call('placeOrder')
         ->assertHasNoErrors()
-        ->assertSee('Commande enregistree')
-        ->assertSee(Order::query()->acrossOrganizations()->firstOrFail()->reference);
+        // Lien signe : l'acheteur n'a pas de compte, c'est ce lien qui le
+        // ramenera a ses billets (decision D-004).
+        ->assertRedirect(Order::query()->acrossOrganizations()->firstOrFail()->statusUrl());
+});
+
+it('declenche le paiement et retient la reference de l operateur', function () {
+    Livewire::test(Checkout::class, ['event' => $this->event])
+        ->call('increment', $this->standard->id)
+        ->set('firstName', 'Awa')
+        ->set('lastName', 'Ndong')
+        ->set('provider', 'AIRTEL')
+        ->set('payerPhone', '074000000')
+        ->call('placeOrder')
+        ->assertHasNoErrors();
+
+    $order = Order::query()->acrossOrganizations()->firstOrFail();
+
+    // Section 21.1 : le push USSD part des la commande creee, et son
+    // identifiant est conserve pour la reconciliation.
+    expect($order->provider_reference)->not->toBeNull()
+        ->and($order->provider_reference)->toStartWith('FAKE-');
 });
 
 it('explique quand le dernier billet vient d etre pris', function () {

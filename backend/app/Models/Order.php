@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Facades\URL;
 use RuntimeException;
 
 /**
@@ -94,6 +96,24 @@ class Order extends Model
     public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);
+    }
+
+    /** Commission retenue par la plateforme (section 21.2). */
+    public function commission(): MorphOne
+    {
+        return $this->morphOne(Commission::class, 'commissionable');
+    }
+
+    /**
+     * Adresse publique de suivi de la commande.
+     *
+     * Signee et sans expiration (decision D-004) : l'acheteur n'a pas de
+     * compte, il garde ce lien. La signature evite qu'on parcoure les
+     * commandes en devinant des references.
+     */
+    public function statusUrl(): string
+    {
+        return URL::signedRoute('orders.show', ['reference' => $this->reference]);
     }
 
     /*

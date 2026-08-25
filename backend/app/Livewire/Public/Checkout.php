@@ -5,12 +5,13 @@ namespace App\Livewire\Public;
 use App\Actions\Orders\CreateOrder;
 use App\Enums\PaymentProvider;
 use App\Models\Event;
-use App\Models\Order;
 use App\Models\TicketType;
 use App\Rules\MobileMoneyNumber;
+use App\Services\Payments\PaymentManager;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
+use Throwable;
 
 /**
  * Parcours d'achat public (sections 15, 16, 16.1).
@@ -41,9 +42,6 @@ class Checkout extends Component
     public string $provider = '';
 
     public string $payerPhone = '';
-
-    /** Commande creee, affichee a la place du formulaire. */
-    public ?Order $placedOrder = null;
 
     public function mount(Event $event): void
     {
@@ -154,7 +152,7 @@ class Checkout extends Component
      * ---------------------------------------------------------------------
      */
 
-    public function placeOrder(CreateOrder $createOrder): void
+    public function placeOrder(CreateOrder $createOrder, PaymentManager $payments): void
     {
         if ($this->ticketCount() < 1) {
             $this->addError('quantities', 'Choisissez au moins un billet.');
@@ -165,7 +163,7 @@ class Checkout extends Component
         $this->validate();
 
         try {
-            $this->placedOrder = $createOrder->handle(
+            $order = $createOrder->handle(
                 event: $this->event,
                 quantities: array_map('intval', $this->quantities),
                 firstName: trim($this->firstName),
@@ -179,18 +177,30 @@ class Checkout extends Component
             // Le stock a pu changer pendant la saisie : le message dit
             // precisement quoi, pour que l'acheteur puisse corriger.
             $this->addError('quantities', $e->getMessage());
-        }
-    }
 
-    /** Reprend un achat apres un echec, sans recharger la page. */
-    public function startOver(): void
-    {
-        $this->placedOrder = null;
-        $this->resetErrorBag();
-
-        foreach (array_keys($this->quantities) as $ticketTypeId) {
-            $this->quantities[$ticketTypeId] = 0;
+            return;
         }
+
+        /*
+         * Declenche le push USSD (section 21.1).
+         *
+         * Un echec ici ne remet pas la commande en cause : elle existe, sa
+         * reservation court, et l'acheteur peut relancer depuis l'ecran de
+         * suivi. La faire echouer maintenant lui ferait tout resaisir.
+         */
+        try {
+            $initialization = $payments->driver()->initializePayment($order);
+
+            if ($initialization->providerReference) {
+                $order->forceFill(['provider_reference' => $initialization->providerReference])->save();
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        // Redirection vers un lien signe : l'acheteur n'a pas de compte, ce
+        // lien est ce qui le ramenera a ses billets (decision D-004).
+        $this->redirect($order->statusUrl(), navigate: true);
     }
 
     private function ticketType(int $ticketTypeId): ?TicketType
