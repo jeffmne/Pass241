@@ -9,8 +9,8 @@ use App\Enums\OrganizationType;
 use App\Models\Event;
 use App\Models\User;
 use App\Support\Tenancy\OrganizationContext;
+use Database\Seeders\Support\PosterPlaceholder;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Storage;
 
 class DatabaseSeeder extends Seeder
 {
@@ -61,6 +61,14 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->seedDemoEvents();
+
+        /*
+         * Une soiree deja passee, avec ses entrees. Separee des deux
+         * evenements ci-dessus, qui se jouent dans deux mois : un ecran
+         * d'entrees ne se juge pas sur des compteurs a zero, et un evenement
+         * a venir ne peut pas avoir de controles credibles.
+         */
+        $this->call(DemoControlledEventSeeder::class);
 
         $this->command?->info('Comptes locaux : awa@pass241.test / paul@pass241.test / admin@pass241.test (mot de passe : password)');
     }
@@ -115,7 +123,7 @@ class DatabaseSeeder extends Seeder
                 // Le modele exige une affiche pour publier : un evenement de
                 // demo sans affiche serait un etat que l'application elle-meme
                 // refuserait de produire.
-                $event->poster_path = $this->generatePosterPlaceholder($slug, $name);
+                $event->poster_path = PosterPlaceholder::for($slug, $name);
                 $event->save();
 
                 $event->location()->create([
@@ -157,55 +165,5 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->command?->info('Evenements de demonstration : /e/concert-afro-2026 et /e/gala-des-entrepreneurs');
-    }
-
-    /**
-     * Affiche de remplacement, generee localement.
-     *
-     * Un aplat azurin avec le nom de l'evenement : ce n'est pas du design, mais
-     * cela evite deux choses — dependre d'une image telechargee depuis
-     * l'exterieur, et publier un evenement sans affiche alors que le modele
-     * l'interdit.
-     */
-    private function generatePosterPlaceholder(string $slug, string $name): string
-    {
-        $path = "events/demo/{$slug}.png";
-
-        if (Storage::disk('public')->exists($path)) {
-            return $path;
-        }
-
-        $width = 800;
-        $height = 1000;
-
-        $image = imagecreatetruecolor($width, $height);
-
-        // Degrade vertical dans la famille azurine (section 70.1).
-        for ($y = 0; $y < $height; $y++) {
-            $ratio = $y / $height;
-            $color = imagecolorallocate(
-                $image,
-                (int) (47 + (20 - 47) * $ratio),
-                (int) (143 + (84 - 143) * $ratio),
-                (int) (230 + (155 - 230) * $ratio),
-            );
-            imagefilledrectangle($image, 0, $y, $width, $y, $color);
-        }
-
-        $white = imagecolorallocate($image, 255, 255, 255);
-        $line = 0;
-        foreach (explode("\n", wordwrap($name, 16, "\n", true)) as $text) {
-            imagestring($image, 5, 60, 420 + ($line * 40), $text, $white);
-            $line++;
-        }
-
-        ob_start();
-        imagepng($image);
-        $binary = (string) ob_get_clean();
-        imagedestroy($image);
-
-        Storage::disk('public')->put($path, $binary);
-
-        return $path;
     }
 }

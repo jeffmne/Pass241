@@ -3,9 +3,11 @@
 namespace App\Livewire\Public;
 
 use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Refunds\RequestRefund;
 use App\Enums\PaymentState;
 use App\Models\Order;
 use App\Services\Payments\PaymentManager;
+use App\Services\Refunds\RefundPolicy;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -37,11 +39,7 @@ class OrderStatus extends Component
         // La portee par organisation est levee : l'acheteur n'appartient a
         // aucune organisation. L'acces est protege par la signature de l'URL
         // (decision D-004), verifiee par le middleware de la route.
-        $this->order = Order::query()
-            ->acrossOrganizations()
-            ->with(['items', 'event.location', 'tickets'])
-            ->where('reference', $reference)
-            ->first() ?? abort(404);
+        $this->order = Order::publicByReference($reference) ?? abort(404);
     }
 
     /**
@@ -81,13 +79,59 @@ class OrderStatus extends Component
         }
     }
 
+    /**
+     * Motif saisi par l'acheteur pour sa demande de remboursement.
+     *
+     * Facultatif : exiger une justification pour recuperer son propre argent
+     * ajouterait une friction que la section 24.1 ne demande pas. C'est le
+     * REFUS, lui, qui doit etre motive.
+     */
+    public string $refundReason = '';
+
+    /**
+     * Soumet une demande de remboursement (section 24.1).
+     *
+     * L'acheteur DEMANDE, il ne rembourse pas : rien d'argent ne bouge ici.
+     * Toutes les regles de recevabilite sont verifiees cote serveur par
+     * RefundPolicy — le bouton peut rester visible, c'est le serveur qui
+     * tranche.
+     */
+    public function requestRefund(RequestRefund $action): void
+    {
+        try {
+            $action->handle(
+                order: $this->order,
+                reason: trim($this->refundReason) ?: null,
+                ipAddress: request()->ip(),
+            );
+        } catch (RuntimeException $e) {
+            $this->addError('refund', $e->getMessage());
+
+            return;
+        }
+
+        $this->refundReason = '';
+        $this->order->refresh();
+
+        session()->flash('refund-requested', true);
+    }
+
     public function render()
     {
-        $this->order->loadMissing(['items', 'event.location', 'tickets']);
+        $this->order->loadMissing(Order::publicRelations());
+
+        $policy = app(RefundPolicy::class);
 
         return view('livewire.public.order-status', [
             'event' => $this->order->event,
             'secondsLeft' => $this->order->secondsBeforeExpiry(),
+            'refundRequest' => $this->order->refundRequests()
+                ->acrossOrganizations()->latest()->first(),
+            // Le motif du blocage est affiche tel quel : l'acheteur doit
+            // comprendre pourquoi il ne peut plus demander, pas se heurter a
+            // un bouton inerte (section 24.1).
+            'refundBlocker' => $policy->blocker($this->order),
+            'refundDeadline' => $policy->deadlineFor($this->order),
             // Ecran de simulation reserve au provider de developpement : il
             // n'existe pas des lors qu'un vrai operateur est branche.
             'canSimulate' => app(PaymentManager::class)->isFake() && app()->environment('local'),

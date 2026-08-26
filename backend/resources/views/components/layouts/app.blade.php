@@ -32,6 +32,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#2F8FE6">
     <title>{{ $title ?? 'Pass241' }}</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="/favicon.ico" sizes="any">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -40,7 +41,10 @@
         {{-- Colonne laterale : uniquement a partir de lg --}}
         <aside class="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:w-64 lg:shrink-0 lg:flex-col lg:border-r lg:border-grey-200 lg:bg-white">
             <div class="px-5 py-6">
-                <span class="font-display text-xl font-extrabold tracking-tight text-azure-700">Pass241</span>
+                <span class="flex items-center gap-2 font-display text-xl font-extrabold tracking-tight text-azure-700">
+                    <x-brand-mark class="h-7 w-auto" />
+                    Pass241
+                </span>
             </div>
 
             <nav class="flex-1 space-y-0.5 px-3">
@@ -74,7 +78,10 @@
             {{-- En-tete mobile --}}
             <header class="sticky top-0 z-20 border-b border-grey-200 bg-white/90 backdrop-blur lg:hidden">
                 <div class="flex items-center justify-between px-4 py-3">
-                    <span class="font-display text-lg font-extrabold tracking-tight text-azure-700">Pass241</span>
+                    <span class="flex items-center gap-2 font-display text-lg font-extrabold tracking-tight text-azure-700">
+                        <x-brand-mark class="h-7 w-auto" />
+                        Pass241
+                    </span>
                     <livewire:organizations.switcher :compact="true" />
                 </div>
             </header>

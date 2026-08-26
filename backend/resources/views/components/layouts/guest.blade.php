@@ -13,6 +13,7 @@
     <meta name="theme-color" content="#F5F7FD">
     <title>{{ $title }}</title>
     <meta name="robots" content="noindex">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="/favicon.ico" sizes="any">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -34,7 +35,7 @@
                'mx-auto' => $width === 'narrow',
                'mx-auto lg:mx-0' => $width === 'wide',
            ])>
-            <x-lucide-ticket class="size-7" stroke-width="1.75" />
+            <x-brand-mark class="h-8 w-auto" />
             Pass241
         </a>
 

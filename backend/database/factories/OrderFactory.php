@@ -27,8 +27,34 @@ class OrderFactory extends Factory
             'payer_phone' => '074'.fake()->numerify('#####'),
             'status' => OrderStatus::Pending,
             'amount' => 10_000,
+            /*
+             * Par defaut, une commande sans frais de prestataire : le montant
+             * debite est le prix des billets. `subtotal` suit donc `amount`,
+             * y compris quand un test le redefinit — la base exige que
+             * l'eclatement tombe juste (decision D-023).
+             *
+             * Un test qui veut des frais passe par l'etat `withPspFee`.
+             */
+            'subtotal' => fn (array $attributes) => $attributes['amount'],
+            'psp_fee_amount' => 0,
+            'psp' => 'fake',
             'expires_at' => now()->addMinutes(5),
         ];
+    }
+
+    /**
+     * Commande portant des frais de prestataire.
+     *
+     * Le montant debite monte, le prix des billets ne bouge pas : c'est
+     * exactement ce que la decision D-023 decrit.
+     */
+    public function withPspFee(int $fee, int $basisPoints = 200): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'amount' => $attributes['subtotal'] + $fee,
+            'psp_fee_amount' => $fee,
+            'psp_fee_basis_points' => $basisPoints,
+        ]);
     }
 
     public function paid(): static

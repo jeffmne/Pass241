@@ -5,6 +5,7 @@ namespace App\Actions\Orders;
 use App\Enums\AuditAction;
 use App\Enums\CommissionType;
 use App\Enums\OrderStatus;
+use App\Jobs\SendTicketsEmail;
 use App\Models\Order;
 use App\Models\Ticket;
 use App\Models\TicketType;
@@ -66,7 +67,7 @@ class ConfirmPayment
             ));
         }
 
-        return $this->context->runFor($order->organization, function () use ($order, $providerReference) {
+        $confirmed = $this->context->runFor($order->organization, function () use ($order, $providerReference) {
             return DB::transaction(function () use ($order, $providerReference) {
                 /*
                  * Relecture verrouillee de la commande.
@@ -100,12 +101,21 @@ class ConfirmPayment
 
                 $tickets = $this->issueTickets($fresh);
 
-                // Section 21.2 : la commission est calculee automatiquement,
-                // avec un instantane du taux.
+                /*
+                 * Section 21.2 : la commission est calculee automatiquement,
+                 * avec un instantane du taux.
+                 *
+                 * Assise sur `subtotal` — le prix des billets — et JAMAIS sur
+                 * `amount`, qui contient en plus les frais du prestataire
+                 * avances par l'acheteur (decision D-023). Les prendre pour
+                 * assiette ferait prelever a Pass241 une commission sur
+                 * l'argent d'un tiers, et gonflerait mecaniquement le net
+                 * reverse a l'organisateur.
+                 */
                 $this->commissions->record(
                     commissionable: $fresh,
                     organization: $fresh->organization,
-                    grossAmount: $fresh->amount,
+                    grossAmount: $fresh->subtotal,
                     type: CommissionType::Ticketing,
                 );
 
@@ -125,6 +135,36 @@ class ConfirmPayment
                 return $fresh;
             });
         });
+
+        $this->sendCopyByEmail($confirmed);
+
+        return $confirmed;
+    }
+
+    /**
+     * Envoie la copie du billet, si une adresse a ete renseignee (section 69).
+     *
+     * Hors de la transaction, et volontairement : un serveur de messagerie
+     * indisponible ne doit jamais annuler un paiement confirme. L'email est une
+     * commodite, le billet est deja emis et consultable (section 15.1).
+     *
+     * Delegue a un job : l'email porte le billet en PDF, dont le rendu coute
+     * trop cher pour le webhook de l'operateur, qui abandonne s'il attend.
+     * Le `try` reste utile — en file synchrone, l'echec remonterait ici.
+     */
+    private function sendCopyByEmail(Order $order): void
+    {
+        if (! $order->email) {
+            return;
+        }
+
+        try {
+            SendTicketsEmail::dispatch($order->getKey());
+        } catch (Throwable $e) {
+            // Journalise sans interrompre : personne ne perd son billet parce
+            // qu'un email n'est pas parti.
+            report($e);
+        }
     }
 
     /**

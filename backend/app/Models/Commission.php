@@ -5,7 +5,10 @@ namespace App\Models;
 use App\Enums\CommissionType;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Support\Money;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use RuntimeException;
 
@@ -30,6 +33,7 @@ class Commission extends Model
         'organization_id',
         'commissionable_type',
         'commissionable_id',
+        'parent_commission_id',
         'type',
         'gross_amount',
         'rate_basis_points',
@@ -66,6 +70,36 @@ class Commission extends Model
     public function commissionable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /** Commission d'origine, quand cette ligne est un ajustement. */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_commission_id');
+    }
+
+    /** Ajustements lies a cette commission (remboursements, section 24.1). */
+    public function adjustments(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_commission_id');
+    }
+
+    /**
+     * Cette ligne corrige-t-elle une commission anterieure ?
+     *
+     * Une ligne d'origine represente ce qui a ete preleve ; un ajustement
+     * represente ce qui a ete rendu. Les additionner sans distinguer les deux
+     * doublerait le chiffre d'affaires de la plateforme.
+     */
+    public function isAdjustment(): bool
+    {
+        return $this->parent_commission_id !== null;
+    }
+
+    /** Ne garde que les lignes d'origine. */
+    public function scopeOriginals(Builder $query): Builder
+    {
+        return $query->whereNull('parent_commission_id');
     }
 
     /** Taux applique a cette transaction, tel qu'il etait ce jour-la. */

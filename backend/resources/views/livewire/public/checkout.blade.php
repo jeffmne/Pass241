@@ -169,16 +169,42 @@
                         </p>
                     </div>
 
-                    {{-- Total : surface pleine, chiffres tabulaires. Un montant
-                         est la donnee la plus relue de l'ecran. --}}
-                    <div class="mt-6 flex items-baseline justify-between gap-4 rounded-xl bg-white px-4 py-3.5">
-                        <span class="text-sm font-medium text-grey-500">
-                            {{ $ticketCount }} billet{{ $ticketCount > 1 ? 's' : '' }}
-                        </span>
-                        <span class="font-display text-2xl font-extrabold text-ink tabular">
-                            {{ Money::format($total) }}
-                        </span>
+                    {{-- Recapitulatif : surface pleine, chiffres tabulaires. Un
+                         montant est la donnee la plus relue de l'ecran.
+
+                         Les frais du prestataire sont annonces AVANT le
+                         paiement et sur une ligne distincte (decision D-023) :
+                         un acheteur qui les decouvre sur son releve se sent
+                         trompe, meme quand la somme est juste. --}}
+                    <div class="mt-6 rounded-xl bg-white px-4 py-3.5">
+                        <div class="flex items-baseline justify-between gap-4">
+                            <span class="text-sm text-grey-500">
+                                {{ $ticketCount }} billet{{ $ticketCount > 1 ? 's' : '' }}
+                            </span>
+                            <span class="text-sm text-ink tabular">{{ Money::format($subtotal) }}</span>
+                        </div>
+
+                        @if ($pspFee > 0)
+                            <div class="mt-2 flex items-baseline justify-between gap-4">
+                                <span class="text-sm text-grey-500">Frais de paiement</span>
+                                <span class="text-sm text-ink tabular">{{ Money::format($pspFee) }}</span>
+                            </div>
+                        @endif
+
+                        <div class="mt-3 flex items-baseline justify-between gap-4 border-t border-grey-200/70 pt-3">
+                            <span class="text-sm font-medium text-grey-500">Total a payer</span>
+                            <span class="font-display text-2xl font-extrabold text-ink tabular">
+                                {{ Money::format($total) }}
+                            </span>
+                        </div>
                     </div>
+
+                    @if ($pspFee > 0)
+                        <p class="mt-2.5 text-xs leading-relaxed text-grey-400">
+                            Les frais de paiement sont ceux de l'operateur mobile money.
+                            Ils ne sont pas rembourses si vous annulez votre commande.
+                        </p>
+                    @endif
 
                     <button type="submit" class="btn btn-primary btn-pill btn-lg mt-4 w-full"
                             wire:loading.attr="disabled">

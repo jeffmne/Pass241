@@ -11,4 +11,13 @@ for dir in storage bootstrap/cache; do
     fi
 done
 
+# storage/framework est un volume Docker : il appartient a root et demarre
+# vide. Les sous-dossiers attendus par Laravel doivent exister avant le premier
+# rendu, sinon Blade n'a nulle part ou ecrire ses vues compilees.
+for dir in cache/data sessions testing views; do
+    mkdir -p "/var/www/html/storage/framework/$dir"
+done
+
+chmod -R a+rwX /var/www/html/storage/framework 2>/dev/null || true
+
 exec "$@"

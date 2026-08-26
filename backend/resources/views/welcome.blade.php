@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#F5F7FD">
     <title>Pass241 — Billetterie et collecte de fonds au Gabon</title>
     <meta name="description" content="Creez votre evenement, partagez son lien, encaissez par Airtel Money et Moov Money. Vos participants recoivent leur billet immediatement, vos agents scannent a l'entree meme sans reseau.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="/favicon.ico" sizes="any">
 
     <meta property="og:type" content="website">
@@ -31,7 +32,7 @@
     <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
         <a href="{{ route('home') }}"
            class="flex shrink-0 items-center gap-2 font-display text-xl font-extrabold tracking-tight text-azure-700">
-            <x-lucide-ticket class="size-6" stroke-width="1.75" />
+            <x-brand-mark class="h-8 w-auto" />
             Pass241
         </a>
 
@@ -157,7 +158,11 @@
              second niveau de flou, ce qu'interdit la section 70.4 — et qui lui
              aurait retire la presence que sa position de moment fort exige. --}}
         <div>
-            <div class="grid items-center gap-10 lg:grid-cols-[1fr_auto] lg:gap-16">
+            {{-- Colonne de texte bornee, et non etiree sur la largeur restante :
+                 le billet vient se poser contre elle plutot qu'a l'autre bout de
+                 la page. Un objet montre a distance de son explication se lit
+                 comme une illustration decorative ; a cote d'elle, il l'appuie. --}}
+            <div class="grid items-center justify-center gap-10 lg:grid-cols-[minmax(0,27rem)_auto] lg:gap-12">
                 <div class="text-center lg:text-left">
                     <h2 class="font-display text-2xl leading-tight font-extrabold text-ink sm:text-3xl lg:text-4xl">
                         Le billet arrive avant que la file ne se forme
@@ -188,8 +193,16 @@
                     </p>
                 </div>
 
-                <div class="flex justify-center lg:justify-end">
-                    <div class="w-full max-w-sm lg:rotate-[1.5deg]">
+                <div class="flex justify-center lg:justify-start">
+                    {{-- Vitrine, et non le billet lui-meme : a taille reelle, l'objet
+                         depasse la hauteur de l'ecran et ecrase la colonne de texte a
+                         cote de laquelle il doit se lire.
+
+                         `zoom` et non `scale` : le premier reduit la BOITE, le second
+                         seulement le dessin — la section garderait sinon le vide de la
+                         taille d'origine sous le billet. Le composant n'est pas touche :
+                         la ou le billet EST le produit, il garde sa taille reelle. --}}
+                    <div class="w-full max-w-sm [zoom:0.78] lg:rotate-[1.5deg] lg:[zoom:0.6]">
                         <x-glass-ticket
                             :animate="true"
                             ticket-type="Billet VIP"
@@ -406,7 +419,7 @@
         <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div class="sm:col-span-2 lg:col-span-1">
                 <span class="flex items-center gap-2 font-display text-lg font-extrabold tracking-tight text-azure-700">
-                    <x-lucide-ticket class="size-5" stroke-width="1.75" />
+                    <x-brand-mark class="h-6 w-auto" />
                     Pass241
                 </span>
                 <p class="mt-4 max-w-xs text-sm leading-relaxed text-grey-500">

@@ -79,31 +79,52 @@
             </div>
 
             @if ($order->tickets->isNotEmpty())
-                <ul class="mt-8 space-y-2">
+                {{-- Section 15.1 : le billet est affiche immediatement apres
+                     confirmation, sans passer par l'email. --}}
+                <ul class="mt-8 space-y-3">
                     @foreach ($order->tickets as $ticket)
-                        <li class="glass-inset flex items-center justify-between gap-4 p-4">
+                        <li class="glass-inset flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                             <span class="min-w-0">
-                                <span class="block font-display text-base font-bold text-ink tabular">
+                                <span class="block font-semibold text-ink">
+                                    {{ $ticket->orderItem?->ticket_type_name }}
+                                </span>
+                                <span class="mt-0.5 block text-sm text-grey-500 tabular">
                                     {{ $ticket->reference }}
                                 </span>
-                                <span class="mt-0.5 block text-sm text-grey-500">
-                                    {{ $ticket->holder_name }}
-                                </span>
                             </span>
-                            <x-status-badge :status="$ticket->status" />
+
+                            <span class="flex shrink-0 items-center gap-2">
+                                <x-status-badge :status="$ticket->status" />
+                                <a href="{{ $ticket->publicUrl() }}" wire:navigate class="btn btn-primary">
+                                    Voir mon billet
+                                </a>
+                            </span>
                         </li>
                     @endforeach
                 </ul>
 
-                {{-- Le QR Code et le telechargement arrivent au module suivant.
-                     Le dire est plus honnete qu'un bouton inerte. --}}
-                <p class="mt-6 flex items-start gap-2.5 rounded-xl border border-grey-200 bg-white px-4 py-3 text-sm text-grey-500">
-                    <x-lucide-info class="mt-0.5 size-4 shrink-0 text-azure-600" stroke-width="1.75" />
-                    <span>
-                        L'affichage du QR Code et le telechargement du billet arrivent tres
-                        prochainement. Conservez ce lien : il vous ramenera a vos billets.
-                    </span>
+                <p class="mt-6 text-center text-sm">
+                    <a href="{{ route('tickets.mine') }}" wire:navigate
+                       class="font-semibold text-azure-600 hover:text-azure-700">
+                        Voir tous mes billets
+                    </a>
                 </p>
+
+                {{-- Le recu est une piece comptable : PDF, telechargeable, et
+                     distinct du billet (decision D-029). --}}
+                <p class="mt-4 text-center text-sm">
+                    <a href="{{ $order->receiptUrl() }}"
+                       class="inline-flex items-center gap-1.5 font-medium text-grey-500 transition-colors hover:text-azure-700">
+                        <x-lucide-file-text class="size-4" stroke-width="1.75" />
+                        Telecharger le recu
+                    </a>
+                </p>
+
+                @if ($order->email)
+                    <p class="mt-3 text-center text-xs text-grey-400">
+                        Une copie a ete envoyee a {{ $order->email }}.
+                    </p>
+                @endif
             @endif
 
         @else
@@ -140,6 +161,101 @@
             </p>
         @enderror
 
+        {{-- ------------------------------------------------------------
+             Demande de remboursement (section 24.1, decision D-027)
+
+             L'acheteur DEMANDE, il ne rembourse pas. Le bouton reste visible
+             hors delai, avec l'explication : la section 24.1 demande que le
+             client comprenne pourquoi il ne peut plus demander, plutot que de
+             se heurter a un bouton inerte.
+        ------------------------------------------------------------- --}}
+        @if ($order->isPaid() || $refundRequest)
+            <div class="mt-8 border-t border-white/70 pt-6">
+                @if ($refundRequest)
+                    <div class="flex flex-col gap-3 rounded-xl bg-white/60 p-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="font-semibold text-ink">
+                                Demande de remboursement {{ $refundRequest->reference }}
+                            </p>
+                            <p class="mt-1 text-sm text-grey-500">
+                                {{ $refundRequest->formattedAmount() }} demandes.
+                                @if ($refundRequest->psp_fee_amount > 0)
+                                    Les {{ $refundRequest->formattedPspFee() }} de frais de
+                                    paiement ne sont pas rembourses.
+                                @endif
+                            </p>
+                            @if ($refundRequest->decision_reason)
+                                <p class="mt-2 text-sm text-ink">
+                                    <span class="font-medium">Reponse :</span>
+                                    {{ $refundRequest->decision_reason }}
+                                </p>
+                            @endif
+                        </div>
+
+                        <span @class([
+                            'shrink-0 rounded-full px-3 py-1 text-xs font-semibold',
+                            'bg-success/10 text-success' => $refundRequest->isApproved(),
+                            'bg-warning/10 text-warning' => $refundRequest->isPending(),
+                            'bg-grey-200/80 text-grey-500' => ! $refundRequest->isPending() && ! $refundRequest->isApproved(),
+                        ])>
+                            {{ $refundRequest->status->label() }}
+                        </span>
+                    </div>
+                @elseif (session('refund-requested'))
+                    <p class="flex items-start gap-2.5 rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
+                        <x-lucide-circle-check class="mt-0.5 size-4 shrink-0 text-success" stroke-width="1.75" />
+                        <span>Demande transmise a l'organisateur.</span>
+                    </p>
+                @else
+                    <details class="group">
+                        <summary class="cursor-pointer list-none text-sm font-medium text-grey-500 transition-colors hover:text-azure-700">
+                            Demander un remboursement
+                        </summary>
+
+                        <div class="mt-4">
+                            @if ($refundBlocker)
+                                <p class="flex items-start gap-2.5 rounded-xl bg-grey-200/50 px-4 py-3 text-sm text-grey-500">
+                                    <x-lucide-info class="mt-0.5 size-4 shrink-0" stroke-width="1.75" />
+                                    <span>{{ $refundBlocker }}</span>
+                                </p>
+                            @else
+                                <form wire:submit="requestRefund">
+                                    <p class="text-sm leading-relaxed text-grey-500">
+                                        Votre demande est transmise a l'organisateur, qui decide de
+                                        l'accepter ou non.
+                                        @if ($refundDeadline)
+                                            Les demandes se ferment le
+                                            {{ $refundDeadline->timezone(config('app.display_timezone'))
+                                                ->translatedFormat('j F \a\ H\hi') }}.
+                                        @endif
+                                        @if ($order->hasPspFee())
+                                            Les {{ $order->formattedPspFee() }} de frais de paiement
+                                            ne sont pas rembourses.
+                                        @endif
+                                    </p>
+
+                                    <label for="refundReason" class="mt-4 mb-1.5 block text-sm font-medium text-ink">
+                                        Motif <span class="font-normal text-grey-400">(facultatif)</span>
+                                    </label>
+                                    <textarea id="refundReason" rows="2" wire:model="refundReason"
+                                              class="field" maxlength="500"></textarea>
+
+                                    @error('refund')
+                                        <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
+                                    @enderror
+
+                                    <button type="submit" class="btn btn-ghost btn-pill mt-3"
+                                            wire:loading.attr="disabled">
+                                        Envoyer la demande
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    </details>
+                @endif
+            </div>
+        @endif
+
         {{-- Recapitulatif : surface pleine, chiffres tabulaires. --}}
         <dl class="mt-8 space-y-2.5 border-t border-white/70 pt-6 text-sm">
             <div class="flex justify-between gap-4">
@@ -156,6 +272,15 @@
                     <dd class="text-ink tabular">{{ $item->formattedSubtotal() }}</dd>
                 </div>
             @endforeach
+
+            @if ($order->hasPspFee())
+                {{-- Les frais restent visibles apres la commande : c'est ce
+                     que l'acheteur compare a son releve (decision D-023). --}}
+                <div class="flex justify-between gap-4">
+                    <dt class="text-grey-500">Frais de paiement</dt>
+                    <dd class="text-ink tabular">{{ $order->formattedPspFee() }}</dd>
+                </div>
+            @endif
 
             <div class="flex justify-between gap-4 border-t border-grey-200/70 pt-2.5">
                 <dt class="font-medium text-ink">Total</dt>

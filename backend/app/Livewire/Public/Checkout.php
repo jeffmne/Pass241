@@ -8,6 +8,8 @@ use App\Models\Event;
 use App\Models\TicketType;
 use App\Rules\MobileMoneyNumber;
 use App\Services\Payments\PaymentManager;
+use App\Services\Payments\PspFeeCalculator;
+use App\Support\BuyerOrders;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use RuntimeException;
@@ -121,10 +123,10 @@ class Checkout extends Component
         $this->quantities[$ticketTypeId] = max(0, $current - 1);
     }
 
-    /** Montant total, toujours recalcule depuis les prix en base. */
-    public function total(): int
+    /** Prix des billets, toujours recalcule depuis les prix en base. */
+    public function subtotal(): int
     {
-        $total = 0;
+        $subtotal = 0;
 
         foreach ($this->quantities as $ticketTypeId => $quantity) {
             if ($quantity < 1) {
@@ -134,11 +136,31 @@ class Checkout extends Component
             $ticketType = $this->ticketType((int) $ticketTypeId);
 
             if ($ticketType) {
-                $total += $ticketType->price * (int) $quantity;
+                $subtotal += $ticketType->price * (int) $quantity;
             }
         }
 
-        return $total;
+        return $subtotal;
+    }
+
+    /**
+     * Frais du prestataire de paiement, a la charge de l'acheteur
+     * (decision D-023).
+     *
+     * Calcules par le service, pas ici : cet ecran ne fait qu'AFFICHER ce que
+     * le serveur a determine. Le montant reellement debite sera recalcule au
+     * moment de creer la commande, a partir des memes prix relus en base —
+     * cet affichage ne peut donc jamais faire foi (regle 80.5).
+     */
+    public function pspFee(): int
+    {
+        return app(PspFeeCalculator::class)->feeFor($this->subtotal())->amount;
+    }
+
+    /** Montant qui partira du telephone de l'acheteur. */
+    public function total(): int
+    {
+        return $this->subtotal() + $this->pspFee();
     }
 
     public function ticketCount(): int
@@ -198,6 +220,10 @@ class Checkout extends Component
             report($e);
         }
 
+        // L'appareil retient la commande : c'est ce qui alimentera « Mes
+        // billets », sans compte et sans SMS (section 15.1, decision D-004).
+        app(BuyerOrders::class)->remember($order->reference);
+
         // Redirection vers un lien signe : l'acheteur n'a pas de compte, ce
         // lien est ce qui le ramenera a ses billets (decision D-004).
         $this->redirect($order->statusUrl(), navigate: true);
@@ -216,6 +242,8 @@ class Checkout extends Component
         return view('livewire.public.checkout', [
             'ticketTypes' => $this->event->publicTicketTypes(),
             'providers' => PaymentProvider::cases(),
+            'subtotal' => $this->subtotal(),
+            'pspFee' => $this->pspFee(),
             'total' => $this->total(),
             'ticketCount' => $this->ticketCount(),
         ]);

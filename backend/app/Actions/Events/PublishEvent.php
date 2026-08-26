@@ -2,6 +2,7 @@
 
 namespace App\Actions\Events;
 
+use App\Actions\Refunds\RefundCancelledEvent;
 use App\Enums\AuditAction;
 use App\Enums\EventStatus;
 use App\Models\Event;
@@ -19,7 +20,10 @@ use RuntimeException;
  */
 class PublishEvent
 {
-    public function __construct(private readonly AuditLogger $audit) {}
+    public function __construct(
+        private readonly AuditLogger $audit,
+        private readonly RefundCancelledEvent $refundBuyers,
+    ) {}
 
     /**
      * Met l'evenement en vente et lui donne sa page publique.
@@ -91,7 +95,7 @@ class PublishEvent
             throw new RuntimeException('Une annulation doit toujours etre motivee.');
         }
 
-        return DB::transaction(function () use ($event, $actor, $reason) {
+        $cancelled = DB::transaction(function () use ($event, $actor, $reason) {
             $event->forceFill([
                 'status' => EventStatus::Cancelled,
                 'cancelled_at' => now(),
@@ -107,6 +111,23 @@ class PublishEvent
 
             return $event->refresh();
         });
+
+        /*
+         * Rembourse tous les acheteurs, FRAIS COMPRIS (decision D-028).
+         *
+         * Hors de la transaction d'annulation, et volontairement : chaque
+         * remboursement appelle le prestataire, et une centaine d'appels
+         * reseau n'ont rien a faire dans une transaction de base de donnees.
+         * L'annulation, elle, est deja actee — c'est elle qui compte pour les
+         * acheteurs qui consultent la page publique.
+         *
+         * Les echecs individuels sont journalises sans interrompre : un
+         * acheteur dont le remboursement echoue ne doit pas empecher les
+         * autres d'etre rembourses.
+         */
+        $this->refundBuyers->handle($cancelled, $actor);
+
+        return $cancelled;
     }
 
     private function assertTransition(Event $event, EventStatus $target): void

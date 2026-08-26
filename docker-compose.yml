@@ -15,6 +15,12 @@ services:
       # Cela fausse la generation du classmap Composer et la decouverte de
       # fichiers par les paquets. Voir docs/00-decisions.md, decision D-013.
       - vendor:/var/www/html/vendor
+      # Vues compilees, cache et sessions : machine-generes, jamais lus depuis
+      # Windows. Sur le montage, Blade echoue a horodater ses fichiers
+      # (« touch(): Utime failed ») — chmod accorde l'ecriture, mais utime
+      # exige la propriete du fichier, que le montage ne peut pas accorder.
+      # storage/logs reste sur le montage : celui-la, on veut le lire.
+      - framework:/var/www/html/storage/framework
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,6 +92,12 @@ services:
     volumes:
       - ./backend:/var/www/html
       - vendor:/var/www/html/vendor
+      # Vues compilees, cache et sessions : machine-generes, jamais lus depuis
+      # Windows. Sur le montage, Blade echoue a horodater ses fichiers
+      # (« touch(): Utime failed ») — chmod accorde l'ecriture, mais utime
+      # exige la propriete du fichier, que le montage ne peut pas accorder.
+      # storage/logs reste sur le montage : celui-la, on veut le lire.
+      - framework:/var/www/html/storage/framework
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,6 +117,12 @@ services:
     volumes:
       - ./backend:/var/www/html
       - vendor:/var/www/html/vendor
+      # Vues compilees, cache et sessions : machine-generes, jamais lus depuis
+      # Windows. Sur le montage, Blade echoue a horodater ses fichiers
+      # (« touch(): Utime failed ») — chmod accorde l'ecriture, mais utime
+      # exige la propriete du fichier, que le montage ne peut pas accorder.
+      # storage/logs reste sur le montage : celui-la, on veut le lire.
+      - framework:/var/www/html/storage/framework
     depends_on:
       redis:
         condition: service_healthy
@@ -115,6 +133,7 @@ volumes:
   pgdata:
   redisdata:
   vendor:
+  framework:
 
 networks:
   pass241:

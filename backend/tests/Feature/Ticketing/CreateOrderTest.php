@@ -1,11 +1,13 @@
 <?php
 
+use App\Actions\Orders\ConfirmPayment;
 use App\Actions\Orders\CreateOrder;
 use App\Enums\AuditAction;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentProvider;
 use App\Jobs\ExpireOrderIfUnpaid;
 use App\Models\AuditLog;
+use App\Models\Commission;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\TicketType;
@@ -67,10 +69,32 @@ it('calcule le montant depuis les prix en base, jamais depuis le client', functi
         $this->vip->id => 1,
     ]);
 
-    // 2 x 10 000 + 1 x 50 000
-    expect($order->amount)->toBeXaf()
-        ->and($order->amount)->toBe(70_000)
-        ->and($order->formattedAmount())->toContain('70');
+    // 2 x 10 000 + 1 x 50 000 de billets, plus 2 % de frais de prestataire
+    // avances par l'acheteur (decision D-023).
+    expect($order->subtotal)->toBeXaf()
+        ->and($order->subtotal)->toBe(70_000)
+        ->and($order->psp_fee_amount)->toBe(1_400)
+        ->and($order->amount)->toBe(71_400)
+        ->and($order->formattedAmount())->toContain('71');
+});
+
+it('n assied jamais la commission sur les frais du prestataire', function () {
+    $order = ($this->place)([$this->vip->id => 1]);
+
+    // Le billet vaut 50 000 : la commission Pass241 porte sur cette somme, pas
+    // sur les 51 000 debites. Prendre le total pour assiette reviendrait a
+    // prelever une commission sur l'argent de l'operateur, et gonflerait le
+    // net reverse a l'organisateur (decision D-023).
+    expect($order->subtotal)->toBe(50_000)
+        ->and($order->amount)->toBe(51_000);
+
+    app(ConfirmPayment::class)->handle($order);
+
+    $commission = Commission::query()->acrossOrganizations()->firstOrFail();
+
+    expect($commission->gross_amount)->toBe(50_000)
+        ->and($commission->commission_amount)->toBe(2_500)
+        ->and($commission->net_amount)->toBe(47_500);
 });
 
 it('fige le prix et le nom du billet au moment de l achat', function () {
@@ -87,7 +111,7 @@ it('fige le prix et le nom du billet au moment de l achat', function () {
     // ce jour-la : c'est la base de toute reconciliation (section 46).
     expect($item->unit_price)->toBe(10_000)
         ->and($item->ticket_type_name)->toBe('Standard')
-        ->and($order->fresh()->amount)->toBe(10_000);
+        ->and($order->fresh()->subtotal)->toBe(10_000);
 });
 
 it('accepte une commande sans adresse email', function () {
@@ -113,7 +137,9 @@ it('journalise la creation de la commande', function () {
 
     expect($log->organization_id)->toBe($this->organization->id)
         ->and($log->metadata['reference'])->toBe($order->reference)
-        ->and($log->metadata['amount'])->toBe(10_000);
+        ->and($log->metadata['subtotal'])->toBe(10_000)
+        ->and($log->metadata['psp_fee'])->toBe(200)
+        ->and($log->metadata['amount'])->toBe(10_200);
 });
 
 it('refuse un billet appartenant a un autre evenement', function () {

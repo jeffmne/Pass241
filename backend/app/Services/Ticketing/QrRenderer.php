@@ -6,6 +6,7 @@ use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Color\Color;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\RoundBlockSizeMode;
+use Endroid\QrCode\Writer\PngWriter;
 use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Support\Facades\Cache;
 
@@ -36,6 +37,38 @@ class QrRenderer
             'qr:'.md5($data.'|'.$size),
             now()->addDay(),
             fn () => $this->render($data, $size),
+        );
+    }
+
+    /**
+     * Rend un QR Code en PNG, encode en data URI.
+     *
+     * Reserve au PDF. Le moteur de rendu PDF ne dessine pas le SVG de facon
+     * fiable — le code peut disparaitre completement du document, ce qui rend
+     * le billet inutilisable a l'entree. Le PNG, lui, est toujours rendu.
+     *
+     * Genere a haute resolution puis reduit par la mise en page : a la taille
+     * d'impression, les modules restent nets.
+     */
+    public function pngDataUri(string $data, int $size = 600): string
+    {
+        return Cache::remember(
+            'qr-png:'.md5($data.'|'.$size),
+            now()->addDay(),
+            function () use ($data, $size) {
+                $result = new Builder(
+                    writer: new PngWriter,
+                    data: $data,
+                    errorCorrectionLevel: ErrorCorrectionLevel::High,
+                    size: $size,
+                    margin: 0,
+                    roundBlockSizeMode: RoundBlockSizeMode::Margin,
+                    foregroundColor: new Color(16, 19, 26),
+                    backgroundColor: new Color(255, 255, 255),
+                )->build();
+
+                return $result->getDataUri();
+            },
         );
     }
 

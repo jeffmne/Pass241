@@ -2,7 +2,12 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Enums\PermissionName;
 use App\Enums\RoleName;
+use App\Models\Event;
+use App\Models\Organization;
+use App\Models\Settlement;
+use App\Services\Statistics\TicketingStatistics;
 use App\Support\Tenancy\OrganizationContext;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -23,13 +28,54 @@ class Overview extends Component
         $organization = app(OrganizationContext::class)->current();
         $user = auth()->user();
 
+        $statistics = app(TicketingStatistics::class);
+
         return view('livewire.dashboard.overview', [
+            'stats' => $statistics->forOrganization($organization),
+            'byType' => $statistics->byTicketType($organization),
+            /*
+             * Les MONTANTS sont conditionnes par la permission financiere ;
+             * les decomptes de billets ne le sont pas (section 10).
+             *
+             * Un CO_ORGANIZER gere la billetterie sans acces aux finances : il
+             * doit savoir combien de billets sont partis pour organiser
+             * l'entree, sans voir les recettes. Masquer les deux le rendrait
+             * incapable de faire son travail.
+             */
+            'canSeeMoney' => $user->can(PermissionName::FinancesView->value),
             'organization' => $organization,
             'user' => $user,
             'roles' => $user->roles->pluck('name')
                 ->map(fn (string $name) => RoleName::tryFrom($name)?->label() ?? $name)
                 ->all(),
             'memberCount' => $organization->members()->active()->count(),
+            // Section 21.2 : l'organisateur doit savoir quand son argent
+            // arrive. C'est la question la plus posee au support d'une
+            // billetterie, et la seule reponse acceptable est une date.
+            'settlements' => Settlement::query()
+                ->with('event')
+                ->latest()
+                ->limit(5)
+                ->get(),
+            'upcomingPayout' => $this->upcomingPayout($organization),
         ]);
+    }
+
+    /**
+     * Prochain reversement attendu, quand il n'a pas encore ete instruit.
+     *
+     * Calcule a partir du premier evenement termine non encore reverse : c'est
+     * lui qui determine la date. Aucun montant n'est affiche ici — il ne sera
+     * fige qu'a la creation du reversement, et annoncer un chiffre qui bougera
+     * vaut moins que ne rien annoncer.
+     */
+    private function upcomingPayout(Organization $organization): ?Event
+    {
+        return Event::query()
+            ->whereNotNull('ends_at')
+            ->whereDoesntHave('settlement')
+            ->where('ends_at', '<=', now())
+            ->orderBy('ends_at')
+            ->first();
     }
 }

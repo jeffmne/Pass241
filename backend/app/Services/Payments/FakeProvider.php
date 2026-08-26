@@ -2,7 +2,9 @@
 
 namespace App\Services\Payments;
 
+use App\Enums\PaymentProvider;
 use App\Enums\PaymentState;
+use App\Enums\PayoutState;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -21,12 +23,34 @@ use Illuminate\Support\Str;
  *
  * L'etat simule vit dans le cache, jamais en base : rien de ce provider ne doit
  * survivre a l'environnement de developpement.
+ *
+ * Implemente les DEUX contrats (decision D-024) : il encaisse et il reverse.
+ * C'est volontairement le cas le plus favorable — un prestataire complet, avec
+ * virement programme. Cela permet de construire le reversement apres evenement
+ * du jalon D sans attendre un contrat, tout en gardant a l'esprit qu'aucun
+ * prestataire reel n'a encore confirme ces capacites.
  */
-class FakeProvider implements PaymentProviderInterface
+class FakeProvider implements CollectionProvider, SettlementProvider
 {
     public function name(): string
     {
         return 'fake';
+    }
+
+    public function capabilities(): PaymentCapabilities
+    {
+        return new PaymentCapabilities(
+            // Faux : meme en simulation, on ne se donne pas la capacite la plus
+            // confortable. L'eclatement natif change l'architecture entiere du
+            // reversement, et le supposer acquis conduirait a construire le
+            // jalon D sur une hypothese qu'aucun prestataire gabonais n'a
+            // confirmee.
+            nativeSplit: false,
+            payout: true,
+            scheduledPayout: true,
+            partialRefund: true,
+            recipientNameLookup: true,
+        );
     }
 
     public function initializePayment(Order $order): PaymentResult
@@ -143,5 +167,87 @@ class FakeProvider implements PaymentProviderInterface
     private function key(Order $order): string
     {
         return 'fake-payment:'.$order->reference;
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Reversement (SettlementProvider)
+     * ---------------------------------------------------------------------
+     */
+
+    /**
+     * Simule un ordre de reversement.
+     *
+     * IDEMPOTENT sur la cle de la requete, et ce n'est pas un detail de
+     * simulation : c'est la propriete que les vrais prestataires devront
+     * garantir. Un ordre rejoue envoie l'argent deux fois, et une somme
+     * envoyee en double ne se recupere pas. La cle est donc consultee avant
+     * toute chose, et la reponse d'origine renvoyee telle quelle.
+     */
+    public function settle(PayoutRequest $request): PayoutResult
+    {
+        $key = 'fake-payout:'.$request->idempotencyKey;
+
+        if ($existing = Cache::get($key)) {
+            return new PayoutResult(
+                state: PayoutState::from($existing['state']),
+                providerReference: $existing['reference'],
+                recipientName: $existing['recipient_name'],
+                raw: ['simulated' => true, 'replayed' => true],
+            );
+        }
+
+        // Un virement date dans le futur reste dans les livres du prestataire
+        // jusqu'a l'echeance : c'est ce qui evite a Pass241 d'etre depositaire
+        // des fonds (section 21.2).
+        $state = $request->releaseAt && $request->releaseAt->isFuture()
+            ? PayoutState::Scheduled
+            : PayoutState::Succeeded;
+
+        $reference = 'FAKEPAY-'.Str::upper(Str::random(12));
+        $recipientName = $this->lookupRecipientName(
+            $request->recipientPhone,
+            $request->recipientOperator,
+        );
+
+        Cache::put($key, [
+            'state' => $state->value,
+            'reference' => $reference,
+            'recipient_name' => $recipientName,
+        ], now()->addDay());
+
+        Cache::put('fake-payout-ref:'.$reference, $state->value, now()->addDay());
+
+        return new PayoutResult(
+            state: $state,
+            providerReference: $reference,
+            recipientName: $recipientName,
+            raw: [
+                'simulated' => true,
+                'amount' => $request->amount,
+                'to' => $request->recipientPhone,
+                'release_at' => $request->releaseAt?->toIso8601String(),
+            ],
+        );
+    }
+
+    public function checkPayout(string $providerReference): PayoutResult
+    {
+        $stored = Cache::get('fake-payout-ref:'.$providerReference);
+
+        // Reference inconnue : UNKNOWN et jamais FAILED. Conclure a l'echec
+        // conduirait a rejouer l'ordre, donc a payer deux fois.
+        return new PayoutResult(
+            state: $stored ? PayoutState::from($stored) : PayoutState::Unknown,
+            providerReference: $providerReference,
+            raw: ['simulated' => true],
+        );
+    }
+
+    public function lookupRecipientName(string $phone, PaymentProvider $operator): ?string
+    {
+        // Un vrai prestataire interroge l'operateur. Ici, un nom stable
+        // derive du numero suffit a exercer l'affichage de confirmation.
+        return 'TITULAIRE '.$operator->value.' '.Str::substr($phone, -4);
     }
 }

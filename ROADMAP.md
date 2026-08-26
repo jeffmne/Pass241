@@ -62,7 +62,10 @@
 - [x] Qualité adaptative selon les capacités de l'appareil (décision D-014)
 - [x] Suppression des `wire:model.live` servant un simple état visuel (décision D-015)
 
+- [x] Nouveau logo intégré le 2026-08-26 (décision D-036) : pictogramme seul en `currentColor`, cadrage relevé à l'encre, favicon SVG clair et sombre, billet de la page d'accueil ramené à une taille de vitrine
+
 **Reste à faire sur ce chantier, non bloquant :**
+- [ ] `apple-touch-icon.png` — iOS ne lit pas les favicons SVG, et le billet vit dans le navigateur du téléphone
 - [ ] Coordonnées réelles dans le pied de page — volontairement laissées vides plutôt qu'inventées
 - [ ] Vérification du rendu sur un vrai téléphone d'entrée de gamme
 - [ ] Dashboard organisateur : non retouché, la lisibilité y prime sur l'expression
@@ -135,30 +138,143 @@
 
 ## JALON 5 — Le billet en main (Phase 3, fin)
 
-- [ ] `TicketTokenService` — payload signé, jamais d'identifiant brut (section 18)
-- [ ] Billet affiché immédiatement après confirmation (section 15.1)
-- [ ] QR Code, téléchargement PDF
-- [ ] Espace « Mes billets » par lien signé et session longue durée
-- [ ] Email de copie si une adresse a été renseignée (section 69)
+- [x] `TicketTokenService` — jeton signé HMAC, clé dédiée, aucune donnée personnelle (section 18)
+- [x] Billet affiché immédiatement après confirmation (section 15.1)
+- [x] Billet en verre liquide conforme à la section 15.2, bannière de l'événement en surimpression
+- [x] QR Code sur encart blanc opaque, jamais sur le verre (règle 70.4)
+- [x] Téléchargement du billet en **image**, capturée sur le billet affiché (décision D-021)
+- [x] PDF réservé à l'email, une pièce jointe par billet — route publique supprimée
+- [x] PDF sur une seule page, centré, QR en PNG, affiche recadrée et voile gravé (décision D-022)
+- [x] Espace « Mes billets » sans compte, par lien signé et cookie de longue durée
+- [x] Recherche manuelle par référence, pour un acheteur revenu d'un autre appareil
+- [x] Email de copie si une adresse a été renseignée (section 69), envoyé par un job
+- [x] Commande `pass241:ticket-key` pour générer la clé de signature
 
-*Vérification : la tranche verticale complète, de la création de l'événement au QR sur téléphone.*
+*Vérification : la tranche verticale complète est faite — création de l'événement, publication, achat, paiement, billet avec QR sur téléphone.*
+
+**Points ouverts :**
+- [ ] **Signature asymétrique** pour la vérification hors connexion par l'agent, sans exposer le secret sur son terminal (section 18). Le préfixe de version du jeton permet de l'ajouter sans invalider les billets en circulation — à trancher au jalon du contrôle d'accès.
+- [ ] Apple / Google Wallet (non prioritaire V1, section 15.1)
+- [ ] Vérification du rendu du PDF à l'impression réelle
+- [ ] Vérification du téléchargement en image sur Safari iOS — la capture repose sur `foreignObject`, historiquement capricieux sur ce moteur. Un échec est déjà rattrapé à l'écran, mais reste à mesurer sur un vrai appareil.
+
+---
+
+## ACCENTUATION DE L'INTERFACE — analyse faite, application à venir
+
+Décidé le 2026-08-25 : le texte visible doit être accentué. Aucune vue n'a encore été modifiée. L'analyse est faite, la reprise est mécanique.
+
+**Périmètre** : nœuds de texte des vues Blade, attributs `aria-label` / `placeholder` / `alt` / `title`, libellés d'enums, messages de validation et d'erreur. Pas les commentaires (convention interne inchangée). Volume mesuré : **213 corrections automatiques dans 21 fichiers**, plus les cas ci-dessous.
+
+**Quatre pièges de masquage, vérifiés — à ne pas réintroduire :**
+
+1. Le `>` de `$attributes->merge` ferme la balise trop tôt : ses attributs passent pour du texte et `role="img"` devient `rôle="img"`. Il faut neutraliser les expressions `{{ }}` **avant** de découper les balises.
+2. Une fonction fléchée JavaScript dans un `@click` contient `=>` : même effet. Neutraliser aussi les valeurs d'attributs (`=\s*"..."`).
+3. Le corps d'une balise peut contenir du masque — ne pas l'exclure du motif de balise, sinon la balise n'est plus trouvée du tout.
+4. L'attribut `content` d'une `<meta>` porte aussi bien une description lisible que `width=device-width` ou `summary_large_image` : le laisser hors de la liste blanche, traiter les rares descriptions à la main.
+
+**Cas grammaticaux, tous relevés :**
+
+- `a` → `à` partout, **sauf** quand il précède `été`, `pu`, `déjà` ou `pas` (auxiliaire avoir). Règle vérifiée sur les 41 occurrences.
+- `des` → `dès` : trois occurrences seulement (`kyc-banner:34`, `organizations/settings:86`, `welcome:166`).
+- `ou` → `où` : deux occurrences (`events/form:161` « Quand et où », `mail/tickets-issued:18` « Où : »).
+- `la`, `du`, `sur` : aucune occurrence à accentuer.
+
+**Mots ambigus, tranchés :** accentués — `annule`, `confirme`, `emis`, `imprime`, `publie`, `utilise`, `utilisee`, `achete` ; non accentués — `affiche`/`affiches` (le nom, l'affiche de l'événement), `limite` (le nom), `valide` (l'adjectif). `cree` devient `crée` et non `créé` dans « se crée en laissant le prix à zéro ».
+
+**Reste à faire** : compléter le dictionnaire (`francais`, `parametres`, `exigee`, `ramene`, `zero`, `autorises`), appliquer, corriger les assertions de tests qui vérifient des chaînes exactes, et traiter les chaînes visibles vivant dans des attributs JavaScript (`x-text="busy ? 'Preparation' : 'Telecharger'"`).
+
+**Données de démonstration** : le seeder contient aussi du texte non accentué (« Institut francais du Gabon »), à reprendre dans la même passe.
+
+---
+
+## DEMANDES EN ATTENTE — reçues le 2026-08-26
+
+Six chantiers demandés, à traiter au fil du développement. **Chacun commence par une analyse de l'existant et un plan soumis à validation avant toute écriture de code.** Rien n'est à implémenter tant que ce plan n'a pas été validé.
+
+### A. Période de vente par type de billet — DEJA EN PLACE, verrouillée le 2026-08-26
+
+**La fonctionnalité existait déjà**, de bout en bout : colonnes `sales_start_at` / `sales_end_at` avec contrainte `CHECK` en base, `salesHaveStarted()` / `salesHaveEnded()` / `isPurchasable()` / `unavailabilityReason()` sur `TicketType`, champs `datetime-local` et validation `after_or_equal` dans l'écran des types de billets, refus côté serveur dans `CreateOrder`, et affichage du motif à la place des boutons de quantité au checkout.
+
+Les quatre états demandés sont distingués, y compris la nuance qui compte : **« La vente est terminée » et « Complet » ne disent pas la même chose** à l'acheteur — le premier lui dit de renoncer, le second de revenir voir si une place se libère.
+
+**Ce qui manquait, et qui a été ajouté** : la couverture de tests (`SalesWindowTest`, 11 cas), dont le refus d'une commande dont la période se ferme entre l'affichage et la validation.
+
+**Un bug réel corrigé au passage** : `unavailabilityReason()` lisait `$this->event` sans lever la portée d'organisation. Sur un chemin public — où l'acheteur n'appartient à aucune organisation — la relation revenait `null` et la méthode **plantait**. `TicketType::resolvedEvent()` relit désormais l'événement hors portée et échoue en fermé. C'est la cinquième fois que cette portée piège un chemin public.
+
+### B. Statistiques du dashboard organisateur — FAIT le 2026-08-26 (décision D-031)
+
+Billets vendus, recettes, net après commission, billets restants, et répartition par catégorie avec barres CSS. Tout agrégé en SQL, cache d'une minute, montants conditionnés par `finances.view`, isolation multi-tenant vérifiée par test.
+
+**Reste à faire** : entrées et taux de présence sont déjà calculés et testés, mais masqués tant qu'aucun billet n'a été scanné — ils s'afficheront d'eux-mêmes dès que le contrôle d'accès (phase 5) produira des scans. Rien à écrire de plus.
+
+**Non fait, à évaluer plus tard** : une vue par événement plutôt que consolidée sur l'organisation. Utile dès qu'un organisateur aura plusieurs événements simultanés ; inutile aujourd'hui.
+
+### C, D, E. Conservation des fichiers de billets — ABANDONNE le 2026-08-26
+
+**Sans objet, et c'est voulu.** Aucun fichier de billet n'est stocke : le PDF est rendu a la volee au moment d'envoyer l'email (`TicketPdf`), et le PNG est produit dans le navigateur de l'acheteur (decision D-021). Rien ne touche jamais le disque ni S3.
+
+Il n'y a donc **aucun fichier a conserver, aucun a supprimer, aucune regle Lifecycle a ecrire, et aucune duree de conservation a configurer.** Le rendu a la volee n'a ni cout de stockage, ni purge a organiser, ni traçabilite de suppression a tenir — il rend le probleme inexistant plutot que de le resoudre.
+
+Les garanties d'integrite demandees sont par ailleurs deja acquises : billet, evenement, participant, type, prix, statut, QR/jeton, transaction, remboursements et historique vivent en base, et rien de ce qui touche aux fichiers ne peut les atteindre.
+
+**A rouvrir seulement si** un besoin reel de stockage apparait — par exemple si le rendu a la volee devient trop couteux sur un evenement de 100 000 billets, ou si un billet doit rester telechargeable a l'identique des annees plus tard. Le plan complet (S3 Lifecycle par prefixe date, marquage en base sans appel reseau, chunking) reste a ecrire a ce moment-la.
+
+### F. Console d'administration — FAIT le 2026-08-26 (décision D-032)
+
+Cinq écrans : vue générale, reversements, organisations, transactions, journal d'audit. Accès hors du système de rôles, vue transverse assumée, consultation seule sans aucune méthode de modification, verre liquide sur la colonne et les cartes, effets au défilement et au survol.
+
+Le réglage de durée de conservation qui motivait cet écran est sans objet (voir C, D, E).
+
+**Reste à faire, non bloquant** : suspension d'une organisation par un chemin dédié et audité (section 10) ; export du journal (section 59) ; alerte automatique sur un reversement resté en état inconnu plusieurs jours.
 
 ---
 
 ## SUITE — après validation de la tranche verticale
 
-### Phase 4 (complément)
+### Phase 4 (complément) — refonte du modèle de paiement, validée le 2026-08-25
+
+Décisions prises : frais PSP à la charge de l'acheteur et affichés séparément ; reversement après l'événement ; aucun document administratif demandé à l'organisateur.
+
+- [x] **Jalon A** — frais PSP payés par l'acheteur (décision D-023) : barème par PSP en configuration, `PspFeeCalculator` en arithmétique entière arrondie au supérieur, colonnes `subtotal` / `psp_fee_amount` / barème figé / `psp` sur `orders`, contraintes `CHECK` d'éclatement en base, ligne « Frais de paiement » au checkout et sur le suivi de commande. La commission Pass241 s'assied sur `subtotal`, jamais sur le total débité.
+  - [ ] Barèmes réels à saisir dès signature avec PVit, PAYNALA ou Digitech Africa — les valeurs de `fake` sont fictives
+- [x] **Jalon B** — abstraction PSP à deux faces (décision D-024) : `CollectionProvider` et `SettlementProvider`, capacités déclarées par le driver, `PayoutRequest` / `PayoutResult` / `PayoutState`, idempotence obligatoire sur le sortant, `holdsFunds()` comme critère de choix du prestataire
+  - [ ] `orders.psp` est renseignée mais aucune ligne financière ne porte encore la référence de transaction du prestataire côté reversement — à faire avec la table `settlements` du jalon D
+- [x] **Jalon C** — destination de reversement sur `Organization` (décision D-025) : numéro + opérateur, sans pièce justificative ni vérification par code, nom du titulaire affiché, changement journalisé à part et notifié par email, colonnes hors `$fillable` avec `SetPayoutDestination` comme seul chemin d'écriture. KYC documentaire éteint derrière `payments.payouts.require_kyc_documents`, non supprimé.
+  - [ ] Écran des réglages non vérifié visuellement — couvert par les tests Livewire, mais la connexion demande une saisie de mot de passe
+- [x] **Jalon D** — reversement après l'événement (décision D-026) : table `settlements` aux montants gelés par déclencheur, un virement par événement, `SettleEvent` avec quatre barrières contre le double paiement, commandes planifiées `pass241:settle-events` (horaire) et `pass241:reconcile-settlements` (deux fois par jour), liste en consultation seule au tableau de bord — aucun bouton « retirer »
+  - [x] Notifier l'organisateur quand son reversement est parti (section 69) — envoyé dès l'acceptation de l'ordre, avec l'éclatement brut / commission / net
+  - [x] Console Super Admin des reversements (décision D-030) : accès hors rôles via `EnsureSuperAdmin`, vue transverse assumée, consultation seule sans aucune méthode de modification, totaux agrégés en SQL
+  - [ ] Alerte quand un reversement reste en état inconnu plusieurs jours — aujourd'hui visible seulement dans la sortie de la commande
+- [x] **Jalon E** — remboursements (décision D-027) : `refund_requests`, règle des 48h vérifiée serveur et en échec fermé, décision motivée de l'organisateur, ajustement de commission par ligne nouvelle au taux figé, déduction automatique du reversement, `pass241:expire-refund-requests`, écran acheteur et écran organisateur
+  - [x] Notifier le client de la décision par email (section 69), motif du refus compris
+  - [x] Annulation d'événement par l'organisateur (décision D-028) : remboursement de tous les billets frais compris, demandes créées déjà approuvées, délai de 48h ignoré, commission rendue sur la part billets seulement
+- [ ] Critère éliminatoire dans le choix du PSP : les fonds doivent rester dans les livres du PSP (sous-compte marchand + reversement programmé par API), Pass241 ne faisant que donner l'instruction
 - [ ] Airtel Money réel, Moov Money réel (dès obtention des credentials)
-- [ ] Reçus
-- [ ] Remboursements, modèle hybride demande/décision (section 24.1)
-- [ ] `CommissionSettlementStrategy` et reversement (section 21.2)
+- [x] Reçus (décision D-029) : PDF sur lien signé et joint à l'email, vendeur = organisateur, frais détaillés, commission absente, remboursements reflétés
 
 ### Phase 5 — Contrôle d'accès
-- [ ] Application React Native / Expo (périmètre V1, section 27.17)
-- [ ] Comptes agents, points d'entrée
-- [ ] Scan QR, validation locale
-- [ ] Mode hors connexion, SQLite, synchronisation
-- [ ] `ScanConflictResolver` (double scan)
+
+**Socle serveur fait le 2026-08-26 (décision D-033)** : `entry_points`, `event_agents`, `access_scans` en ajout seul, `ValidateTicket` avec verrou et arbitrage du double scan, API agent complète (connexion Sanctum, événements, synchronisation incrémentale par curseur, remontée de lots de scans). 34 tests.
+
+**Écrans web faits le 2026-08-26 (décision D-034)** : portes et agents sur un seul écran attaché à l'événement, point d'entrée facultatif, plusieurs agents possibles sur une même porte, mot de passe généré affiché une seule fois, fermeture plutôt que suppression. 13 tests.
+
+**Tableau de bord, historique et entrée sans QR faits le 2026-08-26 (décision D-035)** : compteurs de l'entrée entière et de l'agent, historique corrigé par le serveur, recherche manuelle, et admission à la référence marquée comme telle. 18 tests.
+
+**Écran des entrées fait le 2026-08-26 (décision D-037)** : le pendant organisateur — compteurs, journal filtrable, admission manuelle comptée à part, en lecture seule définitive. 14 tests.
+
+- [x] Comptes agents, points d'entrée
+- [x] Scan QR et validation serveur
+- [x] Résolution du double scan hors connexion (section 31.1)
+- [x] API agent : connexion, synchronisation, remontée des scans
+- [x] Écrans web de gestion des agents et des points d'entrée
+- [x] Tableau de bord agent et historique des contrôles (sections 27.14, 27.15) — côté serveur ; les écrans viennent avec l'application
+- [x] Écran organisateur des entrées (décision D-037) : qui est passé, par quelle porte, ce qui a été refusé, et **combien d'entrées ont été accordées sans lecture du QR**. Lecture seule, vérifiée par un test qui refuse toute méthode d'écriture. 14 tests
+- [x] Application React Native / Expo (périmètre V1, section 27.17) — décision D-038 : connexion, événements autorisés, scanner, validation locale, historique, recherche manuelle, compteurs. 31 tests sur les modules purs
+- [x] Base locale SQLite et file de synchronisation côté application (décision D-038)
+- [ ] **Premier lancement sur un vrai appareil.** Le contrat d'API est vérifié de bout en bout contre le serveur local, et `npm run typecheck` / `npm test` passent — mais caméra, SQLite, SecureStore et NetInfo n'existent que sur un téléphone. Rien de ce qui touche au matériel n'a encore tourné
+- [ ] Révocation d'un appareil à distance (section 27.3) — le serveur sait révoquer une affectation, l'application ne l'apprend qu'à sa requête suivante
+- [ ] Signature asymétrique du jeton, pour une vérification hors ligne sans empreintes (section 18, décision D-018)
 
 ### Phase 6 — Invitations et promotions
 - [ ] Invitations (section 25)

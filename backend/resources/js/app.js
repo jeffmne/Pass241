@@ -219,6 +219,23 @@ function initStickyHeader() {
  * Amorcage
  * ---------------------------------------------------------------------- */
 
+/* -------------------------------------------------------------------------
+ * Telechargement du billet en image
+ * ---------------------------------------------------------------------- */
+
+/*
+ * Expose au bouton de la page billet.
+ *
+ * L'`import()` reste ici, au plus haut niveau : le module de capture et sa
+ * dependance ne sont demandes qu'au clic. Un visiteur qui consulte son billet
+ * sans le telecharger ne paie pas un octet pour cette fonctionnalite
+ * (regle 1 de ce fichier, section 72).
+ */
+window.Pass241 = window.Pass241 || {};
+
+window.Pass241.downloadTicketImage = (ticket, filename) =>
+    import('./ticket-image.js').then((module) => module.downloadTicketImage(ticket, filename));
+
 function boot() {
     initSpecular();
     initReveal();

@@ -66,6 +66,94 @@
         </form>
     </section>
 
+    {{-- ----------------------------------------------------------------
+         Reversement (section 21.2, decision D-025)
+
+         Le numero sur lequel l'organisateur recoit le net de ses ventes.
+         Aucune verification par code n'est demandee : le compte mobile money
+         est deja verifie par l'operateur, qui reclame une piece d'identite a
+         l'ouverture. Le nom du titulaire renvoye par le prestataire est
+         affiche ensuite — c'est le seul garde-fou contre une faute de frappe,
+         et un virement mobile money ne se rappelle pas.
+    ----------------------------------------------------------------- --}}
+    <section class="surface mt-5 p-4 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="font-display text-lg font-bold text-ink">Reversement</h2>
+            @if ($organization->hasPayoutDestination())
+                <span class="rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
+                    Numero enregistre
+                </span>
+            @else
+                <span class="rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
+                    A renseigner
+                </span>
+            @endif
+        </div>
+
+        <p class="mt-2 text-sm leading-relaxed text-grey-500">
+            Vos recettes sont versees sur ce numero apres votre evenement,
+            deduction faite de la commission Pass241.
+        </p>
+
+        @if (session('payout-saved'))
+            <p class="mt-4 flex items-start gap-2.5 rounded-xl border border-success/30 bg-success/5 px-3 py-2.5 text-sm text-ink">
+                <x-lucide-circle-check class="mt-0.5 size-4 shrink-0 text-success" stroke-width="1.75" />
+                <span>Numero de reversement enregistre.</span>
+            </p>
+        @endif
+
+        @if ($organization->payout_name)
+            {{-- Le nom vient de l'operateur, pas de nous : il permet a
+                 l'organisateur de reconnaitre son propre compte avant que le
+                 premier versement ne parte. --}}
+            <p class="mt-4 flex items-start gap-2.5 rounded-xl bg-azure-50 px-3 py-2.5 text-sm text-ink">
+                <x-lucide-user-check class="mt-0.5 size-4 shrink-0 text-azure-600" stroke-width="1.75" />
+                <span>
+                    Vous recevrez vos recettes sur le
+                    <span class="font-semibold tabular">{{ $organization->payout_phone }}</span>,
+                    au nom de <span class="font-semibold">{{ $organization->payout_name }}</span>.
+                    Si ce n'est pas votre compte, corrigez le numero.
+                </span>
+            </p>
+        @endif
+
+        <form wire:submit="savePayoutDestination" class="mt-5">
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label for="payoutOperator" class="mb-1.5 block text-sm font-medium text-ink">Operateur</label>
+                    <select id="payoutOperator" wire:model="payoutOperator" class="field" @disabled(! $canManage)>
+                        <option value="">Choisir</option>
+                        @foreach ($operators as $operator)
+                            <option value="{{ $operator->value }}">{{ $operator->label() }}</option>
+                        @endforeach
+                    </select>
+                    @error('payoutOperator') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
+                </div>
+
+                <div>
+                    <label for="payoutPhone" class="mb-1.5 block text-sm font-medium text-ink">Numero</label>
+                    <input id="payoutPhone" type="tel" inputmode="numeric" autocomplete="off"
+                           wire:model="payoutPhone" class="field" placeholder="074 00 00 00"
+                           @disabled(! $canManage)>
+                    @error('payoutPhone') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
+                </div>
+            </div>
+
+            @if ($canManage)
+                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-xs leading-relaxed text-grey-400">
+                        Tout changement de ce numero est journalise et signale par email.
+                    </p>
+                    <button type="submit" class="btn btn-primary w-full shrink-0 sm:w-auto"
+                            wire:loading.attr="disabled">
+                        Enregistrer le numero
+                    </button>
+                </div>
+            @endif
+        </form>
+    </section>
+
+    @if ($kycDocumentsRequired)
     <section class="surface mt-5 p-4 sm:p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <h2 class="font-display text-lg font-bold text-ink">Verification d'identite</h2>
@@ -146,4 +234,5 @@
             </form>
         @endif
     </section>
+    @endif
 </div>

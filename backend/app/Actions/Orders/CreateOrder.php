@@ -10,6 +10,8 @@ use App\Models\Event;
 use App\Models\Order;
 use App\Models\TicketType;
 use App\Services\Audit\AuditLogger;
+use App\Services\Payments\PaymentManager;
+use App\Services\Payments\PspFeeCalculator;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -32,6 +34,8 @@ class CreateOrder
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly OrganizationContext $context,
+        private readonly PspFeeCalculator $fees,
+        private readonly PaymentManager $payments,
     ) {}
 
     /**
@@ -72,7 +76,7 @@ class CreateOrder
                 $provider, $payerPhone, $ipAddress
             ) {
                 $lines = [];
-                $total = 0;
+                $ticketsTotal = 0;
 
                 foreach ($quantities as $ticketTypeId => $quantity) {
                     $ticketType = $this->resolveTicketType($event, (int) $ticketTypeId);
@@ -81,17 +85,30 @@ class CreateOrder
 
                     // Instantane du prix : la commande doit continuer a dire ce
                     // qui a ete paye, meme si le tarif change ensuite.
-                    $subtotal = $ticketType->price * $quantity;
-                    $total += $subtotal;
+                    $lineTotal = $ticketType->price * $quantity;
+                    $ticketsTotal += $lineTotal;
 
                     $lines[] = [
                         'ticket_type_id' => $ticketType->getKey(),
                         'ticket_type_name' => $ticketType->name,
                         'quantity' => $quantity,
                         'unit_price' => $ticketType->price,
-                        'subtotal' => $subtotal,
+                        'subtotal' => $lineTotal,
                     ];
                 }
+
+                /*
+                 * Frais du prestataire, a la charge de l'acheteur
+                 * (decision D-023). Calcules ici et nulle part ailleurs : le
+                 * montant debite est celui que le serveur produit, jamais
+                 * celui que le navigateur a affiche (regle 80.5).
+                 *
+                 * Le bareme est fige sur la commande. Sans cet instantane, une
+                 * transaction deviendrait inexplicable apres un changement de
+                 * prestataire.
+                 */
+                $psp = $this->payments->driver()->name();
+                $fee = $this->fees->feeFor($ticketsTotal, $psp);
 
                 $order = new Order([
                     'event_id' => $event->getKey(),
@@ -100,7 +117,14 @@ class CreateOrder
                     'email' => $email,
                     'payment_provider' => $provider,
                     'payer_phone' => $payerPhone,
-                    'amount' => $total,
+                    'psp' => $psp,
+                    // `subtotal` est l'assiette de la commission Pass241 ;
+                    // `amount` est ce qui part du telephone de l'acheteur.
+                    'subtotal' => $ticketsTotal,
+                    'psp_fee_amount' => $fee->amount,
+                    'psp_fee_basis_points' => $fee->basisPoints,
+                    'psp_fee_fixed' => $fee->fixed,
+                    'amount' => $ticketsTotal + $fee->amount,
                     // Section 17.1 : la duree de reservation est celle du delai
                     // de validation du paiement. Les deux ne doivent jamais
                     // diverger, d'ou une source unique.
@@ -129,7 +153,13 @@ class CreateOrder
                 $order,
                 [
                     'reference' => $order->reference,
+                    // Les trois montants, et non le seul total : un audit doit
+                    // pouvoir dire ce qui revenait a qui sans recalculer avec
+                    // un bareme qui aura peut-etre change.
                     'amount' => $order->amount,
+                    'subtotal' => $order->subtotal,
+                    'psp_fee' => $order->psp_fee_amount,
+                    'psp' => $order->psp,
                     'provider' => $provider->value,
                     'tickets' => $order->items->sum('quantity'),
                 ],

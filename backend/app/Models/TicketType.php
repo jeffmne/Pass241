@@ -133,13 +133,40 @@ class TicketType extends Model
             && $this->salesHaveStarted()
             && ! $this->salesHaveEnded()
             && ! $this->isSoldOut()
-            && $this->event->allowsPurchase();
+            && (bool) $this->resolvedEvent()?->allowsPurchase();
+    }
+
+    /**
+     * Evenement porteur, lisible hors portee d'organisation.
+     *
+     * L'acheteur n'appartient a aucune organisation : une simple lecture de la
+     * relation reviendrait null sur la page publique, et ces deux methodes
+     * planteraient sur un evenement inexistant. `Event::publicTicketTypes()`
+     * rattache deja l'evenement pour cette raison — ce repli fait que
+     * l'appelant n'a plus a y penser, et transforme une erreur fatale en
+     * refus propre.
+     */
+    private function resolvedEvent(): ?Event
+    {
+        if ($this->relationLoaded('event') && $this->event) {
+            return $this->event;
+        }
+
+        $event = Event::query()->acrossOrganizations()->find($this->event_id);
+
+        if ($event) {
+            $this->setRelation('event', $event);
+        }
+
+        return $event;
     }
 
     /** Raison pour laquelle l'achat est ferme, a afficher a l'acheteur. */
     public function unavailabilityReason(): ?string
     {
-        if (! $this->event->allowsPurchase()) {
+        // Echec en ferme : sans evenement lisible, la vente est fermee. Une
+        // anomalie ne doit pas ouvrir un droit d'achat.
+        if (! $this->resolvedEvent()?->allowsPurchase()) {
             return 'La vente n\'est pas ouverte.';
         }
 

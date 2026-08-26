@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Organizations;
 
+use App\Actions\Organizations\SetPayoutDestination;
 use App\Actions\Organizations\SubmitKyc;
 use App\Enums\AuditAction;
 use App\Enums\DocumentType;
 use App\Enums\KycStatus;
+use App\Enums\PaymentProvider;
 use App\Enums\PermissionName;
 use App\Models\OrganizationDocument;
+use App\Rules\MobileMoneyNumber;
 use App\Services\Audit\AuditLogger;
 use App\Support\Tenancy\OrganizationContext;
 use Livewire\Attributes\Layout;
@@ -34,6 +37,17 @@ class Settings extends Component
     /** @var array<string, mixed> */
     public array $documents = [];
 
+    /*
+     * Destination de reversement (section 21.2, decision D-025).
+     *
+     * Ces deux champs ne sont jamais ecrits directement sur le modele : ils
+     * passent par SetPayoutDestination, seul chemin d'ecriture, qui journalise
+     * et notifie. Les colonnes correspondantes sont hors de `$fillable`.
+     */
+    public string $payoutPhone = '';
+
+    public string $payoutOperator = '';
+
     public function mount(OrganizationContext $context): void
     {
         $organization = $context->current();
@@ -41,6 +55,44 @@ class Settings extends Component
         $this->name = $organization->name;
         $this->contactEmail = $organization->contact_email ?? '';
         $this->contactPhone = $organization->contact_phone ?? '';
+        $this->payoutPhone = $organization->payout_phone ?? '';
+        $this->payoutOperator = $organization->payout_operator?->value ?? '';
+    }
+
+    /**
+     * Enregistre le numero sur lequel l'organisateur recoit ses recettes.
+     *
+     * Aucune verification par code n'est demandee (decision D-025) : le compte
+     * mobile money est deja verifie par l'operateur. Le nom du titulaire
+     * renvoye par le prestataire est affiche ensuite, ce qui laisse a
+     * l'organisateur une chance de reperer une faute de frappe — un virement
+     * mobile money ne se rappelle pas.
+     */
+    public function savePayoutDestination(
+        SetPayoutDestination $action,
+        OrganizationContext $context,
+    ): void {
+        $this->authorizeManage();
+
+        $this->validate([
+            'payoutOperator' => ['required', 'in:'.implode(',', PaymentProvider::values())],
+            'payoutPhone' => [
+                'required', 'string', 'max:20',
+                new MobileMoneyNumber(PaymentProvider::tryFrom($this->payoutOperator)),
+            ],
+        ], attributes: [
+            'payoutOperator' => 'operateur',
+            'payoutPhone' => 'numero de reversement',
+        ]);
+
+        $action->handle(
+            organization: $context->current(),
+            phone: $this->payoutPhone,
+            operator: PaymentProvider::from($this->payoutOperator),
+            actor: auth()->user(),
+        );
+
+        session()->flash('payout-saved', true);
     }
 
     /**
@@ -141,6 +193,11 @@ class Settings extends Component
                 ->keyBy(fn (OrganizationDocument $doc) => $doc->type->value),
             'canSubmitKyc' => $organization->kyc_status !== KycStatus::Verified,
             'canManage' => auth()->user()->can(PermissionName::OrganizationManage->value),
+            'operators' => PaymentProvider::cases(),
+            // Decision D-025 : plus aucune piece n'est demandee a
+            // l'organisateur. Le dispositif reste en place derriere ce
+            // reglage, pret a etre rallume.
+            'kycDocumentsRequired' => (bool) config('payments.payouts.require_kyc_documents'),
         ]);
     }
 }

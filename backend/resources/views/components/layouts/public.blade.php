@@ -31,6 +31,7 @@
         <meta name="robots" content="noindex, nofollow">
     @endunless
 
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="/favicon.ico" sizes="any">
 
     {{--
@@ -94,7 +95,7 @@
                    'text-white group-data-[stuck=true]:text-azure-700' => $heroDark,
                    'text-azure-700' => ! $heroDark,
                ])>
-                <x-lucide-ticket class="size-5" stroke-width="1.75" />
+                <x-brand-mark class="h-7 w-auto" />
                 Pass241
             </a>
             <span @class([

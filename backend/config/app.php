@@ -86,6 +86,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cle de signature des billets
+    |--------------------------------------------------------------------------
+    |
+    | Section 18 : le QR Code encode une charge utile signee, jamais un
+    | identifiant brut.
+    |
+    | Volontairement distincte d'APP_KEY : une rotation de la cle applicative
+    | ne doit jamais invalider des billets deja vendus, et parfois deja
+    | imprimes.
+    |
+    */
+
+    'ticket_token_key' => env('TICKET_TOKEN_SIGNING_KEY', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------
     |

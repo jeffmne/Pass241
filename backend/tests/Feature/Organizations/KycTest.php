@@ -146,8 +146,11 @@ it('debloque le reversement apres verification par un administrateur', function 
     $organization = $this->organization->fresh();
 
     expect($organization->kyc_status)->toBe(KycStatus::Verified)
-        ->and($organization->canReceivePayouts())->toBeTrue()
-        ->and($organization->kyc_verified_at)->not->toBeNull();
+        ->and($organization->kyc_verified_at)->not->toBeNull()
+        // Depuis la decision D-025, la verification ne suffit plus a elle
+        // seule : sans numero de destination, il n'y a rien vers quoi virer.
+        ->and($organization->canReceivePayouts())->toBeFalse()
+        ->and($organization->payoutBlocker())->toContain('numero mobile money');
 });
 
 it('interdit a un organisateur de verifier sa propre organisation', function () {

@@ -89,6 +89,35 @@ class Event extends Model
         return $this->hasOne(EventLocation::class);
     }
 
+    /** Billets emis pour cet evenement (section 18). */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class);
+    }
+
+    /** Points d'entree de l'evenement (section 29). */
+    public function entryPoints(): HasMany
+    {
+        return $this->hasMany(EntryPoint::class);
+    }
+
+    /** Agents affectes au controle de cet evenement (section 30). */
+    public function agents(): HasMany
+    {
+        return $this->hasMany(EventAgent::class);
+    }
+
+    /**
+     * Reversement du net a l'organisateur (section 21.2).
+     *
+     * Un seul par evenement, garanti par une contrainte d'unicite : c'est ce
+     * qui empeche de payer deux fois apres un echec transitoire.
+     */
+    public function settlement(): HasOne
+    {
+        return $this->hasOne(Settlement::class);
+    }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

@@ -152,6 +152,610 @@ Les blocs dépliables et le menu d'actions de la page publique sont des `<detail
 
 ---
 
+## D-018 — Jeton de billet signé par HMAC, clé dédiée
+**2026-08-25**
+
+Le QR Code encode `1.<identifiants>.<signature>` — quatre identifiants et une signature HMAC-SHA256 tronquée à 128 bits. Clé dédiée `TICKET_TOKEN_SIGNING_KEY`, jamais `APP_KEY`.
+
+**Raison de la clé dédiée** : une rotation de la clé applicative — opération de routine — invaliderait sinon tous les billets déjà vendus et parfois imprimés.
+
+**Raison de la troncature** : chaque caractère ajoute des modules au QR, donc de la difficulté à scanner sous un mauvais éclairage. 128 bits restent hors de portée d'une falsification.
+
+**Ce que le jeton ne contient pas** : aucun nom, aucune adresse, aucun prix. Un QR Code se photographie, se partage et s'affiche sur un écran verrouillé.
+
+**Ce que le jeton ne dit pas** : si le billet est encore valide. Le statut évolue après l'émission — remboursement, scan — et un jeton ne peut pas porter une information changeante. La vérification finale reste en base (section 18.1).
+
+**Limite pour le module mobile** : la section 18 autorise HMAC « au minimum », mais évoque une signature asymétrique pour la vérification hors connexion sans exposer le secret sur le terminal de l'agent. Avec HMAC, un agent hors ligne devrait détenir la clé. Le préfixe de version permet d'ajouter une branche asymétrique sans invalider les billets en circulation — à trancher au jalon du contrôle d'accès.
+
+---
+
+## D-019 — Le PDF reprend le dessin du billet, sans le verre
+**2026-08-25** — *complétée par les décisions D-021 et D-022 le même jour : le PDF n'est plus téléchargeable depuis la plateforme, et les contraintes du moteur de rendu y sont mesurées.*
+
+Le PDF reprend la composition de l'écran « Mon billet » : bandeau de marque, bannière de l'événement avec le nom en surimpression, informations, ligne de déchirure à encoches, QR sur encart blanc.
+
+**Ce qui change, et pourquoi.** Le moteur de rendu PDF ne connaît ni flexbox, ni `backdrop-filter`, ni les dégradés du verre liquide. La composition est refaite en positionnement absolu et en tableaux — seule technique donnant un résultat prévisible sur A4.
+
+Le verre liquide, lui, n'a aucun équivalent imprimable : il repose sur ce qu'il y a **derrière** lui, et une feuille de papier n'a pas d'arrière-plan. La silhouette, les encoches et la palette sont conservées ; la matière cède la place au contraste.
+
+La bannière est intégrée en `data:` URI plutôt que référencée par URL : le moteur devrait sinon la chercher par le réseau, ce qui suppose qu'il puisse joindre l'application depuis l'intérieur du conteneur — et ferait échouer le téléchargement en silence sinon.
+
+---
+
+## D-038 — Application agent : React Native, Expo SDK 57, et le cœur en modules purs
+**2026-08-26**
+
+L'application de contrôle d'accès (`/mobile`), périmètre V1 de la section 27.17. Expo SDK 57, React Native 0.86, TypeScript strict, `expo-camera` pour le scan, `expo-sqlite` pour la base locale, `expo-secure-store` pour la session, `expo-crypto` pour les empreintes.
+
+### Ce qui est testable est isolé, et testé
+
+La justesse ne vit pas dans les écrans : elle vit dans `src/domain/`, quatre modules **purs** — décision locale, file de synchronisation, écart d'horloge, libellés de verdict. Aucun ne touche au réseau, à la base ni à l'horloge : tout leur est donné.
+
+C'est la seule partie qu'on peut vérifier sans appareil, et c'est précisément celle où une erreur laisse entrer quelqu'un qui ne devrait pas. **31 tests** la couvrent. Les écrans, eux, sont minces par construction — ils affichent ce que le domaine décide.
+
+### Les trois règles reprises du serveur
+
+1. **La décision est locale, le verdict est du serveur.** L'agent voit un résultat immédiatement, hors connexion comprise ; le serveur arbitre ensuite et peut contredire (section 31.1). L'application remplace son verdict sans discuter — et le bandeau d'état signale combien de contrôles ont été retournés, sans quoi l'agent resterait sur un « entrée autorisée » périmé.
+
+2. **Aucun secret sur l'appareil.** La base locale ne stocke que des **empreintes SHA-256** de jetons. Au scan, l'application hache ce qu'elle lit et cherche l'empreinte : aucun secret n'a eu besoin de descendre. Le seul jeton conservé est celui d'un contrôle pas encore remonté — le serveur en a besoin pour vérifier la signature — et il est **effacé dès la confirmation**.
+
+3. **Un contrôle enregistré ne se perd jamais.** Écriture locale avant toute tentative réseau ; file rejouable ; idempotence garantie côté serveur. À la synchronisation, **les contrôles partent avant que les billets n'arrivent** : si la connexion ne dure que quelques secondes, ce qu'on veut sauver, ce sont les passages déjà effectués.
+
+### Deux écarts assumés avec le serveur
+
+- Un billet d'un **autre événement** est absent de la base locale : l'application dit « invalide » là où le serveur dira « autre événement ». Les deux refusent l'entrée, donc le geste de l'agent est identique, et l'historique se corrige à la synchronisation.
+- Un **double scan simultané à deux portes** n'est pas arbitrable localement — aucun téléphone ne sait ce que fait l'autre. Les deux agents voient « entrée autorisée », et le serveur déclasse le plus récent. C'est le compromis que le mode hors connexion impose : mieux vaut laisser passer deux fois dans un cas rare que bloquer une file entière dès que le réseau tombe.
+
+### Choix d'interface
+
+Pas de NativeWind ni de bibliothèque de composants : `StyleSheet` et un fichier de thème reprenant la palette. L'application a cinq écrans utilitaires ; une couche de style supplémentaire coûterait plus à maintenir qu'elle ne rapporterait.
+
+**Pas de verre liquide non plus.** Il suppose un écran posé dans une lumière choisie ; l'agent tient son téléphone à bout de bras, la nuit. Le verdict occupe tout l'écran, en aplat, et se lit avant le texte — trois tons et non deux, parce que « déjà utilisé » envoie chercher le vrai porteur là où « invalide » signale une contrefaçon.
+
+Le retour au scanner est **automatique** après deux secondes et demie : demander un geste par personne ajouterait des centaines de gestes à la soirée. Un verrou entre deux lectures empêche la caméra de produire dix contrôles pour une seule présentation.
+
+### Ce qui n'est pas vérifié, et ne peut pas l'être ici
+
+Le contrat d'API est vérifié de bout en bout contre le serveur local — connexion, événements, empreintes, compteurs, historique, recherche répondent exactement dans la forme attendue par le client. **Le reste ne l'est pas** : caméra, SQLite, SecureStore et NetInfo n'existent que sur un appareil. `npm run typecheck` et `npm test` passent ; le premier lancement réel reste à faire.
+
+### Reste ouvert
+
+- **Signature asymétrique du jeton** (section 18, décision D-018). L'empreinte protège déjà le téléphone perdu ; la clé publique permettrait en plus de vérifier une signature hors ligne, sans télécharger la moindre empreinte. Le préfixe de version du jeton permet de l'ajouter sans invalider les billets en circulation.
+- Révocation d'un appareil à distance (section 27.3) : le serveur sait révoquer une affectation, l'application ne l'apprend qu'à sa prochaine requête.
+- Build de développement et distribution interne (skill `expo-dev-client`).
+
+---
+
+## D-037 — Écran des entrées : en lecture seule, et l'admission manuelle bien visible
+**2026-08-26**
+
+Le pendant organisateur du contrôle d'accès : qui est passé, par quelle porte, et ce qui a été refusé. Pendant la soirée, c'est l'écran qu'on garde ouvert ; le lendemain, c'est celui qui répond aux questions posées après coup.
+
+### Aucun chemin d'écriture, et un test qui le vérifie
+
+Le journal des scans est en ajout seul, protégé par déclencheur PostgreSQL (section 68). L'écran n'expose aucune correction, aucune suppression — **un organisateur qui pourrait effacer une entrée pourrait nier une présence**.
+
+La garantie ne repose pas seulement sur l'intention : un test énumère les méthodes publiques du composant et échoue si l'une commence par `save`, `update`, `delete` ou `edit`. C'est ce qui empêche qu'un ajout distrait, dans six mois, ouvre discrètement la porte.
+
+### `attendees.view`, et non `access_control.manage`
+
+Cet écran nomme des personnes. Gérer les portes et lire la liste de ceux qui sont entrés sont deux droits différents, et c'est le second qui est en jeu. Les trois rôles qui gèrent le contrôle d'accès possèdent déjà `attendees.view` par défaut : la distinction ne gêne personne aujourd'hui, mais elle tient si un organisateur restreint un jour les permissions d'un Manager.
+
+### Ce que l'écran refuse de lisser
+
+- **L'admission manuelle a son propre compteur.** Elle est légitime — un QR illisible arrive — mais sa vérification est plus faible qu'un scan signé, et c'est la seule chose qu'on veut pouvoir compter après coup. La noyer dans le total la rendrait indétectable.
+- **Les billets attendus excluent les remboursés et annulés**, sans quoi le taux de présence ne pourrait jamais atteindre 100 % — un chiffre faux est pire qu'aucun chiffre.
+- **Les arbitrages de double scan sont signalés en tête**, avec l'écart d'horloge quand il est anormal (section 31.1). Les deux causes possibles — horloge déréglée ou tentative de passer à deux — méritent d'être vues.
+- **Le tri se fait sur l'heure du scan, pas de la synchronisation.** Un lot remonté après une coupure se range à l'heure où les gens sont passés.
+
+### Le filtre « sans porte déclarée »
+
+Le point d'entrée est facultatif (décision D-034) : un lieu à porte unique n'en déclare aucune. Ces contrôles doivent rester retrouvables, donc le filtre distingue trois états — une porte précise, toutes, et aucune.
+
+---
+
+## D-036 — Nouveau logo : le pictogramme seul, découpé à l'encre
+**2026-08-26**
+
+Un nouveau `docs/design/logo.svg` a été fourni : le P à traits de vitesse contenant un QR Code, le mot-symbole « Pass 241 », et la signature « Vivez, réservez, profitez. ».
+
+### Ce que l'interface reprend, et ce qu'elle laisse
+
+**Le pictogramme seul.** Le mot-symbole reste du texte vivant, comme avant : un mot vectorisé devient flou sous vingt pixels, ne se sélectionne pas, ne se lit pas à la voix, et ne suit pas la graisse du reste de la page. La signature suit la même règle.
+
+Le tracé est monochrome, donc `currentColor` s'applique : azur dans l'en-tête, blanc sur le bandeau du billet, sans dupliquer un seul fichier.
+
+### Le cadrage vient de l'encre, pas des coordonnées
+
+Le logo a été rasterisé puis parcouru pixel par pixel. Trois bandes d'encre séparées par du vide parfait : le pictogramme (y 215–681), le mot-symbole (706–860), la signature (884–911). Le pictogramme occupe donc **x 275–799, y 215–681** — d'où le cadrage `viewBox="275 215 525 467"`.
+
+Déduire ce cadrage des coordonnées du fichier donne un résultat décentré : les points de contrôle des courbes débordent largement du dessin visible (x commence à 155 dans les données, à 275 à l'encre).
+
+### Quatre tracés, jamais fusionnés
+
+Le fichier répartit le dessin sur quatre tracés en `fill-rule="evenodd"`. Les fusionner en un seul **changerait le dessin** : deux contours superposés s'y soustraient au lieu de s'additionner, et le creux du P viendrait trouer le plein d'un autre tracé. Le découpage retire les sous-tracés du mot-symbole (50 sur 91) mais conserve la répartition d'origine — 61 ko de source ramenés à 18 ko de balisage.
+
+### Favicon
+
+`favicon.svg` reprend le même pictogramme avec une couleur figée : un fichier d'icône n'a aucun contexte dont hériter. Les deux schémas sont prévus, azur 700 en clair et azur 300 en sombre — l'onglet d'un navigateur sombre affiche l'icône sur un fond sombre. Le `favicon.ico` d'origine, vide (zéro octet), reste en dernier recours.
+
+**Reste à faire, non bloquant** : `apple-touch-icon.png` pour l'ajout à l'écran d'accueil sur iOS, qui ne lit pas les favicons SVG — c'est un geste réel sur un produit dont le billet vit dans le navigateur du téléphone.
+
+### Le billet de la page d'accueil, réduit
+
+Le même composant sert de vitrine sur la page d'accueil et de billet réel après paiement. À taille réelle il fait 958 px de haut : plus que la hauteur d'un écran, et il écrasait la colonne de texte qu'il devait illustrer.
+
+La vitrine est donc réduite par `zoom` — et non par `scale`, qui ne réduit que le dessin en laissant la boîte d'origine, donc un grand vide sous le billet. **Le composant n'est pas touché** : là où le billet *est* le produit, il garde sa taille réelle.
+
+---
+
+## D-035 — Tableau de bord, historique, et l'entrée accordée sans QR
+**2026-08-26**
+
+Fin de la partie serveur de la Phase 5 : les trois routes que l'application Expo consommera pour ses écrans de compteurs, d'historique et de recherche (sections 27.14, 27.15) — et le chemin d'entrée qui manquait derrière la recherche manuelle.
+
+### Ce que le téléphone ne peut pas savoir
+
+L'application tient ses compteurs dans sa base locale, et c'est elle qui les affiche hors connexion. Le tableau de bord serveur ne les remplace pas : il donne **ce que font les autres portes**. À une entrée tenue par quatre agents, la question n'est pas « combien ai-je scanné » mais « combien de personnes sont entrées » — et la réponse est répartie sur quatre téléphones.
+
+La réponse porte donc les deux : `counters` pour l'entrée entière, `mine` pour l'agent. Les billets attendus excluent les remboursés et annulés, sans quoi le nombre de billets restants ne tomberait jamais à zéro.
+
+### L'historique corrige le téléphone, il ne le remplace pas
+
+Deux situations le rendent nécessaire, et les deux arrivent à une vraie entrée. Un scan affiché « entrée autorisée » peut **perdre l'arbitrage** quand un scan plus ancien remonte d'une autre porte (section 31.1) : l'application ne peut pas le deviner, seul le serveur arbitre. Et un téléphone réinstallé en pleine soirée repart sinon d'un historique vide.
+
+**Périmètre : ses propres contrôles, pas ceux de l'entrée entière.** Un téléphone d'agent se perd ; il n'a pas à contenir la liste nominative de tous ceux qui sont entrés par les autres portes (sections 27.5, 27.16). Les compteurs globaux, eux, ne nomment personne — c'est pourquoi ils sont donnés sans réserve.
+
+### La recherche manuelle appelait un chemin d'entrée, qui n'existait pas
+
+La section 27.15 prévoit qu'un agent retrouve un billet par sa référence quand le QR est illisible. La remontée de scans, elle, n'acceptait qu'un jeton. **La recherche n'aurait donc été qu'un écran de consultation** : l'agent identifiait le billet, laissait la personne entrer, et ce passage n'existait nulle part.
+
+Un scan porte désormais un jeton **ou** une référence. Les deux passent par la même décision — même verrou, même arbitrage, mêmes refus. La référence évite de lire un QR abîmé, elle n'ouvre rien de plus : billet d'un autre événement, remboursé, annulé ou déjà passé se refusent identiquement, et trois tests le vérifient.
+
+**La correspondance est exacte, jamais approchante.** C'est la recherche qui tolère une saisie partielle et propose des candidats ; le geste qui fait entrer quelqu'un désigne un billet précis. Une approximation y ferait entrer le voisin de référence.
+
+Quand les deux sont envoyés, **le jeton l'emporte** : sinon une application pourrait dégrader volontairement la vérification en joignant une référence à un QR parfaitement lisible.
+
+### La colonne `manual`, et pourquoi elle n'est pas cosmétique
+
+Une admission à la référence et un scan signé se ressembleraient parfaitement dans le journal. Or l'un prouve une signature, l'autre une référence lue à l'œil — **c'est précisément la distinction qu'on cherche le lendemain**, quand on se demande comment quelqu'un est entré. Un agent qui admettrait à la main la moitié d'une entrée se verrait immédiatement.
+
+Le fait est figé au même titre que les autres (déclencheur PostgreSQL étendu), et l'audit le dit à part : `TICKET_ADMITTED_MANUALLY`, jamais confondu avec `TICKET_USED`.
+
+### La recherche n'est pas un export
+
+Trois caractères minimum, vingt résultats au plus, jokers `LIKE` neutralisés, limitation à 30 appels par minute. Sans cela, une recherche sur `%` rendrait la liste entière des participants — sur un téléphone qui se perd. Aucun jeton n'y descend, même règle que la synchronisation : une empreinte permet de reconnaître un billet, pas d'en fabriquer un.
+
+---
+
+## D-034 — Écrans de gestion : une porte facultative, plusieurs agents dessus
+**2026-08-26**
+
+Partie web de la Phase 5 : l'organisateur déclare ses portes et affecte ses agents depuis un seul écran, attaché à l'événement.
+
+### Un seul écran pour les deux
+
+Les points d'entrée et les agents partagent une page. Un agent s'affecte à une porte : les séparer obligerait à naviguer entre deux écrans pour une seule décision, la veille d'un événement où l'organisateur n'a pas de temps à perdre.
+
+### La porte est facultative, et n'impose aucune correspondance
+
+**La plupart des lieux n'ont qu'une entrée.** Exiger un point d'entrée avant de pouvoir affecter un agent ajouterait une étape sans contrepartie à la majorité des organisateurs : `entry_point_id` est nullable, et l'écran propose « Toutes les entrées ».
+
+Symétriquement, **rien ne limite le nombre d'agents sur une porte** — une entrée à fort débit en demande plusieurs. La seule unicité posée est `(event_id, user_id)` : un agent ne figure qu'une fois sur un événement. Deux tests fixent ces deux libertés.
+
+### Ce qui ne se supprime pas
+
+Une entrée se **ferme**, elle ne se supprime pas : fermée en cours de soirée, elle ne reçoit plus de scan, mais l'historique de ceux qui y sont passés reste lisible. Un agent se **retire** de la même façon — son affectation porte `revoked_at`, et c'est elle qui explique dans six mois pourquoi tel agent a scanné tel billet (section 67).
+
+Les noms d'entrée sont uniques par événement : deux « Entrée VIP » rendraient l'historique inexploitable, la question « qui est passé par l'entrée VIP ? » n'ayant plus de réponse unique.
+
+### Le mot de passe se transmet de vive voix
+
+Quand l'adresse est inconnue, un compte est créé avec un mot de passe généré, **affiché une seule fois** à l'organisateur et jamais stocké en clair. Sur ce marché, un agent recruté pour une soirée n'a souvent pas d'adresse qu'il consulte : attendre qu'il clique sur un lien d'invitation le laisserait dehors le soir venu.
+
+Une adresse déjà connue **réutilise le compte** : un agent qui travaille pour deux organisateurs n'en a pas deux, et un organisateur qui tient lui-même la porte s'affecte avec le sien. Les rôles Spatie étant portés par organisation, aucun droit ne fuit de l'une à l'autre.
+
+### Ce que l'écran ne croit pas
+
+L'identifiant de point d'entrée venu du navigateur est **revérifié contre l'événement courant** avant toute affectation : sans cela, un agent pourrait être placé à la porte d'un autre événement (règle 80.4).
+
+L'activité des agents est **agrégée en une seule requête SQL**. La compter agent par agent ferait autant de requêtes que d'agents, chacune parcourant, sur un événement de cent mille billets, un volume conséquent.
+
+### Le piège PostgreSQL, troisième fois
+
+Rattraper une violation d'unicité ne suffit pas : PostgreSQL a déjà avorté la transaction entière, et la requête suivante échoue. Sans point de sauvegarde, un nom d'entrée en double faisait planter l'écran au lieu d'afficher une erreur de saisie. **Toute insertion dont l'échec est attendu vit désormais dans sa propre transaction imbriquée** — c'est la troisième fois que ce piège se referme sur ce projet.
+
+---
+
+## D-033 — Contrôle d'accès : socle serveur et API agent
+**2026-08-26**
+
+Phase 5, partie serveur : points d'entrée, affectation des agents, validation d'un billet, et l'API que consommera l'application Expo.
+
+### Ce qui décide qu'une personne entre
+
+Le billet est relu **sous verrou** avant d'être marqué utilisé. Deux agents qui scannent le même QR au même instant à deux portes ne peuvent pas le faire passer deux fois — sans le verrou, les deux liraient « actif » avant que l'un n'écrive.
+
+**Le scan au timestamp local le plus ancien gagne** (section 31.1), quel que soit l'ordre d'arrivée réseau. Un agent hors connexion qui synchronise une heure plus tard ne perd pas son antériorité — c'est ce qui rend le mode hors ligne utilisable à une vraie entrée. Quand un scan plus ancien arrive après coup, celui qui avait été accepté est déclassé et lié à son vainqueur : l'historique dit ce qui s'est passé plutôt que de faire disparaître un passage.
+
+**Tout est journalisé, refus compris**, y compris les QR non reconnus enregistrés sans billet — c'est le cas qui signale une contrefaçon.
+
+**Le point d'entrée ne filtre rien.** Il ne décide pas qu'un billet VIP passe par l'entrée VIP : la section 29 ne le prévoit pas, et l'inventer ferait refuser des porteurs valides — le pire défaut possible pour un contrôle d'accès.
+
+### L'application ne reçoit jamais de secret
+
+L'API envoie des **empreintes SHA-256 des jetons**, jamais les jetons. Un téléphone d'agent se perd et se vole à l'entrée d'un concert : avec les jetons, le voleur repart avec de quoi fabriquer tous les QR de l'événement ; avec les empreintes, il peut reconnaître un billet, pas en créer un.
+
+C'est la réponse pratique à la limite notée en D-018 : la signature HMAC ne peut pas être vérifiée hors ligne sans exposer la clé. La signature asymétrique reste la solution propre, et le préfixe de version du jeton permettra de l'ajouter sans invalider les billets en circulation.
+
+### L'agent n'a pas de contexte d'organisation
+
+Un agent peut servir plusieurs organisations : il n'a donc aucun contexte actif, et c'est **l'affectation** qui définit son périmètre. Toutes les lectures passent par `AgentAccess`, qui lève la portée **d'un seul bloc** — lever relation par relation ne fonctionne pas, une fermeture de chargement imbriqué recevant une `Relation` et non un `Builder`.
+
+`eventFor()` réunit résolution et autorisation, et répond **404 et non 403** : un agent n'a pas à apprendre quels événements existent ailleurs sur la plateforme.
+
+Le **point d'entrée enregistré vient de l'affectation, jamais de la requête** : une application ne doit pas pouvoir se déclarer à une autre porte que celle où l'organisateur l'a placée.
+
+### Faille fermée en écrivant les tests
+
+**Sanctum, faute de jeton, retombe sur la session web** — et une session obtient un `TransientToken` qui répond « oui » à **toutes** les habilitations, `agent` comprise. L'API agent était donc joignable depuis un navigateur connecté au dashboard, avec les droits d'un agent. `EnsureAgentToken` exige désormais un vrai jeton personnel d'appareil. Un test le verrouille.
+
+Découvert par accident : un test de déconnexion passait alors qu'il n'aurait pas dû.
+
+### Le reste
+
+Jetons Sanctum portant l'habilitation `agent` **et elle seule**, nommés d'après l'appareil pour permettre une révocation à distance ciblée. Un seul jeton par appareil : une reconnexion remplace le précédent plutôt que d'empiler des accès oubliés.
+
+Limitation de connexion **par couple compte + appareil** : par email seul, quelqu'un pourrait fermer la porte d'un agent légitime en échouant volontairement depuis un autre téléphone.
+
+La remontée des scans se fait **par lot**, rejouable, et tolérante à l'échec partiel — un scan qui échoue n'annule pas les autres, sinon l'application retransmettrait indéfiniment un lot dont un seul élément pose problème. La synchronisation est **paginée par curseur** (un `OFFSET 90000` relirait quatre-vingt-dix mille lignes) et **incrémentale** via `since`.
+
+L'**écart d'horloge** de l'appareil est conservé à chaque scan. La règle du double scan repose sur l'horodatage local ; un appareil déréglé peut faire gagner le mauvais scan. Ce signal ne bloque rien — il permet de le démontrer après coup, ce que la spec elle-même demande de documenter.
+
+**Deux bugs corrigés au passage** : sur une retransmission, le scan gagnant était réécrit pour pointer vers lui-même ; et PostgreSQL avortant toute la transaction sur une violation de contrainte, la reprise après doublon échouait — l'insertion vit maintenant dans un point de sauvegarde.
+
+---
+
+## D-032 — Console d'administration étoffée, en verre, en consultation seule
+**2026-08-26**
+
+Quatre écrans supplémentaires (section 58) : vue générale, organisations, transactions, journal d'audit — en plus des reversements.
+
+### Ce qui structure ces écrans
+
+**Consultation seule, structurellement, partout.** Aucun écran n'expose de méthode qui modifie quoi que ce soit : ni suspendre, ni rembourser, ni rejouer, ni supprimer. Des tests parcourent les méthodes publiques de chaque composant pour interdire leur réapparition — c'est le genre de bouton qu'on rajoute « juste pour dépanner » six mois plus tard.
+
+La **suspension d'une organisation** est prévue par la section 10 mais n'est pas exposée ici : elle coupe des ventes en cours et bloque des reversements, elle mérite un chemin dédié, audité et confirmé, pas un bouton dans une liste.
+
+**Le journal n'expose aucune action destructive et n'en exposera jamais** : un journal qu'on peut nettoyer ne prouve rien (section 67).
+
+**La commission est distinguée du volume qui transite.** Le volume passe par la plateforme sans lui appartenir (section 21.2) ; les confondre donnerait à Pass241 un chiffre d'affaires imaginaire. Les deux chiffres sont côte à côte, étiquetés.
+
+**Ce qui demande une intervention n'est jamais mis en cache**, contrairement au reste (cinq minutes) : un reversement en échec doit apparaître à l'instant où il échoue, pas cinq minutes plus tard. Il passe aussi **avant** les volumes à l'écran — c'est un outil de surveillance, pas un tableau de bord commercial.
+
+**Aucun numéro de téléphone n'apparaît nulle part**, même partiellement. Ces écrans servent à repérer un écart de montant ou un statut anormal, pas à retrouver quelqu'un (section 52).
+
+### Le verre
+
+La colonne latérale est le **seul endroit du produit où une colonne entière est en verre** : elle est fixe, ne défile pas, et se détache d'une nappe ambiante — les trois conditions qui rendent l'effet lisible plutôt que décoratif. Les cartes de chiffres sont en verre avec un liseré de lumière sur l'arête haute : c'est ce qui distingue une vitre d'un rectangle blanc translucide.
+
+**Les tableaux restent des surfaces pleines** (règle 70.4) : la lisibilité y prime sur la matière.
+
+Les cartes se révèlent au défilement et se soulèvent de deux pixels au survol, avec le reflet spéculaire qui suit le curseur. Deux pixels et pas plus — au-delà, la grille bouge et l'œil suit le mouvement au lieu de lire le chiffre. Tout est désactivé sur appareil modeste, sur écran tactile et en mouvement réduit.
+
+### Deux bugs trouvés en construisant
+
+1. **Mes règles CSS ajoutées hors de `@layer components` passaient devant les utilitaires Tailwind.** Une classe `border-l-[3px]` posée dans le gabarit ne s'appliquait plus — le liseré des actions financières du journal était invisible. Les nouvelles règles vivent maintenant dans la couche.
+2. **`select()` appelé après `withCount` emporte la sous-requête de comptage** : le nombre de membres d'une organisation ressortait vide. L'ordre est inversé, et un test verrouille la valeur.
+
+`AuditAction` reçoit un `label()` lisible et un `isFinancial()`. Les libellés sont écrits à la main : « PAYOUT_DESTINATION_CHANGED » se transforme mal en français, et c'est un écran qu'on parcourt vite.
+
+---
+
+## D-031 — Statistiques du dashboard : agrégation SQL, cache court, montants sous permission
+**2026-08-26**
+
+Chiffres de billetterie du dashboard organisateur (section 56) : billets vendus, recettes, net après commission, billets restants, entrées et taux de présence, plus la répartition par catégorie de billet.
+
+**Tout est agrégé en SQL. Aucune collection de billets n'est chargée, jamais.** Un événement de 100 000 billets doit produire les mêmes quelques lignes de résultat qu'un événement de dix. Compter en PHP marcherait six mois, puis ferait tomber le dashboard le jour du premier gros événement — c'est-à-dire exactement le jour où l'organisateur le regarde le plus. Un test compte les requêtes et vérifie qu'elles contiennent `COUNT(` ou `SUM(`.
+
+**Deux règles de comptage, qui expliquent les chiffres :**
+
+1. Un billet **remboursé, annulé ou expiré n'est pas vendu**. Le compter gonflerait les recettes d'un argent rendu au client.
+2. La recette d'un billet est le **prix réellement payé**, relevé sur la ligne de commande, jamais le tarif courant du type : le prix a pu changer depuis l'achat.
+
+**Le net figure à côté de la recette brute, dès la première lecture.** Afficher 70 000 quand l'organisateur recevra 66 500 ferait lire le reversement comme une erreur — c'est le même raisonnement que pour l'email de reversement (décision D-026).
+
+**Les montants sont conditionnés par `finances.view`, pas les décomptes de billets.** Un CO_ORGANIZER gère la billetterie « sans accès aux finances par défaut » (section 10) : il doit savoir combien de billets sont partis pour organiser l'entrée, sans voir les recettes. Masquer les deux le rendrait incapable de faire son travail.
+
+**Cache d'une minute.** Assez pour qu'un dashboard rafraîchi en boucle ne réagrège pas à chaque fois, assez court pour qu'une vente faite à l'instant apparaisse avant que quelqu'un ne s'inquiète. `forget()` permet d'invalider explicitement.
+
+**Répartition par NOM de catégorie et non par identifiant** : « VIP » veut dire la même chose d'un événement à l'autre, et c'est cette lecture qui intéresse l'organisateur. Une catégorie **jamais vendue apparaît quand même**, avec zéro — c'est souvent celle-là qu'on cherche, la faire disparaître serait contre-productif.
+
+**Entrées et taux de présence sont calculés mais masqués tant qu'aucun billet n'a été scanné.** Le contrôle d'accès arrive en phase 5 ; annoncer « 0 entrée » et « 0 % de présence » ne renseignerait sur rien et se lirait comme un échec. La carte annonce « À venir » à la place.
+
+**Barres en CSS, sans bibliothèque de graphiques.** Quatre à dix lignes ne justifient pas des dizaines de kilo-octets sur une connexion mobile gabonaise (section 72). Le chiffre reste à côté de la barre : c'est lui qu'on lit, la barre ne sert qu'à comparer.
+
+---
+
+## D-030 — Console d'administration : accès hors rôles, consultation seule
+**2026-08-26**
+
+Console Super Admin (section 58), ouverte sur les reversements. Trois choix structurants.
+
+**L'accès ne passe pas par le système de rôles.** Les rôles Spatie sont **scopés par organisation** : un rôle s'évalue dans le contexte d'une organisation, alors que le Super Admin n'appartient à aucune et les voit toutes. Faire passer cet accès par un rôle obligerait à lui inventer une organisation, et ouvrirait la porte à ce qu'un organisateur se l'attribue chez lui. D'où un middleware dédié sur `users.is_super_admin`, et des routes **hors** du middleware `organization` — l'y placer renverrait le Super Admin créer une organisation.
+
+`EnsureSuperAdmin` répond **404 et non 403** : l'existence même de la console n'a pas à être confirmée à qui n'y a pas accès.
+
+**C'est le seul écran du produit qui traverse les organisations.** Chaque requête porte `acrossOrganizations()` de façon explicite et assumée : c'est la raison d'être du rôle. Partout ailleurs, voir deux organisations dans la même liste serait une faille (règle 80.4). Un test vérifie qu'un organisateur reçoit 404.
+
+**Consultation seule, structurellement.** La section 58 exige que « les données financières historiques restent protégées contre les modifications arbitraires ». Ici cela veut dire qu'**aucune méthode n'existe** — ni approuver, ni rejouer, ni annuler, ni marquer comme payé — et non qu'un bouton est désactivé. Un bouton grisé laisserait croire qu'un humain peut libérer des fonds à la demande, alors que le reversement est instruit par une commande planifiée et son montant gelé par déclencheur (décision D-026). Un test parcourt les méthodes publiques du composant pour interdire leur réapparition.
+
+**Le design reprend celui du dashboard organisateur** — même colonne latérale, même palette, mêmes surfaces. J'avais d'abord fait une console sombre et dense, plus proche d'un outil de surveillance ; l'arbitrage produit a été de garder un seul langage visuel, un administrateur passant d'un espace à l'autre. Seule différence conservée : une pastille « Administration » sous la marque, pour qu'on ne confonde jamais cette console avec l'espace d'un organisateur.
+
+Le numéro de destination n'y apparaît jamais, même partiellement : un écran de surveillance n'en a pas besoin pour repérer un écart (section 52). Les totaux sont agrégés en SQL — charger les lignes pour les additionner en PHP marcherait six mois, puis plus du tout.
+
+---
+
+## D-029 — Reçu de paiement : PDF, vendeur = organisateur, sans commission
+**2026-08-26**
+
+Reçu de paiement pour toute commande réellement encaissée. Champs repris de la section 53 (reçu de don) adaptée à la billetterie : référence unique, objet, montant, date, méthode de paiement, identité.
+
+**En PDF, et téléchargeable — contrairement au billet.** Les deux documents ne servent pas la même chose : le billet doit être le même objet à l'écran et dans la galerie du téléphone, d'où l'image (décision D-021) ; le reçu est une pièce comptable qu'on classe, qu'on transmet à un trésorier ou qu'on joint à une note de frais. Le PDF est son format naturel.
+
+**Trois règles de contenu, chacune pour une raison précise :**
+
+1. **Le vendeur est l'organisateur, jamais Pass241.** La plateforme encaisse pour son compte et n'est jamais dépositaire des fonds (section 21.2). Un reçu qui présenterait Pass241 comme vendeur dirait le contraire de ce que le produit est. Le pied de page l'énonce explicitement.
+2. **La commission n'y figure nulle part.** Elle se joue entre la plateforme et l'organisateur ; l'acheteur ne l'a pas payée, et l'imprimer lui ferait croire qu'elle lui a été prélevée. Un test le verrouille.
+3. **Les frais de paiement y figurent, sur leur propre ligne.** L'acheteur a été débité de 10 200 pour un billet à 10 000 : sans cette ligne il ne peut pas réconcilier avec son relevé mobile money, et un écart inexpliqué se lit comme une tromperie (décision D-023).
+
+**Référence déterministe**, dérivée de celle de la commande (`PS241-9GG6-TY7` → `RC-9GG6-TY7`). Le même reçu régénéré six mois plus tard porte le même numéro, sans colonne ni séquence à maintenir, et l'unicité découle de celle de la commande.
+
+**Le document reflète l'état actuel**, remboursements compris : un reçu qui continuerait à attester un paiement intégral après remboursement serait faux. Il reste émis après remboursement — `hasBeenPaid()` et non `isPaid()` : une commande remboursée n'est plus payée, mais elle l'a été, et c'est cela que le reçu atteste. Sur une commande jamais payée, il est refusé : attester un paiement qui n'a pas eu lieu serait un faux.
+
+**Joint à l'email une seule fois**, contrairement aux billets qui le sont un par un : il porte sur la commande entière, le dupliquer par billet n'aurait aucun sens comptable.
+
+Le numéro de paiement n'apparaît que par ses quatre derniers chiffres (section 52) : un reçu se transmet et finit archivé.
+
+---
+
+## D-028 — Annulation d'événement : le client est remboursé frais compris
+**2026-08-25**
+
+Quand l'organisateur annule son événement, tous les acheteurs sont remboursés **intégralement, frais de paiement compris**. C'est l'organisateur qui les supporte.
+
+**Pourquoi un chemin distinct de la demande client.** Ici l'acheteur n'a rien demandé et n'y est pour rien. Lui faire supporter le coût d'une décision qui n'est pas la sienne serait indéfendable — alors que lorsqu'il change d'avis, les frais restent chez l'opérateur (décision D-023). Trois différences en découlent, et aucune ne se réduit à un paramètre :
+
+1. Les frais sont rendus.
+2. Aucune décision n'est demandée : les demandes naissent déjà approuvées, il n'y a rien à arbitrer.
+3. Le délai de 48h ne s'applique pas. Il protège l'organisateur des changements d'avis tardifs ; il n'a aucun sens quand c'est lui qui annule.
+
+**Une colonne `origin` sur `refund_requests`**, et un booléen `includes_psp_fee`. Sans eux, `psp_fee_amount` serait ambigu : la même colonne signifierait « frais retenus » dans un cas et « frais rendus » dans l'autre, et aucun rapport ne serait fiable.
+
+**La commission est rendue sur la PART BILLETS seulement.** Les frais n'ont jamais transité par l'organisateur : il n'y a aucune commission à leur rendre. D'où `RefundRequest::ticketPortion()`, utilisé comme assiette d'ajustement dans les deux chemins.
+
+**Les remboursements se font hors de la transaction d'annulation** : chaque commande appelle le prestataire, et une centaine d'appels réseau n'ont rien à faire dans une transaction de base de données. L'annulation, elle, est déjà actée — c'est ce qui compte pour les acheteurs qui consultent la page publique. Un échec individuel est journalisé sans interrompre : un acheteur dont le remboursement échoue ne doit pas empêcher les autres d'être remboursés.
+
+Un billet déjà remboursé n'est pas remboursé une seconde fois, et un billet déjà utilisé reste utilisé.
+
+### Notifications ajoutées (section 69)
+
+- **Décision de remboursement au client.** Seul canal par lequel il l'apprend : il n'a pas de compte, et rien ne le ramène sur sa page de suivi. Sans cet email, un refus ne lui serait jamais expliqué — or la section 24.1 exige qu'il soit motivé.
+- **Reversement parti à l'organisateur**, envoyé dès que le prestataire **accepte** l'ordre et non seulement quand le virement aboutit : un reversement programmé reste en attente plusieurs heures. L'email détaille l'éclatement brut / commission / net, parce qu'un montant seul, inférieur au chiffre du tableau de bord, se lit comme une erreur.
+- **Demande fermée sans réponse**, pour ne pas laisser le client croire qu'elle est toujours à l'étude.
+
+Aucune de ces notifications ne peut interrompre l'opération qu'elle accompagne, et aucune ne contient un numéro complet.
+
+---
+
+## D-027 — Remboursements : le client demande, l'organisateur décide
+**2026-08-25**
+
+Modèle hybride de la section 24.1, implémenté tel quel. Le client **ne déclenche jamais** un remboursement : il ouvre un dossier, et rien d'argent ne bouge tant que l'organisateur n'a pas tranché.
+
+### La fenêtre de 48h n'est pas une politique commerciale
+
+C'est la pierre angulaire du modèle financier. Le reversement intervient **après** l'événement (décision D-026) ; fermer les demandes **avant** garantit qu'aucun remboursement n'exigera jamais de récupérer des fonds déjà partis chez l'organisateur — auprès de gens qui ont peut-être déjà dépensé l'argent. Réduire `payments.refunds.window_hours` sans revoir le reversement ferait de Pass241 le créancier de ses propres clients. Le fichier de configuration le dit à l'endroit où quelqu'un serait tenté de le changer.
+
+### Les frais de paiement ne sont pas remboursés
+
+Ils ont été versés à l'opérateur, qui ne les rend pas (décision D-023). Les rembourser quand même reviendrait à les faire supporter par Pass241 à chaque changement d'avis d'un acheteur. C'est annoncé avant le paiement, rappelé au moment de la demande, et rappelé à l'organisateur sur son écran de décision pour qu'il ne croie pas devoir les rendre.
+
+### La commission est ajustée par une ligne nouvelle
+
+La table des commissions interdisait toute seconde ligne pour une même transaction. La contrainte n'a pas été supprimée mais **resserrée** : elle ne porte plus que sur les lignes d'origine, via un index partiel. C'est elle qui rend le calcul de commission idempotent face à un webhook rejoué (section 23) ; la perdre aurait rouvert cette faille.
+
+Un ajustement porte `parent_commission_id` et reprend **le taux figé de la ligne d'origine**, jamais celui de la configuration du jour : rembourser au taux d'aujourd'hui une transaction facturée au taux d'hier produirait un écart que personne ne saurait expliquer. Un déclencheur interdit qu'un ajustement pointe vers un autre ajustement — une chaîne rendrait le cumul invérifiable.
+
+Conséquence sur le reversement : `SettlementLedger` **soustrait** les ajustements et garde les commandes partiellement remboursées, amputées de la part rendue. Les exclure entièrement priverait l'organisateur des billets non remboursés de la même commande ; les ignorer lui reverserait de l'argent déjà rendu au client.
+
+### Deux bugs trouvés en écrivant les tests, tous deux réels
+
+1. **`getOriginal()` rend l'énum, pas la chaîne.** Le garde-fou censé empêcher de rouvrir une demande tranchée se déclenchait sur la *première* décision. Corrigé avec `getRawOriginal()`.
+2. **`RefundPolicy` échouait en OUVERT.** L'acheteur n'appartient à aucune organisation : la lecture de `$order->event` revenait `null` sous la portée globale, la date limite devenait inconnue, et la fenêtre était alors considérée comme ouverte **pour tout le monde, indéfiniment**. L'événement est désormais relu hors portée, et l'absence de date bloque la demande au lieu de l'autoriser. Une règle financière ne doit jamais échouer en ouvert.
+
+### Le reste
+
+`EXPIRED` est distinct de `REJECTED` : le client a demandé dans les temps et personne n'a répondu. La distinction compte pour arbitrer un litige. Une commande planifiée horaire ferme ces demandes — laissées ouvertes, elles bloqueraient l'argent de l'organisateur sans que personne ait rien décidé.
+
+Un index partiel n'autorise **qu'une demande en cours** par billet : un client refusé peut en soumettre une nouvelle si sa situation change, mais ne peut pas en empiler dix pour forcer la main à l'organisateur.
+
+Un refus doit être motivé (section 24.1) ; une acceptation non. Un billet **déjà utilisé** reste utilisé malgré le remboursement : celui-ci règle la question de l'argent, il n'annule pas une entrée déjà effectuée. L'appel au prestataire se fait hors transaction — un service indisponible ne doit pas faire croire au client que sa demande a été refusée.
+
+---
+
+## D-026 — Reversement après l'événement, un virement par événement
+**2026-08-25**
+
+Le net revient à l'organisateur **après son événement**, en un seul virement, déclenché par une tâche planifiée. Aucun bouton « retirer » n'existe nulle part dans le produit.
+
+**Pourquoi après l'événement, et pas plus tôt.** La fenêtre de remboursement se ferme **48h avant** l'événement (section 24.1). Reverser après garantit donc qu'aucun remboursement n'exigera jamais de récupérer des fonds déjà partis chez l'organisateur — ce qui ferait de Pass241 le créancier de ses propres clients, auprès de gens qui ont peut-être déjà dépensé l'argent. Les 24 heures supplémentaires absorbent les incidents du jour même : annulation sur place, salle fermée, réclamation massive à la sortie.
+
+**Un virement par événement, pas par commande.** Moins de frais fixes, et un relevé lisible pour l'organisateur.
+
+### La distinction qui rend la promesse vraie
+
+Deux dates différentes, et les confondre viderait la décision de son sens :
+
+- **date de libération** — quand les fonds arrivent : `fin de l'événement + délai` ;
+- **date d'instruction** — quand l'ordre part chez le prestataire.
+
+Si le prestataire sait programmer un virement (`scheduledPayout`), l'ordre part **dès la fin de l'événement** avec une date d'exécution future : les fonds restent dans **ses** livres jusque-là, et Pass241 n'en est jamais dépositaire. S'il ne sait pas, l'ordre attend l'échéance et l'argent dort entre-temps sur le compte marchand de la plateforme — c'est exactement ce que `PaymentCapabilities::holdsFunds()` signale, et cela reste un critère éliminatoire dans le choix du PSP.
+
+### Ce qui empêche de payer deux fois
+
+Une somme envoyée en double ne se récupère pas. Quatre barrières indépendantes :
+
+1. Contrainte d'unicité sur `event_id` **et** sur `idempotency_key` en base : deux workers simultanés ne peuvent pas produire deux ordres. La violation est rattrapée et la ligne existante reprise.
+2. La clé d'idempotence est transmise au prestataire, qui doit reconnaître un ordre déjà reçu.
+3. Un ordre déjà accepté n'est jamais renvoyé. Seul un échec **explicite** autorise une nouvelle tentative.
+4. **Un état inconnu n'est jamais un échec.** Une exception réseau non plus — le prestataire a pu recevoir l'ordre avant que la connexion ne tombe. Seule la commande de réconciliation peut transformer un état inconnu en échec, et c'est le seul endroit du code qui en a le droit.
+
+### Ce qui est figé, et pourquoi
+
+Les montants viennent **exclusivement** des lignes de commission déjà figées — jamais d'un recalcul à partir des prix. La commission porte un instantané de son taux : recalculer six mois plus tard donnerait un chiffre différent de celui annoncé.
+
+Le bénéficiaire est un **instantané**, jamais une jointure vers l'organisation. Si le numéro change le lendemain, ce reversement doit continuer à dire vers où l'argent est parti — c'est précisément la trace qu'on cherche quand on soupçonne un détournement.
+
+Un déclencheur PostgreSQL refuse toute modification des montants, du bénéficiaire, de l'événement et de la clé d'idempotence. Le statut, lui, évolue — c'est la différence avec la table des commissions, immuable de bout en bout : ici le cycle de vie est réel, seule la partie financière ne doit jamais bouger. La suppression est interdite, et les clés étrangères sont en `restrictOnDelete` : supprimer une organisation effacerait la trace d'un virement réellement parti.
+
+**Balayage planifié plutôt que job différé** posé à la création de l'événement : une date d'événement se modifie, un worker redémarre, une file se vide. Un job programmé des semaines à l'avance survit mal à tout cela, et un reversement oublié ne se remarque que le jour où l'organisateur téléphone.
+
+**Écart assumé par rapport au plan** : pas de classe `SettlementStrategy`. La distinction annoncée entre « instruire tôt » et « payer tard » tient en deux méthodes de `SettlementLedger` pilotées par les capacités. Une hiérarchie de stratégies sans seconde implémentation réelle aurait coûté plus qu'elle n'aurait rapporté.
+
+---
+
+## D-025 — Destination de reversement sans pièces justificatives ni vérification par code
+**2026-08-25**
+
+L'organisateur renseigne un numéro mobile money et son opérateur. C'est tout. **Aucune pièce justificative n'est demandée, et aucune vérification par code n'est envoyée.**
+
+**Pourquoi c'est défendable.** Le compte mobile money de destination est déjà vérifié par Airtel ou Moov, qui exigent une pièce d'identité à l'ouverture. Il y a donc bien une identité derrière ce numéro — Pass241 ne la collecte simplement pas lui-même. Combiné au reversement après l'événement (décision à venir, jalon D), le risque principal reste couvert : un événement fictif ne se tient jamais, et les réclamations arrivent avant que les fonds ne partent.
+
+**Conséquence sur `canReceivePayouts()`.** La condition portait sur `kyc_status === VERIFIED`. Elle porte désormais sur : destination renseignée, organisation non suspendue, et compte **non rejeté** par le Super Admin. Le changement n'est pas cosmétique — garder `VERIFIED` aurait bloqué tout le monde, plus personne ne soumettant de dossier. `kyc_status` subsiste comme levier du Super Admin pour couper les fonds d'un compte suspect.
+
+**Le dispositif KYC n'est pas supprimé** (règle 81), il est éteint : `config('payments.payouts.require_kyc_documents')`, à `false`. Le formulaire, l'action `SubmitKyc`, les documents et la revue restent fonctionnels et testés, prêts à être rallumés le jour où le volume, un prestataire ou le régulateur l'exigeront.
+
+**Ce qui remplace la vérification, sans ajouter de friction :**
+
+1. **Le nom du titulaire** renvoyé par le prestataire est conservé et affiché : « vous recevrez vos recettes sur le 074XXXXXX, au nom de … ». L'organisateur ne fait rien, il lit. C'est le seul garde-fou restant contre une faute de frappe — un virement mobile money ne se rappelle pas, et plusieurs centaines de milliers de francs partent définitivement chez un inconnu.
+2. **Tout changement est journalisé à part**, avec `PAYOUT_DESTINATION_CHANGED` distinct de `PAYOUT_DESTINATION_SET`. Confondre les deux empêcherait de repérer une redirection de fonds parmi les premières saisies. Le numéro précédent est conservé — sans lui, une trace ne dit pas vers où les fonds ont été détournés — mais **masqué**, le journal étant consulté et exporté : il doit permettre de reconnaître un numéro, pas de le recopier (section 52).
+3. **Tout changement est notifié par email** à l'organisation. C'est le dispositif de détection d'une prise de contrôle de compte : la victime reçoit un message qu'elle n'attendait pas. L'email ne contient que les quatre derniers chiffres — il transite en clair et finit archivé.
+
+Une destination identique ne produit ni écriture, ni entrée de journal, ni notification : une alerte qui n'apprend rien banalise les vraies.
+
+**Les colonnes sont hors de `$fillable`** et n'ont qu'un seul chemin d'écriture, `SetPayoutDestination`. Rediriger les fonds vers un autre numéro est le vecteur de fraude central une fois qu'une plateforme sait payer : aucun champ de formulaire ne doit pouvoir les atteindre par affectation en masse.
+
+---
+
+## D-024 — Abstraction du prestataire scindée : encaisser et reverser
+**2026-08-25**
+
+`PaymentProviderInterface` est remplacée par deux contrats distincts :
+
+- **`CollectionProvider`** — encaissement. Toujours disponible. Porte aussi le remboursement, qui annule un encaissement et repart vers l'acheteur.
+- **`SettlementProvider`** — reversement vers l'organisateur. Peut ne pas exister.
+
+**Pourquoi les séparer.** Un agrégateur peut savoir prendre un paiement mobile money sans exposer la moindre API de virement sortant. Les réunir obligeait chaque driver à mentir sur la moitié de son contrat. Désormais, un driver qui n'implémente pas `SettlementProvider` annonce par sa seule signature qu'aucun reversement automatique n'est possible avec lui — ce qu'il vaut mieux découvrir avant de signer qu'après le premier événement.
+
+`PaymentManager::settlement()` **échoue bruyamment** plutôt que de rendre `null` : un appelant qui demande à reverser doit s'arrêter net. Rendre `null` laisserait passer un appel silencieux, et un reversement qui n'a jamais eu lieu ne se remarque que le jour où l'organisateur téléphone.
+
+**Les capacités sont déclarées par le driver**, jamais lues en configuration : un prestataire ne sait pas éclater un encaissement parce qu'un fichier l'affirme. `PaymentCapabilities` porte `nativeSplit`, `payout`, `scheduledPayout`, `partialRefund`, `recipientNameLookup`, et deux questions dérivées :
+
+- `canSettle()` — l'argent peut-il arriver chez l'organisateur autrement qu'à la main ?
+- `holdsFunds()` — **Pass241 détient-il les fonds entre l'encaissement et le reversement ?** Vrai sans éclatement natif ni virement programmé. C'est exactement ce que la section 21.2 veut éviter ; la méthode existe pour que ce soit visible plutôt que subi, et pour servir de critère de choix du prestataire.
+
+**Ce qui distingue le sortant de l'entrant, et qui a guidé le contrat :**
+
+- `PayoutRequest` porte une **clé d'idempotence obligatoire**. Un webhook d'encaissement rejoué crée un doublon rattrapable ; un ordre de virement rejoué envoie l'argent deux fois, et une somme envoyée en double ne se récupère pas.
+- `PayoutState::Unknown` ne doit **jamais** être traité comme un échec. Conclure trop vite à l'échec conduit à rejouer l'ordre, donc à payer deux fois.
+- `PayoutState::Scheduled` distingue « accepté » de « arrivé ». Les confondre ferait annoncer à l'organisateur un argent qu'il n'a pas encore.
+- `lookupRecipientName()` permet d'afficher le titulaire du numéro sans rien demander à l'organisateur — la vérification par code ayant été écartée. Un virement mobile money ne se rappelle pas : une faute de frappe est définitive.
+
+`FakeProvider` implémente les deux contrats, mais **déclare `nativeSplit: false`**. Se donner la capacité la plus confortable en simulation conduirait à construire le reversement du jalon D sur une hypothèse qu'aucun prestataire gabonais n'a confirmée.
+
+---
+
+## D-023 — Frais du prestataire de paiement à la charge de l'acheteur
+**2026-08-25**
+
+Les frais du prestataire (PSP) sont **ajoutés au prix des billets et payés par l'acheteur**, affichés sur une ligne distincte avant le paiement.
+
+**Pourquoi ce choix.** Le modèle annoncé — billet à 10 000 FCFA, 500 pour Pass241, 9 500 pour l'organisateur — ne laisse rien au prestataire, qui prélève pourtant de l'ordre de 1,5 à 3,5 % plus souvent une part fixe. Les trois issues possibles étaient : rogner la commission Pass241 (marge réelle ramenée à 1,5 %, voire négative sur les petits montants à cause de la part fixe), rogner le net de l'organisateur (l'exemple affiché devient faux), ou les facturer à l'acheteur. C'est la troisième qui a été retenue, à condition qu'ils soient annoncés — un acheteur qui découvre un écart sur son relevé se sent trompé, même quand la somme est juste.
+
+**Ce que cela implique dans le code :**
+
+- `orders.amount` cesse d'être le prix des billets pour devenir **le montant réellement débité**. Le prix des billets vit dans `orders.subtotal`.
+- **La commission Pass241 s'assied sur `subtotal`, jamais sur `amount`.** Prendre le total pour assiette ferait prélever une commission sur l'argent de l'opérateur et gonflerait mécaniquement le net reversé à l'organisateur. C'est le piège principal de cette décision.
+- Le barème appliqué (points de base + part fixe) est **figé sur la commande**, comme le taux de commission l'est déjà : une transaction doit rester explicable après un changement de prestataire.
+- Une colonne `orders.psp` enregistre l'agrégateur ayant traité la transaction, distincte de `payment_provider` (AIRTEL ou MOOV, choisi par l'acheteur). Sans elle, changer d'agrégateur rendrait l'historique irréconciliable.
+- Deux contraintes `CHECK` en base : `amount = subtotal + psp_fee_amount`, et des montants positifs. Un total qui ne se reconcilie pas avec ses parts est une erreur comptable qui passerait inaperçue dans un rapport.
+
+**Arrondi au franc SUPÉRIEUR**, contrairement à la commission qui arrondit au plus proche. L'asymétrie est voulue : un franc de commission en moins est une recette manquée, un franc de frais en moins est un découvert sur le compte marchand que quelqu'un devra combler, transaction après transaction.
+
+**Un prestataire sans barème configuré fait échouer la commande**, volontairement. Sans cette règle, brancher un vrai PSP sans renseigner ses frais les ferait absorber en silence par Pass241.
+
+**Sort des frais en cas de remboursement** : non remboursables quand c'est l'acheteur qui demande (annoncé à l'écran avant le paiement) ; remboursés quand l'organisateur annule l'événement, et c'est alors lui qui les supporte. À implémenter au jalon E.
+
+**Valeurs actuelles fictives** : le barème du driver `fake` (2 %) existe pour que le parcours montre la ligne de frais en développement. Aucun prestataire ne l'a confirmé.
+
+---
+
+## D-021 — Le billet se télécharge en image, le PDF ne part que par email
+**2026-08-25**
+
+Le bouton « Télécharger » de la page billet produit une **image PNG**, capturée dans le navigateur sur le nœud DOM du billet affiché. Le PDF n'est plus téléchargeable depuis la plateforme : la route publique est supprimée, et le document part uniquement en pièce jointe de l'email de confirmation (un fichier par billet).
+
+**Raison.** Trois mises en page du même objet — écran, PDF, image — divergent inévitablement, et c'est exactement ce qui s'était produit : le PDF avait pris du retard sur l'écran. Capturer le DOM réel supprime le problème à la racine, l'image *étant* le billet affiché, verre liquide compris. Le PDF garde sa raison d'être propre : une pièce jointe qu'on archive, qu'on transfère et qu'on imprime.
+
+**Coût assumé** : une dépendance front (`html-to-image`), la seule du projet. Elle est chargée par `import()` dynamique au moment du clic — Vite en fait un fragment séparé de 12 ko, jamais demandé par un visiteur qui ne télécharge pas son billet. `app.js` reste à 3,5 ko.
+
+**Deux pièges rencontrés, à ne pas réintroduire :**
+
+1. La capture recopie les styles du nœud capturé dans l'image produite. Un `left: -10000px` posé sur la scène hors écran déplaçait donc son contenu de 10000 pixels *à l'intérieur* de l'image, qui ressortait vide aux bonnes dimensions. D'où deux éléments distincts : un conteneur qui positionne, une scène qui décore et qu'on capture.
+2. `backdrop-filter` ne produit rien pendant une capture : la technique repose sur un `<foreignObject>` SVG, qui n'a pas de fond à flouter. Une règle `[data-ticket-capture] .glass` remplace le flou par la teinte de repli déjà prévue pour les appareils modestes.
+
+**Conséquence sur l'email** : la pièce jointe contient le QR, qui circule donc hors de tout contrôle. Sans conséquence — le billet est nominatif (section 16) et un seul scan le consomme (section 19) : une copie transmise ne crée pas une seconde entrée, elle vole la première.
+
+**Conséquence sur la confirmation de paiement** : le rendu des PDF est sorti de la requête vers un job (`SendTicketsEmail`). Le webhook de l'opérateur mobile money abandonne s'il attend, et la confirmation d'un paiement ne peut pas payer le prix d'une mise en page.
+
+---
+
+## D-022 — Contraintes du moteur de rendu PDF, mesurées
+**2026-08-25**
+
+Le billet PDF sortait sur deux pages, sans QR visible, blocs mal ajustés. Les causes, vérifiées une à une en rastérisant le document plutôt qu'en supposant :
+
+| Symptôme | Cause | Correction |
+|---|---|---|
+| QR absent, débordement sur une 2ᵉ page | dompdf n'applique pas les dimensions CSS à un **SVG inline** : le code sortait à sa taille intrinsèque (480px ≈ 127mm) | QR rendu en **PNG** (`QrRenderer::pngDataUri`) |
+| Affiche minuscule dans un coin | `background-size: cover` n'existe pas | Image recadrée au rapport du cadre côté serveur (GD), posée en `<img>` |
+| Voile sombre à arête franche | Aucun dégradé disponible | Dégradé **gravé dans l'image** ligne par ligne (`TicketPdf::burnScrim`) |
+| Affiche à 28mm dans un cadre de 36mm | Hauteur imposée à la fois au cadre et à l'image | Hauteur sur le cadre seul ; l'image n'est dimensionnée que par sa largeur |
+| Titre de l'événement disparu | Sans hauteur de référence, `bottom: 0` sort le bloc du cadre, `overflow: hidden` l'efface | Hauteur explicite sur le cadre |
+| Liseré sous l'affiche | Espace de ligne réservé sous l'image ; `line-height: 0` et `font-size: 0` font disparaître le titre avec lui | Fond du cadre à la teinte sombre du bas du dégradé |
+| Pied de page éclaté sur 4 lignes | URL signée de 150 caractères | Domaine + référence de commande, réellement saisissables |
+
+**Règle qui en découle** : les encoches latérales n'existent que sur le billet affiché. Le moteur les rogne au rayon du bandeau, et sur du papier un demi-cercle peint de la couleur du fond ne se lit comme une déchirure que si la feuille est de cette couleur. La ligne de déchirure, elle, s'imprime.
+
+**Budget de hauteur** : le contenu occupe environ 242mm sur les 297mm d'une A4, le reste centrant le billet sur la feuille. Ajouter un bloc impose d'en retirer un — une seconde page sort de l'imprimante avec la moitié du billet dessus, et personne ne sait laquelle présenter à l'entrée.
+
+**Poids** : l'affiche est réencodée en JPEG à 1000px de large. Une commande de dix billets produisait sinon un email de plusieurs mégaoctets, que les messageries rejettent — or l'email est le canal de secours du billet.
+
+---
+
+## D-020 — `storage/framework` dans un volume Docker
+**2026-08-25**
+
+Les vues compilées, le cache et les sessions vivent dans un volume Docker, plus sur le montage Windows.
+
+**Raison** : Blade échoue à horodater ses fichiers compilés sur ce montage (`touch(): Utime failed: Operation not permitted`). Le `chmod` de la décision D-011 accorde l'écriture, mais `utime` exige la **propriété** du fichier, que le montage ne peut pas accorder. Toute page dont la vue n'était pas déjà compilée renvoyait une erreur 500.
+
+Même famille que la décision D-013 : ce qui est généré par la machine n'a rien à faire sur le montage. `storage/logs` y reste — celui-là, on veut le lire depuis Windows.
+
+---
+
 ## D-017 — Réservation à chaque commande, stock déduit de la base
 **2026-08-25** — amende la section 17.1
 

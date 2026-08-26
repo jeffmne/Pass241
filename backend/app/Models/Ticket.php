@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Enums\TicketStatus;
 use App\Models\Concerns\BelongsToOrganization;
+use App\Services\Ticketing\TicketTokenService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\URL;
 use RuntimeException;
 
 /**
@@ -86,6 +88,40 @@ class Ticket extends Model
         return $this->belongsTo(TicketType::class);
     }
 
+    /**
+     * Ligne de commande d'origine.
+     *
+     * C'est elle qui porte le prix reellement paye et le nom du type au moment
+     * de l'achat — pas le type de billet, qui a pu changer depuis.
+     */
+    public function orderItem(): BelongsTo
+    {
+        return $this->belongsTo(OrderItem::class);
+    }
+
+    /**
+     * Recherche par reference pour l'affichage public.
+     *
+     * Sort de la portee par organisation : le porteur du billet n'appartient a
+     * aucune organisation. L'acces reste protege par la signature de l'URL.
+     */
+    public static function publicByReference(string $reference): ?self
+    {
+        return static::query()
+            ->acrossOrganizations()
+            // La levee de portee doit etre repetee sur CHAQUE relation chargee.
+            // Un `with('event.location')` simple appliquerait la portee globale
+            // a l'evenement, qui reviendrait null — et la page planterait sur
+            // une propriete manquante plutot que d'afficher le billet.
+            ->with([
+                'event' => fn ($query) => $query->acrossOrganizations()->with(['location', 'organization']),
+                'orderItem',
+                'order' => fn ($query) => $query->acrossOrganizations(),
+            ])
+            ->where('reference', $reference)
+            ->first();
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', TicketStatus::Active->value);
@@ -94,5 +130,46 @@ class Ticket extends Model
     public function allowsEntry(): bool
     {
         return $this->status->allowsEntry();
+    }
+
+    /**
+     * Contenu du QR Code : une charge utile signee (section 18).
+     *
+     * Calcule a la demande plutot que stocke. Le jeton est une fonction pure
+     * des identifiants du billet : le conserver en base ajouterait une colonne
+     * a maintenir, et un risque de divergence, sans rien apporter.
+     */
+    public function qrToken(): string
+    {
+        return app(TicketTokenService::class)->issue($this);
+    }
+
+    /**
+     * Empreinte du jeton, pour la validation hors connexion (section 27.7).
+     *
+     * L'application agent telecharge cette empreinte, JAMAIS le jeton. La
+     * difference est tout sauf theorique : un telephone d'agent se perd et se
+     * vole. Avec les jetons, le voleur repart avec de quoi fabriquer tous les
+     * QR de l'evenement ; avec les empreintes, il ne peut rien en faire —
+     * elles servent a reconnaitre un billet, pas a en creer un.
+     *
+     * L'agent scanne, l'application calcule l'empreinte de ce qu'elle a lu et
+     * la cherche dans sa base locale. Aucun secret ne quitte le serveur.
+     */
+    public function tokenHash(): string
+    {
+        return hash('sha256', $this->qrToken());
+    }
+
+    /**
+     * Adresse publique du billet, signee et sans expiration.
+     *
+     * L'acheteur n'a pas de compte : ce lien est ce qu'il partage et ce qu'il
+     * retrouve (decision D-004). La signature empeche de parcourir les billets
+     * en devinant des references.
+     */
+    public function publicUrl(): string
+    {
+        return URL::signedRoute('tickets.show', ['reference' => $this->reference]);
     }
 }

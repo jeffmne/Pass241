@@ -506,6 +506,39 @@
         background-color: var(--color-offwhite);
         box-shadow: inset 0 1px 2px rgba(20, 84, 155, 0.14);
     }
+
+    /*
+     * Perforation du billet.
+     *
+     * Une vraie ligne de points, et non un trait pointille CSS : c'est ce
+     * detail qui fait lire la partie basse comme une souche detachable. Un
+     * `border-dashed` donne des tirets rectangulaires, qu'aucun billet
+     * imprime n'a jamais eus.
+     */
+    .ticket-perforation {
+        height: 3px;
+        background-image: radial-gradient(
+            circle,
+            rgba(20, 84, 155, 0.34) 1.4px,
+            transparent 1.5px
+        );
+        background-size: 9px 3px;
+        background-repeat: repeat-x;
+        background-position: center;
+    }
+
+    /*
+     * La souche : legerement teintee pour se distinguer du corps du billet,
+     * comme la partie qu'un agent conserve. Surface pleine et non du verre —
+     * elle accueille le QR Code (regle 70.4).
+     */
+    .ticket-stub {
+        background-image: linear-gradient(
+            180deg,
+            rgba(242, 248, 254, 0.55),
+            rgba(228, 241, 253, 0.75)
+        );
+    }
 }
 
 /*
@@ -551,5 +584,158 @@
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 120ms !important;
+    }
+}
+
+/* -------------------------------------------------------------------------
+ * Capture du billet en image
+ * ---------------------------------------------------------------------- */
+
+/*
+ * Cadre hors ecran dans lequel le billet est clone avant d'etre capture
+ * (resources/js/ticket-image.js).
+ *
+ * Il n'apparait jamais a l'utilisateur : c'est le fond de l'image telechargee.
+ * Sans lui, le PNG serait a moitie transparent — le billet est en verre, il
+ * n'a pas de fond a lui.
+ */
+[data-ticket-capture] {
+    background-image: linear-gradient(160deg, #EEF1F7 0%, #E2ECF8 55%, #D8E7F7 100%);
+    border-radius: 32px;
+}
+
+/*
+ * `backdrop-filter` ne produit RIEN pendant une capture : la technique repose
+ * sur un <foreignObject> SVG, qui n'a pas de fond a flouter. Sans cette regle
+ * le verre sortirait transparent et le billet illisible.
+ *
+ * La teinte reprend celle du repli deja utilise pour les appareils modestes,
+ * qui existe precisement pour compenser l'absence de flou.
+ */
+[data-ticket-capture] .glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
+}
+
+/* Le reflet suit le pointeur : fige dans une image, il se lit comme une tache.
+   L'animation d'arrivee, elle, capturerait le billet en cours de vol. */
+[data-ticket-capture] .glass-specular::after {
+    display: none;
+}
+
+[data-ticket-capture] .ticket-arrive {
+    animation: none;
+}
+
+@layer components {
+    /* -------------------------------------------------------------------------
+     * Console d'administration
+     * ---------------------------------------------------------------------- */
+
+    /*
+     * Rail lateral en verre.
+     *
+     * Le seul endroit du produit ou une colonne entiere est en verre. Elle est
+     * fixe, ne defile pas, et se detache d'une nappe ambiante : les trois
+     * conditions qui rendent l'effet lisible plutot que decoratif (section 70.4).
+     *
+     * Blanc plus soutenu que `.glass` : cette colonne porte de la navigation lue
+     * en diagonale, pas du contenu qu'on relit. Le contraste prime sur la
+     * transparence.
+     */
+    .glass-rail {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.74));
+        backdrop-filter: blur(24px) saturate(180%);
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        border-right: 1px solid rgba(255, 255, 255, 0.75);
+        box-shadow: 1px 0 24px rgba(20, 84, 155, 0.06);
+    }
+
+    /* Appareil modeste : le flou tombe, la teinte monte pour compenser. */
+    :root[data-quality='reduced'] .glass-rail {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(255, 255, 255, 0.96);
+    }
+
+    /* Navigateur sans backdrop-filter : meme repli. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .glass-rail {
+            background: rgba(255, 255, 255, 0.96);
+        }
+    }
+
+    /*
+     * Carte de chiffre en verre, avec un liseré de lumiere sur l'arete haute.
+     *
+     * Ce liseré est ce qui distingue une vitre d'un rectangle blanc translucide :
+     * une surface de verre reçoit la lumiere par sa tranche. Un seul pixel suffit,
+     * et il ne coute rien a rendre.
+     */
+    .glass-stat {
+        position: relative;
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
+        backdrop-filter: blur(20px) saturate(175%);
+        -webkit-backdrop-filter: blur(20px) saturate(175%);
+        border: 1px solid rgba(255, 255, 255, 0.7);
+        border-radius: 20px;
+        box-shadow:
+            0 8px 28px rgba(20, 84, 155, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .glass-stat::before {
+        content: '';
+        position: absolute;
+        inset: 0 12% auto 12%;
+        height: 1px;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+    }
+
+    :root[data-quality='reduced'] .glass-stat {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(255, 255, 255, 0.94);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .glass-stat {
+            background: rgba(255, 255, 255, 0.94);
+        }
+    }
+
+    /*
+     * Relief au survol des cartes de chiffres.
+     *
+     * Une carte en verre monte de deux pixels et son ombre s'elargit : c'est ce
+     * que ferait une vitre qu'on souleve. Deux pixels et pas plus — au-dela, la
+     * grille se met a bouger et l'oeil suit le mouvement au lieu de lire le
+     * chiffre.
+     *
+     * Reserve aux appareils dotes d'un vrai pointeur. Au doigt, un etat de survol
+     * reste colle apres le tap et se lit comme un defaut.
+     */
+    @media (hover: hover) and (pointer: fine) {
+        .glass-stat {
+            transition:
+                transform var(--duration-state) var(--ease-out-quart),
+                box-shadow var(--duration-state) var(--ease-out-quart);
+        }
+
+        .glass-stat:hover {
+            transform: translate3d(0, -2px, 0);
+            box-shadow:
+                0 14px 38px rgba(20, 84, 155, 0.14),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+    }
+
+    /* Un mouvement reduit demande de ne rien deplacer du tout. */
+    @media (prefers-reduced-motion: reduce) {
+        .glass-stat:hover {
+            transform: none;
+        }
     }
 }
