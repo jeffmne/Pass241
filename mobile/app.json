@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Pass241 Controle",
+    "slug": "pass241-agent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "pass241agent",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ga.pass241.agent",
+      "infoPlist": {
+        "NSCameraUsageDescription": "La camera sert uniquement a lire les QR Codes des billets a l'entree. Aucune image n'est enregistree."
+      }
+    },
+    "android": {
+      "package": "ga.pass241.agent",
+      "adaptiveIcon": {
+        "backgroundColor": "#14549b",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "La camera sert uniquement a lire les QR Codes des billets a l'entree. Aucune image n'est enregistree.",
+          "recordAudioAndroid": false
+        }
+      ]
+    ]
+  }
+}

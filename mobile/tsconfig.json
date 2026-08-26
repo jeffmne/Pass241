@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    // `types` restreint les paquets @types charges globalement. Sans « jest »,
+    // `tsc --noEmit` ne connait ni `it` ni `expect` et signale des erreurs dans
+    // des tests qui passent — un bruit qui finit par faire ignorer la commande.
+    "types": ["jest"]
+  }
+}
