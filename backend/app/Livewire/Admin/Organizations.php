@@ -12,10 +12,10 @@ use Livewire\WithPagination;
 /**
  * Annuaire des organisations, pour le Super Admin (section 58).
  *
- * Consultation seule. La suspension d'une organisation est prevue par la
- * section 10, mais elle coupe les ventes en cours et bloque les reversements :
- * elle merite son propre chemin, audite et confirme, pas un bouton dans une
- * liste. Elle n'est donc pas exposee ici tant que ce chemin n'existe pas.
+ * Chaque carte ouvre la fiche du compte. La suspension vit la-bas et pas ici :
+ * elle coupe les ventes en cours et bloque les reversements, elle merite un
+ * ecran ou l'on voit ce qu'on ferme avant de le fermer — pas un bouton au bout
+ * d'une ligne de liste.
  */
 #[Layout('components.layouts.admin')]
 class Organizations extends Component

@@ -37,7 +37,15 @@ class CampaignPage extends Component
      */
     public int $visible = self::PAGE;
 
-    private const PAGE = 10;
+    /**
+     * Cinq dons, puis « voir plus ».
+     *
+     * La page publique se lit sur un telephone : une liste plus longue pousse
+     * la description et le bouton de don hors de l'ecran, alors que ce sont eux
+     * qui font agir. Le TOTAL, lui, est annonce en toutes lettres — c'est lui
+     * qui fait la transparence, pas la longueur de la liste (section 37).
+     */
+    private const PAGE = 5;
 
     /** Plafond de securite : au-dela, plus personne ne fait defiler. */
     private const MAX_VISIBLE = 200;

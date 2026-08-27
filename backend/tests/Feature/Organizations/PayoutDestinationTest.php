@@ -102,7 +102,7 @@ it('refuse le reversement a une organisation suspendue', function () {
         $this->organization, '074000000', PaymentProvider::Airtel, $this->owner,
     );
 
-    $this->organization->forceFill(['suspended_at' => now()])->save();
+    $this->organization->forceFill(['suspended_at' => now(), 'suspension_reason' => 'Suspendue pour ce test.'])->save();
 
     expect($this->organization->fresh()->canReceivePayouts())->toBeFalse();
 });

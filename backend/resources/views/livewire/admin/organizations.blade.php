@@ -6,9 +6,9 @@
 {{--
     Annuaire des organisations (section 58).
 
-    Consultation seule. La suspension est prevue par la section 10, mais elle
-    coupe les ventes en cours et bloque les reversements : elle merite son
-    propre chemin, audite et confirme, pas un bouton dans une liste.
+    Chaque carte ouvre la fiche de l'organisation. La suspension vit la-bas, et
+    pas ici : elle coupe les ventes en cours et bloque les reversements, elle
+    merite un ecran ou l'on voit ce qu'on ferme avant de le fermer.
 --}}
 <div>
     <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -47,8 +47,9 @@
             {{-- Chaque carte se revele a son entree dans l'ecran, avec un
                  decalage en cascade : l'ordre de lecture porte ici une
                  information, les organisations etant classees par volume. --}}
-            <div class="glass-stat glass-specular p-4 sm:p-5"
-                 data-reveal data-reveal-step="{{ $index % 5 }}">
+            <a href="{{ route('admin.organization', $organization) }}" wire:navigate
+               class="glass-stat glass-specular block p-4 transition-transform hover:-translate-y-0.5 sm:p-5"
+               data-reveal data-reveal-step="{{ $index % 5 }}">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
@@ -92,7 +93,7 @@
                         </p>
                     </div>
                 </div>
-            </div>
+            </a>
         @empty
             <div class="surface p-10 text-center text-sm text-grey-500">
                 Aucune organisation ne correspond.
@@ -106,8 +107,7 @@
 
     <p class="mt-6 text-xs leading-relaxed text-grey-400">
         Les volumes portent sur les billets reellement vendus : un billet
-        rembourse, annule ou expire n'est pas compte. La suspension d'une
-        organisation ne se fait pas depuis cet ecran — elle coupe des ventes en
-        cours et merite un chemin dedie.
+        rembourse, annule ou expire n'est pas compte. Ouvrez une organisation pour
+        voir son detail, son activite, et suspendre ou reactiver son compte.
     </p>
 </div>

@@ -67,7 +67,19 @@ class Login extends Component
             organizationId: $user->current_organization_id,
         );
 
-        $this->redirectIntended(route('dashboard'), navigate: true);
+        /*
+         * Le Super Admin va a SA console, pas au tableau de bord organisateur.
+         *
+         * Il n'appartient a aucune organisation : envoye sur `/dashboard`, il
+         * etait renvoye vers « creez votre organisation » et se retrouvait dans
+         * le monde de l'organisateur, sans aucun moyen de deviner l'adresse de
+         * la console — laquelle repond 404 a tout le monde, donc aucun lien ne
+         * la trahit.
+         */
+        $this->redirectIntended(
+            $user->isSuperAdmin() ? route('admin.overview') : route('dashboard'),
+            navigate: true,
+        );
     }
 
     public function render()

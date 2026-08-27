@@ -149,36 +149,64 @@ function initSpecular() {
  * Chaque element est oublie par l'observateur des qu'il a ete revele : rien ne
  * continue a s'evaluer pendant le reste du defilement.
  */
-function initReveal() {
-    const targets = document.querySelectorAll('[data-reveal]');
-    if (targets.length === 0) return;
+let revealObserver = null;
 
+function initReveal() {
     if (reducedMotion.matches || !('IntersectionObserver' in window)) {
         return;
     }
 
+    if (revealObserver === null) {
+        revealObserver = new IntersectionObserver(
+            (entries) => {
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) continue;
+
+                    // Decalage en cascade uniquement quand l'element appartient
+                    // a une vraie sequence : l'ordre de lecture porte alors une
+                    // information, ce qui n'est pas le cas d'une section isolee.
+                    const step = Number(entry.target.dataset.revealStep ?? 0);
+                    entry.target.style.transitionDelay = `${Math.min(step, 4) * 70}ms`;
+                    entry.target.classList.add('is-revealed');
+
+                    revealObserver.unobserve(entry.target);
+                }
+            },
+            { rootMargin: '0px 0px -12% 0px', threshold: 0.1 }
+        );
+    }
+
+    observeReveals(document);
+}
+
+/**
+ * Met sous surveillance les elements a reveler d'une portion du document.
+ *
+ * APPELEE AUSSI APRES CHAQUE MISE A JOUR LIVEWIRE, et c'est tout l'objet de
+ * cette fonction. Un clic sur un filtre remplace les cartes de la liste par des
+ * elements NEUFS : l'observateur installe au chargement ne les connait pas, ils
+ * n'obtiennent jamais `is-revealed`, et la liste reste invisible jusqu'a ce que
+ * l'utilisateur recharge la page.
+ *
+ * Le defaut ne se voyait qu'a l'usage : la premiere peinture est correcte, et
+ * seule une seconde requete Livewire la casse.
+ *
+ * `data-reveal="on"` n'est pose sur <html> qu'ici : tant que ce script n'a pas
+ * tourne, la regle CSS qui masque les elements ne s'applique pas et la page
+ * reste entierement lisible.
+ */
+function observeReveals(scope) {
+    if (revealObserver === null || !scope || typeof scope.querySelectorAll !== 'function') {
+        return;
+    }
+
+    const targets = scope.querySelectorAll('[data-reveal]:not(.is-revealed)');
+    if (targets.length === 0) return;
+
     root.dataset.reveal = 'on';
 
-    const observer = new IntersectionObserver(
-        (entries) => {
-            for (const entry of entries) {
-                if (!entry.isIntersecting) continue;
-
-                // Decalage en cascade uniquement quand l'element appartient a
-                // une vraie sequence : l'ordre de lecture porte alors une
-                // information, ce qui n'est pas le cas d'une section isolee.
-                const step = Number(entry.target.dataset.revealStep ?? 0);
-                entry.target.style.transitionDelay = `${Math.min(step, 4) * 70}ms`;
-                entry.target.classList.add('is-revealed');
-
-                observer.unobserve(entry.target);
-            }
-        },
-        { rootMargin: '0px 0px -12% 0px', threshold: 0.1 }
-    );
-
     for (const target of targets) {
-        observer.observe(target);
+        revealObserver.observe(target);
     }
 }
 
@@ -251,3 +279,36 @@ if (document.readyState === 'loading') {
 // Livewire remplace le contenu sans recharger la page : les observateurs
 // doivent etre reinstalles sur le nouveau document.
 document.addEventListener('livewire:navigated', boot);
+
+/*
+ * Mises a jour EN PLACE : un filtre, une pagination, un formulaire.
+ *
+ * `livewire:navigated` ne couvre que les navigations de page. Une simple
+ * requete de composant remplace des noeuds sans declencher cet evenement — et
+ * les cartes remplacees n'etaient plus jamais revelees.
+ *
+ * Deux crochets, volontairement :
+ *
+ * - `morph.added` prend chaque element ajoute, y compris ceux qu'un
+ *   `wire:key` fait apparaitre seul au milieu d'une liste ;
+ * - `morphed` rattrape le reste, une fois le composant entierement remplace.
+ *
+ * Un crochet inconnu d'une version de Livewire ne se declenche simplement
+ * jamais : les enregistrer tous les deux ne coute rien et couvre les deux
+ * mecaniques.
+ */
+document.addEventListener('livewire:init', () => {
+    if (typeof window.Livewire?.hook !== 'function') {
+        return;
+    }
+
+    window.Livewire.hook('morph.added', ({ el }) => {
+        if (el?.hasAttribute?.('data-reveal')) {
+            observeReveals(el.parentElement ?? document);
+        }
+    });
+
+    window.Livewire.hook('morphed', ({ component }) => {
+        observeReveals(component?.el ?? document);
+    });
+});

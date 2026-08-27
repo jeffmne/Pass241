@@ -48,7 +48,7 @@ it('renvoie vers la creation d organisation un utilisateur qui n en a aucune', f
 
 it('bloque l acces a une organisation suspendue', function () {
     [$user, $organization] = organizerWithOrganization();
-    $organization->forceFill(['suspended_at' => now()])->save();
+    $organization->forceFill(['suspended_at' => now(), 'suspension_reason' => 'Suspendue pour ce test.'])->save();
 
     $this->actingAs($user)->get('/dashboard')->assertForbidden();
 });

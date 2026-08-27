@@ -226,7 +226,7 @@ it('ne reverse rien sans numero de destination', function () {
 it('ne reverse rien a une organisation suspendue', function () {
     ($this->sell)(1);
 
-    $this->organization->forceFill(['suspended_at' => now()])->save();
+    $this->organization->forceFill(['suspended_at' => now(), 'suspension_reason' => 'Suspendue pour ce test.'])->save();
 
     expect(app(SettleFunds::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
 });

@@ -125,6 +125,15 @@ enum AuditAction: string
     // Exports
     case ExportGenerated = 'EXPORT_GENERATED';
 
+    /*
+     * Reglages de la plateforme (section 58).
+     *
+     * Journalise avec l'ancienne ET la nouvelle valeur : un taux de commission
+     * qui bouge sans trace serait indefendable le jour ou un organisateur
+     * conteste son reversement.
+     */
+    case PlatformSettingChanged = 'PLATFORM_SETTING_CHANGED';
+
     /**
      * Libelle lisible, affiche dans le journal d'audit (section 58).
      *
@@ -202,6 +211,7 @@ enum AuditAction: string
             self::CampaignCancelled => 'Campagne annulee',
 
             self::ExportGenerated => 'Export genere',
+            self::PlatformSettingChanged => 'Reglage de la plateforme modifie',
         };
     }
 

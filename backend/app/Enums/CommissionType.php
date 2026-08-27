@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Services\Platform\PlatformSettings;
+
 /**
  * Nature de la transaction commissionnee (section 21.2).
  *
@@ -28,10 +30,18 @@ enum CommissionType: string
      * Jamais un flottant : 2,5 % ne se represente pas exactement en binaire, et
      * l'erreur finirait par produire un franc d'ecart sur certaines
      * transactions.
+     *
+     * Lu par `PlatformSettings`, qui retombe sur `config/commission.php` quand
+     * rien n'a ete regle : le Super Admin peut changer le taux sans
+     * deploiement, et une installation neuve fonctionne sans rien initialiser.
+     *
+     * Changer ce taux N'AFFECTE JAMAIS LE PASSE : chaque commission porte un
+     * instantane du sien (decision D-003), et les reversements se calculent a
+     * partir de ces instantanes.
      */
     public function basisPoints(): int
     {
-        return (int) config('commission.basis_points.'.$this->value);
+        return app(PlatformSettings::class)->commissionBasisPoints($this);
     }
 
     /** « 5 % », « 2,5 % » — pour l'affichage uniquement. */

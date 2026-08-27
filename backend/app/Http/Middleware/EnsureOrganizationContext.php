@@ -36,11 +36,23 @@ class EnsureOrganizationContext
         $organization = $this->resolveOrganization($user);
 
         if (! $organization) {
-            // L'utilisateur est authentifie mais n'appartient a aucune
-            // organisation active : il doit en creer une avant d'aller plus loin.
-            return $request->expectsJson()
-                ? response()->json(['message' => 'Aucune organisation active.'], 403)
-                : redirect()->route('organizations.create');
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Aucune organisation active.'], 403);
+            }
+
+            /*
+             * Le Super Admin n'appartient a aucune organisation, et ce n'est
+             * pas un compte incomplet : c'est sa nature. L'envoyer creer une
+             * organisation le ferait entrer dans le monde de l'organisateur
+             * alors que sa console est ailleurs.
+             */
+            if ($user->isSuperAdmin()) {
+                return redirect()->route('admin.overview');
+            }
+
+            // Un organisateur, lui, doit bien creer son organisation avant
+            // d'aller plus loin.
+            return redirect()->route('organizations.create');
         }
 
         // Defense en profondeur : `current_organization_id` peut pointer vers une

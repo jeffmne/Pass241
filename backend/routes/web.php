@@ -7,8 +7,10 @@ use App\Http\Controllers\DonationReceiptController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ReceiptController;
 use App\Livewire\Admin\AuditTrail as AdminAuditTrail;
+use App\Livewire\Admin\OrganizationDetail as AdminOrganizationDetail;
 use App\Livewire\Admin\Organizations as AdminOrganizations;
 use App\Livewire\Admin\Overview as AdminOverview;
+use App\Livewire\Admin\Settings as AdminSettings;
 use App\Livewire\Admin\Settlements as AdminSettlements;
 use App\Livewire\Admin\Transactions as AdminTransactions;
 use App\Livewire\Auth\Login;
@@ -185,8 +187,22 @@ Route::middleware('auth')->group(function () {
         Route::get('/', AdminOverview::class)->name('admin.overview');
         Route::get('/reversements', AdminSettlements::class)->name('admin.settlements');
         Route::get('/organisations', AdminOrganizations::class)->name('admin.organizations');
+
+        /*
+         * Fiche d'une organisation (section 58).
+         *
+         * Hors du middleware `organization`, comme toute la console : le Super
+         * Admin n'appartient a aucune organisation et les voit toutes. La
+         * liaison se fait donc sur le slug sans portee — `Organization` ne
+         * porte pas le trait multi-tenant, c'est elle qui le definit.
+         */
+        Route::get('/organisations/{organization}', AdminOrganizationDetail::class)
+            ->name('admin.organization');
         Route::get('/transactions', AdminTransactions::class)->name('admin.transactions');
         Route::get('/journal', AdminAuditTrail::class)->name('admin.audit');
+
+        // Section 58 : reglages metier de la plateforme. Aucun secret n'y passe.
+        Route::get('/parametres', AdminSettings::class)->name('admin.settings');
     });
 
     /*

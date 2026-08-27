@@ -26,6 +26,7 @@
         ['label' => 'Organisations', 'icon' => 'building-2', 'route' => 'admin.organizations'],
         ['label' => 'Transactions', 'icon' => 'receipt', 'route' => 'admin.transactions'],
         ['label' => 'Journal', 'icon' => 'scroll-text', 'route' => 'admin.audit'],
+        ['label' => 'Parametres', 'icon' => 'settings', 'route' => 'admin.settings'],
     ];
 @endphp
 <!DOCTYPE html>
