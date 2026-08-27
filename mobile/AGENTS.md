@@ -49,3 +49,19 @@ pas a faire entrer quelqu'un plus vite n'a rien a faire ici.
 npm run typecheck   # tsc --noEmit
 npm test            # jest, sur les modules purs
 ```
+
+## Sur un vrai appareil
+
+Expo Go suffit : caméra, SQLite, stockage sécurisé, empreintes et état du
+réseau sont tous inclus dans Expo Go pour le SDK 57.
+
+1. `EXPO_PUBLIC_API_URL` dans `.env` doit être l'adresse de la machine **vue du
+   téléphone** — jamais `localhost`, qui y désigne le téléphone lui-même.
+2. Téléphone et machine sur le même réseau.
+3. Pare-feu Windows : ports 8000 (serveur) et 8081 (bundler) en entrée.
+4. `npm start`, puis le QR Code dans Expo Go — ou l'URL `exp://…:8081` saisie à
+   la main.
+
+Test le plus rapide en cas de doute : ouvrir `http://<ip>:8000` dans le
+navigateur du téléphone. Si la page d'accueil s'affiche, le réseau n'est pas en
+cause.

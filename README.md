@@ -73,10 +73,17 @@ npm run typecheck && npm test
 `EXPO_PUBLIC_API_URL` doit pointer vers une adresse joignable **depuis le
 téléphone** : `10.0.2.2` sur émulateur Android, l'IP de la machine sur le réseau
 local pour un vrai appareil. `localhost` y désignerait le téléphone lui-même.
+La variable est lue au démarrage du bundler : la changer demande de relancer
+`npm start`.
 
-Le scan, la base locale et le stockage sécurisé n'existent pas dans Expo Go sur
-tous les appareils : un build de développement est nécessaire pour les
-fonctionnalités natives.
+**Expo Go suffit.** Tous les modules natifs utilisés — caméra, SQLite, stockage
+sécurisé, empreintes, état du réseau — y sont inclus pour le SDK 57. Un build de
+développement ne devient nécessaire que le jour où une dépendance native hors
+SDK entre dans le projet.
+
+Le téléphone doit être sur le même réseau que la machine, et Windows doit
+laisser passer les ports 8000 (serveur) et 8081 (bundler) en entrée — le
+pare-feu le demande au premier lancement.
 
 ## Commandes courantes
 
