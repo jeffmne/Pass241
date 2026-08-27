@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\CommissionType;
 use App\Enums\EventCategory;
 use App\Enums\EventStatus;
 use App\Enums\EventVisibility;
+use App\Enums\OrderStatus;
 use App\Models\Concerns\BelongsToOrganization;
+use App\Services\Settlement\Settlable;
+use Carbon\CarbonInterface;
 use Database\Factories\EventFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,8 +17,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -24,7 +31,7 @@ use RuntimeException;
  * doit jamais laisser passer ceux d'une autre (section 9). La page publique,
  * elle, sort explicitement de cette portee — voir `publicBySlug()`.
  */
-class Event extends Model
+class Event extends Model implements Settlable
 {
     /** @use HasFactory<EventFactory> */
     use BelongsToOrganization, HasFactory;
@@ -118,10 +125,13 @@ class Event extends Model
      *
      * Un seul par evenement, garanti par une contrainte d'unicite : c'est ce
      * qui empeche de payer deux fois apres un echec transitoire.
+     *
+     * Polymorphe depuis la decision D-041 : la meme table accueille les
+     * reversements des collectes, qui n'ont pas d'evenement.
      */
-    public function settlement(): HasOne
+    public function settlement(): MorphOne
     {
-        return $this->hasOne(Settlement::class);
+        return $this->morphOne(Settlement::class, 'settlable');
     }
 
     public function createdBy(): BelongsTo
@@ -296,5 +306,59 @@ class Event extends Model
     public function categoryLine(): string
     {
         return implode(' • ', array_map(fn (EventCategory $c) => $c->label(), $this->categoryCases()));
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Reversement (contrat Settlable, decision D-041)
+     * ---------------------------------------------------------------------
+     */
+
+    public function settlementOrganization(): ?Organization
+    {
+        return $this->organization;
+    }
+
+    /**
+     * Les commissions de billetterie de CET evenement.
+     *
+     * Une commande en echec ou annulee n'a rien encaisse : la reverser
+     * creerait de l'argent qui n'existe pas (regle 80.1). Les commandes
+     * partiellement remboursees restent dans le calcul, amputees de la part
+     * rendue par leur ligne d'ajustement.
+     */
+    public function constrainCommissions(QueryBuilder $query): void
+    {
+        $query->join('orders', function ($join) {
+            $join->on('commissions.commissionable_id', '=', 'orders.id')
+                ->where('commissions.commissionable_type', '=', (new Order)->getMorphClass());
+        })
+            ->where('orders.event_id', $this->getKey())
+            ->whereIn('orders.status', [
+                OrderStatus::Paid->value,
+                OrderStatus::PartiallyRefunded->value,
+                OrderStatus::Refunded->value,
+            ]);
+    }
+
+    public function settlementCommissionType(): CommissionType
+    {
+        return CommissionType::Ticketing;
+    }
+
+    /**
+     * La fin de l'evenement.
+     *
+     * `starts_at` en secours : la date de fin est facultative en base, et un
+     * evenement sans elle ne doit pas rester eternellement non reverse.
+     */
+    public function settlementEndsAt(): ?CarbonInterface
+    {
+        return $this->ends_at ?? $this->starts_at;
+    }
+
+    public function settlementLabel(): string
+    {
+        return Str::limit($this->name, 20, '');
     }
 }

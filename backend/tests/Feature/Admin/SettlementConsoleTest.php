@@ -2,7 +2,7 @@
 
 use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Organizations\SetPayoutDestination;
-use App\Actions\Settlements\SettleEvent;
+use App\Actions\Settlements\SettleFunds;
 use App\Enums\PaymentProvider;
 use App\Enums\PayoutState;
 use App\Livewire\Admin\Settlements as AdminSettlements;
@@ -69,7 +69,7 @@ beforeEach(function () {
             app(ConfirmPayment::class)->handle($order->load('items'));
         });
 
-        $settlement = app(SettleEvent::class)->handle($event->fresh()->load('organization'));
+        $settlement = app(SettleFunds::class)->handle($event->fresh()->load('organization'));
 
         app(OrganizationContext::class)->forget();
 

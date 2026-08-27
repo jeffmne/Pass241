@@ -4,15 +4,16 @@ namespace App\Actions\Settlements;
 
 use App\Enums\AuditAction;
 use App\Enums\PayoutState;
-use App\Models\Event;
 use App\Models\Settlement;
 use App\Notifications\SettlementSent;
 use App\Services\Audit\AuditLogger;
 use App\Services\Payments\PaymentManager;
 use App\Services\Payments\PayoutRequest;
 use App\Services\Payments\PayoutResult;
+use App\Services\Settlement\Settlable;
 use App\Services\Settlement\SettlementLedger;
 use App\Support\Tenancy\OrganizationContext;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -20,15 +21,16 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Reverse a l'organisateur le net d'un evenement (section 21.2, decision D-026).
+ * Reverse a l'organisateur le net d'un evenement ou d'une collecte
+ * (section 21.2, decisions D-026 et D-041).
  *
  * QUATRE GARANTIES tiennent ensemble ici, et aucune ne peut sauter :
  *
- * 1. UN SEUL VIREMENT. Une contrainte d'unicite sur `event_id` et une cle
- *    d'idempotence unique en base : deux workers traitant le meme evenement au
+ * 1. UN SEUL VIREMENT. Une contrainte d'unicite sur le couple polymorphe et une
+ *    cle d'idempotence unique en base : deux workers traitant le meme objet au
  *    meme instant ne peuvent pas produire deux ordres. Un virement rejoue
- *    envoie l'argent deux fois, et une somme envoyee en double ne se
- *    recupere pas.
+ *    envoie l'argent deux fois, et une somme envoyee en double ne se recupere
+ *    pas.
  *
  * 2. LE MONTANT NE VIENT JAMAIS D'UNE REQUETE. Il est calcule a partir des
  *    lignes de commission deja figees, ecrit une fois, puis gele par
@@ -45,7 +47,7 @@ use Throwable;
  * Aucun ecran ne declenche cette action : elle vient d'une commande planifiee.
  * Il n'existe pas de bouton « retirer » dans le produit (section 21.2).
  */
-class SettleEvent
+class SettleFunds
 {
     public function __construct(
         private readonly SettlementLedger $ledger,
@@ -57,14 +59,18 @@ class SettleEvent
     /**
      * @param  bool  $force  ignore la date d'echeance, pour les tests et le support
      */
-    public function handle(Event $event, bool $force = false): ?Settlement
+    public function handle(Settlable&Model $settlable, bool $force = false): ?Settlement
     {
-        return $this->context->runFor($event->organization, function () use ($event, $force) {
-            if (! $force && ! $this->ledger->isDue($event)) {
+        $organization = $settlable->settlementOrganization();
+
+        if (! $organization) {
+            return null;
+        }
+
+        return $this->context->runFor($organization, function () use ($settlable, $organization, $force) {
+            if (! $force && ! $this->ledger->isDue($settlable)) {
                 return null;
             }
-
-            $organization = $event->organization;
 
             if (! $organization->canReceivePayouts()) {
                 // Pas une erreur : l'organisateur n'a simplement pas encore
@@ -72,7 +78,7 @@ class SettleEvent
                 return null;
             }
 
-            $settlement = $this->settlementFor($event);
+            $settlement = $this->settlementFor($settlable, $organization);
 
             if ($settlement === null) {
                 return null;
@@ -83,37 +89,36 @@ class SettleEvent
                 return $settlement;
             }
 
-            return $this->send($settlement, $event);
+            return $this->send($settlement, $settlable);
         });
     }
 
     /**
      * Retrouve ou cree la ligne de reversement.
      *
-     * Renvoie null quand il n'y a rien a reverser : aucune vente confirmee, ou
-     * un net sous le seuil ou les frais fixes du prestataire mangeraient
-     * l'essentiel du virement.
+     * Renvoie null quand il n'y a rien a reverser : aucune transaction
+     * confirmee, ou un net sous le seuil ou les frais fixes du prestataire
+     * mangeraient l'essentiel du virement.
      */
-    private function settlementFor(Event $event): ?Settlement
+    private function settlementFor(Settlable&Model $settlable, $organization): ?Settlement
     {
-        $existing = Settlement::query()->where('event_id', $event->getKey())->first();
+        $existing = $this->existingFor($settlable);
 
         if ($existing) {
             return $existing;
         }
 
-        $totals = $this->ledger->totalsFor($event);
+        $totals = $this->ledger->totalsFor($settlable);
         $minimum = (int) config('payments.payouts.minimum_amount');
 
         if ($totals['net'] <= 0 || $totals['net'] < $minimum) {
             return null;
         }
 
-        $organization = $event->organization;
-
         try {
             $settlement = DB::transaction(fn () => Settlement::create([
-                'event_id' => $event->getKey(),
+                'settlable_type' => $settlable->getMorphClass(),
+                'settlable_id' => $settlable->getKey(),
                 'reference' => $this->uniqueReference(),
                 'gross_amount' => $totals['gross'],
                 'commission_amount' => $totals['commission'],
@@ -125,14 +130,14 @@ class SettleEvent
                 'recipient_name' => $organization->payout_name,
                 'status' => PayoutState::Pending->value,
                 'psp' => $this->payments->driver()->name(),
-                'idempotency_key' => $this->idempotencyKey($event),
-                'scheduled_for' => $this->ledger->releaseDateFor($event),
+                'idempotency_key' => $this->idempotencyKey($settlable),
+                'scheduled_for' => $this->ledger->releaseDateFor($settlable),
             ]));
         } catch (UniqueConstraintViolationException) {
             // Un autre worker vient de creer la ligne. C'est exactement ce que
             // la contrainte protege : on reprend la sienne plutot que d'en
             // creer une seconde.
-            return Settlement::query()->where('event_id', $event->getKey())->first();
+            return $this->existingFor($settlable);
         }
 
         $this->audit->log(
@@ -143,7 +148,7 @@ class SettleEvent
                 'gross' => $settlement->gross_amount,
                 'commission' => $settlement->commission_amount,
                 'net' => $settlement->net_amount,
-                'orders' => $totals['orders'],
+                'transactions' => $totals['transactions'],
                 'recipient' => $settlement->maskedRecipient(),
             ],
             actor: null,
@@ -153,8 +158,16 @@ class SettleEvent
         return $settlement;
     }
 
+    private function existingFor(Settlable&Model $settlable): ?Settlement
+    {
+        return Settlement::query()
+            ->where('settlable_type', $settlable->getMorphClass())
+            ->where('settlable_id', $settlable->getKey())
+            ->first();
+    }
+
     /** Transmet l'ordre au prestataire et enregistre sa reponse. */
-    private function send(Settlement $settlement, Event $event): Settlement
+    private function send(Settlement $settlement, Settlable&Model $settlable): Settlement
     {
         if (! $this->payments->supportsSettlement()) {
             throw new RuntimeException(
@@ -177,7 +190,7 @@ class SettleEvent
                 releaseAt: $settlement->scheduled_for?->isFuture()
                     ? $settlement->scheduled_for
                     : null,
-                label: 'Pass241 '.Str::limit($event->name, 20, ''),
+                label: 'Pass241 '.$settlable->settlementLabel(),
             ));
         } catch (Throwable $e) {
             report($e);
@@ -244,7 +257,7 @@ class SettleEvent
     private function notifyOrganizer(Settlement $settlement): void
     {
         try {
-            $settlement->loadMissing('event');
+            $settlement->loadMissing('settlable');
             $settlement->organization->notify(new SettlementSent($settlement));
         } catch (Throwable $e) {
             report($e);
@@ -262,14 +275,16 @@ class SettleEvent
     }
 
     /**
-     * Cle stable pour un evenement donne.
+     * Cle stable pour un objet donne.
      *
      * Doit rester identique d'une tentative a l'autre : c'est ce qui permet au
-     * prestataire de reconnaitre un ordre deja recu et de le refuser.
+     * prestataire de reconnaitre un ordre deja recu et de le refuser. Le type
+     * y figure — un evenement et une collecte peuvent porter le meme
+     * identifiant.
      */
-    private function idempotencyKey(Event $event): string
+    private function idempotencyKey(Settlable&Model $settlable): string
     {
-        return 'settlement-event-'.$event->getKey();
+        return 'settlement-'.Str::lower(class_basename($settlable)).'-'.$settlable->getKey();
     }
 
     /** Reference lisible, du type RV-4KX9-27B. */

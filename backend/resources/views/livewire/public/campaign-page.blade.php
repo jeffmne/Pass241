@@ -300,10 +300,22 @@
                     </div>
 
                     {{-- Section 40 : le montant est visible dans tous les cas,
-                         que le donateur soit nomme ou anonyme. --}}
-                    <p class="shrink-0 font-semibold text-ink tabular">
-                        {{ $donation->formattedSubtotal() }}
-                    </p>
+                         que le donateur soit nomme ou anonyme.
+
+                         Section 47 : c'est le NET apres remboursement qui
+                         s'affiche. Un don rembourse en totalite reste dans
+                         l'historique — il ne s'en retire pas (section 45) —
+                         mais il y figure a zero. --}}
+                    <div class="shrink-0 text-right">
+                        <p class="font-semibold text-ink tabular">
+                            {{ $donation->formattedNetAmount() }}
+                        </p>
+                        @if ($donation->isRefunded())
+                            <p class="text-xs text-grey-400">
+                                {{ $donation->isFullyRefunded() ? 'Rembourse' : 'Partiellement rembourse' }}
+                            </p>
+                        @endif
+                    </div>
                 </div>
             @empty
                 <div class="py-8 text-center">

@@ -69,6 +69,11 @@ class CampaignStatistics
      * jours creux disparaissent ecrase le temps et fait lire une progression
      * reguliere la ou il y a eu un pic puis rien.
      *
+     * Ce sont les dons RECUS chaque jour, avant remboursement : la courbe
+     * raconte l'activite de la collecte, pas son solde. Un remboursement
+     * decide trois semaines apres un don n'appartient pas au jour de ce don,
+     * et l'y soustraire reecrirait l'histoire. Il se lit dans le total.
+     *
      * @return Collection<int, array{date: Carbon, amount: int, count: int}>
      */
     public function evolution(Campaign $campaign, int $days = self::EVOLUTION_DAYS): Collection
@@ -127,7 +132,15 @@ class CampaignStatistics
             ')
             ->first();
 
-        $collected = (int) ($row->collected ?? 0);
+        // Section 47 : les remboursements se deduisent du collecte, exactement
+        // comme sur la page publique — les deux chiffres viennent de la meme
+        // regle, et ne peuvent donc pas diverger.
+        $refunded = (int) DB::table('donation_refunds')
+            ->join('donations', 'donations.id', '=', 'donation_refunds.donation_id')
+            ->where('donations.campaign_id', $campaign->getKey())
+            ->sum('donation_refunds.amount');
+
+        $collected = max(0, (int) ($row->collected ?? 0) - $refunded);
         $donations = (int) ($row->donations ?? 0);
 
         return [

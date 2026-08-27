@@ -120,7 +120,7 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-grey-500">{{ $settlement->organization?->name }}</td>
-                        <td class="px-4 py-3 text-grey-500">{{ $settlement->event?->name }}</td>
+                        <td class="px-4 py-3 text-grey-500">{{ $settlement->settlableName() }}</td>
                         <td class="px-4 py-3 text-right text-grey-500 tabular">{{ $settlement->formattedGross() }}</td>
                         <td class="px-4 py-3 text-right text-grey-500 tabular">{{ $settlement->formattedCommission() }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-ink tabular">{{ $settlement->formattedNet() }}</td>
@@ -156,7 +156,7 @@
                         <p class="mt-0.5 truncate text-sm text-grey-500">
                             {{ $settlement->organization?->name }}
                         </p>
-                        <p class="truncate text-sm text-grey-400">{{ $settlement->event?->name }}</p>
+                        <p class="truncate text-sm text-grey-400">{{ $settlement->settlableName() }}</p>
                     </div>
                     <x-settlement-state :status="$settlement->status" />
                 </div>

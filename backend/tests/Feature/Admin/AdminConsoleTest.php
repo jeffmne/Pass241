@@ -138,7 +138,10 @@ it('remonte ce qui demande une intervention sans passer par le cache', function 
     expect(app(PlatformStatistics::class)->attention()['settlements'])->toBe(0);
 
     forOrganization($organization, fn () => Settlement::create([
-        'event_id' => Event::query()->acrossOrganizations()->value('id'),
+        // Rattachement polymorphe depuis la decision D-041 : la meme table
+        // accueille les reversements des collectes.
+        'settlable_type' => (new Event)->getMorphClass(),
+        'settlable_id' => Event::query()->acrossOrganizations()->value('id'),
         'reference' => 'RV-TEST-001',
         'gross_amount' => 20_000, 'commission_amount' => 1_000, 'net_amount' => 19_000,
         'recipient_phone' => '074000000', 'recipient_operator' => 'AIRTEL',

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Facades\URL;
 
@@ -90,13 +91,19 @@ class Donation extends Model implements Payable
     /**
      * Commission retenue par la plateforme (2,5 %, section 21.2).
      *
-     * La ligne D'ORIGINE seulement : un remboursement ajoutera un ajustement
+     * La ligne D'ORIGINE seulement : un remboursement ajoute un ajustement
      * partageant la meme transaction, et les additionner doublerait le chiffre.
      */
     public function commission(): MorphOne
     {
         return $this->morphOne(Commission::class, 'commissionable')
             ->whereNull('parent_commission_id');
+    }
+
+    /** Remboursements, totaux ou partiels, lies a ce don (section 47). */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(DonationRefund::class);
     }
 
     /*
@@ -180,10 +187,68 @@ class Donation extends Model implements Payable
         return $this->donor_name;
     }
 
-    /** Le don lui-meme, seul montant publie (section 40). */
+    /**
+     * Part deja rendue au donateur (section 47).
+     *
+     * Lit la somme preparee par `withSum('refunds', 'amount')` quand elle est
+     * la : sur une liste de cent dons, interroger la base une fois par ligne
+     * couterait cent requetes pour un chiffre qu'une seule agregation donne.
+     */
+    public function refundedAmount(): int
+    {
+        if ($this->relationLoaded('refunds')) {
+            return (int) $this->refunds->sum('amount');
+        }
+
+        $preloaded = $this->getAttribute('refunds_sum_amount');
+
+        if ($preloaded !== null) {
+            return (int) $preloaded;
+        }
+
+        /*
+         * Portee levee : cette somme est lue aussi bien depuis le tableau de
+         * bord que depuis la page publique, ou aucun contexte d'organisation
+         * n'existe. Aucune fuite possible — la requete est bornee aux
+         * remboursements de CE don, qui appartiennent forcement a la meme
+         * organisation que lui.
+         */
+        return (int) $this->refunds()->acrossOrganizations()->sum('amount');
+    }
+
+    /**
+     * Ce que ce don represente REELLEMENT aujourd'hui (section 47).
+     *
+     * « Le montant affiche publiquement pour ce don individuel doit refleter le
+     * montant net apres remboursement partiel. » Un don rembourse en totalite
+     * reste dans l'historique — il ne s'en retire pas (section 45) — mais il y
+     * figure a zero.
+     */
+    public function netAmount(): int
+    {
+        return max(0, (int) $this->subtotal - $this->refundedAmount());
+    }
+
+    public function isRefunded(): bool
+    {
+        return $this->refundedAmount() > 0;
+    }
+
+    public function isFullyRefunded(): bool
+    {
+        return $this->netAmount() === 0;
+    }
+
+    /** Le don lui-meme, avant remboursement. */
     public function formattedSubtotal(): string
     {
         return Money::format($this->subtotal);
+    }
+
+    /** Ce que le don pese aujourd'hui : c'est ce qui s'affiche partout. */
+    public function formattedNetAmount(): string
+    {
+        return Money::format($this->netAmount());
     }
 
     /** Ce qui part reellement du telephone, frais compris. */

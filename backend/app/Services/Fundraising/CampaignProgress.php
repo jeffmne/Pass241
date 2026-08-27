@@ -58,7 +58,20 @@ class CampaignProgress
             ')
             ->first();
 
-        $collected = (int) ($row->collected ?? 0);
+        /*
+         * Section 47 : les remboursements se DEDUISENT du montant collecte.
+         *
+         * « collectedAmount = SUM(donations confirmees) − SUM(remboursements
+         * lies). » Une seconde agregation plutot qu'une jointure : un don peut
+         * porter plusieurs remboursements partiels, et joindre les deux tables
+         * multiplierait les lignes de dons avant de les sommer.
+         */
+        $refunded = (int) DB::table('donation_refunds')
+            ->join('donations', 'donations.id', '=', 'donation_refunds.donation_id')
+            ->where('donations.campaign_id', $campaign->getKey())
+            ->sum('donation_refunds.amount');
+
+        $collected = max(0, (int) ($row->collected ?? 0) - $refunded);
         $donations = (int) ($row->donations ?? 0);
         // Par numero de telephone : c'est la seule identite dont on dispose a
         // coup sur, le donateur n'ayant pas de compte. Deux dons du meme

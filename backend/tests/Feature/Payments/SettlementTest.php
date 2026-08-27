@@ -2,7 +2,7 @@
 
 use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Organizations\SetPayoutDestination;
-use App\Actions\Settlements\SettleEvent;
+use App\Actions\Settlements\SettleFunds;
 use App\Enums\AuditAction;
 use App\Enums\KycStatus;
 use App\Enums\OrderStatus;
@@ -90,7 +90,7 @@ beforeEach(function () {
 it('reverse le net des commissions et jamais les frais du prestataire', function () {
     ($this->sell)(2);
 
-    $settlement = app(SettleEvent::class)->handle($this->event);
+    $settlement = app(SettleFunds::class)->handle($this->event);
 
     // 2 billets a 10 000 = 20 000 de brut, 5 % = 1 000 de commission.
     // Les 400 de frais prestataire ont ete avances par l'acheteur : ils ne
@@ -118,12 +118,14 @@ it('ne compte que les commandes reellement payees', function () {
 
     // Une commande en echec n'a rien encaisse : la reverser creerait de
     // l'argent qui n'existe pas.
+    // `transactions` et non `orders` : le grand livre ne sait plus s'il compte
+    // des commandes ou des dons (decision D-041).
     expect($totals['gross'])->toBe(10_000)
-        ->and($totals['orders'])->toBe(1);
+        ->and($totals['transactions'])->toBe(1);
 });
 
 it('ne cree aucun reversement quand rien n a ete vendu', function () {
-    expect(app(SettleEvent::class)->handle($this->event))->toBeNull()
+    expect(app(SettleFunds::class)->handle($this->event))->toBeNull()
         ->and(Settlement::query()->acrossOrganizations()->count())->toBe(0);
 });
 
@@ -134,7 +136,7 @@ it('respecte le montant minimal de reversement', function () {
 
     // Sous le seuil, les frais fixes du prestataire mangeraient l'essentiel
     // du virement.
-    expect(app(SettleEvent::class)->handle($this->event))->toBeNull();
+    expect(app(SettleFunds::class)->handle($this->event))->toBeNull();
 });
 
 /*
@@ -154,7 +156,7 @@ it('ne reverse rien avant la fin de l evenement', function () {
     // C'est tout l'interet du choix : la fenetre de remboursement se ferme 48h
     // AVANT l'evenement (section 24.1). Reverser apres garantit qu'aucun
     // remboursement n'exigera de recuperer des fonds deja partis.
-    expect(app(SettleEvent::class)->handle($this->event->fresh()))->toBeNull();
+    expect(app(SettleFunds::class)->handle($this->event->fresh()))->toBeNull();
 });
 
 it('programme le virement sans le liberer avant le delai', function () {
@@ -166,7 +168,7 @@ it('programme le virement sans le liberer avant le delai', function () {
 
     ($this->sell)(1);
 
-    $settlement = app(SettleEvent::class)->handle($this->event->fresh()->load('organization'));
+    $settlement = app(SettleFunds::class)->handle($this->event->fresh()->load('organization'));
 
     /*
      * Le prestataire simule sait programmer un virement : l'ordre part des la
@@ -218,7 +220,7 @@ it('ne reverse rien sans numero de destination', function () {
 
     ($this->sell)(1);
 
-    expect(app(SettleEvent::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
+    expect(app(SettleFunds::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
 });
 
 it('ne reverse rien a une organisation suspendue', function () {
@@ -226,7 +228,7 @@ it('ne reverse rien a une organisation suspendue', function () {
 
     $this->organization->forceFill(['suspended_at' => now()])->save();
 
-    expect(app(SettleEvent::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
+    expect(app(SettleFunds::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
 });
 
 it('ne reverse rien a un compte refuse par le super admin', function () {
@@ -234,7 +236,7 @@ it('ne reverse rien a un compte refuse par le super admin', function () {
 
     $this->organization->forceFill(['kyc_status' => KycStatus::Rejected])->save();
 
-    expect(app(SettleEvent::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
+    expect(app(SettleFunds::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
 });
 
 /*
@@ -246,8 +248,8 @@ it('ne reverse rien a un compte refuse par le super admin', function () {
 it('ne cree jamais deux reversements pour le meme evenement', function () {
     ($this->sell)(2);
 
-    $first = app(SettleEvent::class)->handle($this->event);
-    $second = app(SettleEvent::class)->handle($this->event);
+    $first = app(SettleFunds::class)->handle($this->event);
+    $second = app(SettleFunds::class)->handle($this->event);
 
     // Un virement rejoue envoie l'argent deux fois, et une somme envoyee en
     // double ne se recupere pas.
@@ -258,12 +260,12 @@ it('ne cree jamais deux reversements pour le meme evenement', function () {
 it('ne renvoie jamais un ordre deja accepte par le prestataire', function () {
     ($this->sell)(2);
 
-    $settlement = app(SettleEvent::class)->handle($this->event);
+    $settlement = app(SettleFunds::class)->handle($this->event);
     $reference = $settlement->provider_reference;
 
     expect($settlement->isAccepted())->toBeTrue();
 
-    app(SettleEvent::class)->handle($this->event);
+    app(SettleFunds::class)->handle($this->event);
 
     // Meme reference de transaction : aucun second ordre n'est parti.
     expect($settlement->fresh()->provider_reference)->toBe($reference);
@@ -272,7 +274,7 @@ it('ne renvoie jamais un ordre deja accepte par le prestataire', function () {
 it('refuse de reverser un montant modifie apres coup', function () {
     ($this->sell)(2);
 
-    $settlement = app(SettleEvent::class)->handle($this->event);
+    $settlement = app(SettleFunds::class)->handle($this->event);
 
     // Le montant vient d'une ligne de commission figee et n'est plus
     // modifiable : sans cela, une correction en base pourrait changer la somme
@@ -286,7 +288,7 @@ it('refuse de reverser un montant modifie apres coup', function () {
 it('refuse de rediriger un reversement vers un autre numero', function () {
     ($this->sell)(2);
 
-    $settlement = app(SettleEvent::class)->handle($this->event);
+    $settlement = app(SettleFunds::class)->handle($this->event);
 
     expect(fn () => forOrganization(
         $this->organization,
@@ -297,7 +299,7 @@ it('refuse de rediriger un reversement vers un autre numero', function () {
 it('refuse la suppression d un reversement', function () {
     ($this->sell)(2);
 
-    $settlement = app(SettleEvent::class)->handle($this->event);
+    $settlement = app(SettleFunds::class)->handle($this->event);
 
     expect(fn () => forOrganization($this->organization, fn () => $settlement->delete()))
         ->toThrow(RuntimeException::class, 'ne se supprime pas');
@@ -312,7 +314,7 @@ it('refuse la suppression d un reversement', function () {
 it('fige le beneficiaire au moment du reversement', function () {
     ($this->sell)(2);
 
-    $settlement = app(SettleEvent::class)->handle($this->event);
+    $settlement = app(SettleFunds::class)->handle($this->event);
 
     app(SetPayoutDestination::class)->handle(
         $this->organization->fresh(), '062111111', PaymentProvider::Moov, $this->owner,
@@ -328,7 +330,7 @@ it('fige le beneficiaire au moment du reversement', function () {
 it('journalise la creation et l aboutissement du reversement', function () {
     ($this->sell)(2);
 
-    app(SettleEvent::class)->handle($this->event);
+    app(SettleFunds::class)->handle($this->event);
 
     expect(AuditLog::action(AuditAction::SettlementCreated)->count())->toBe(1)
         ->and(AuditLog::action(AuditAction::SettlementSucceeded)->count())->toBe(1);
@@ -337,7 +339,7 @@ it('journalise la creation et l aboutissement du reversement', function () {
 it('masque le numero du beneficiaire dans le journal', function () {
     ($this->sell)(2);
 
-    app(SettleEvent::class)->handle($this->event);
+    app(SettleFunds::class)->handle($this->event);
 
     $log = AuditLog::action(AuditAction::SettlementCreated)->firstOrFail();
 
@@ -383,7 +385,7 @@ it('ne reconcilie rien quand aucun reversement n est en attente', function () {
 it('previent l organisateur que son reversement est parti', function () {
     ($this->sell)(2);
 
-    app(SettleEvent::class)->handle($this->event);
+    app(SettleFunds::class)->handle($this->event);
 
     // C'est la question la plus posee au support d'une billetterie : un
     // message suffit a l'eviter (section 69).
@@ -394,7 +396,7 @@ it('previent l organisateur que son reversement est parti', function () {
 });
 
 it('ne previent pas quand rien n a ete reverse', function () {
-    app(SettleEvent::class)->handle($this->event);
+    app(SettleFunds::class)->handle($this->event);
 
     Notification::assertNotSentTo(
         $this->organization,

@@ -3,13 +3,19 @@
 namespace App\Models;
 
 use App\Enums\CampaignStatus;
+use App\Enums\CommissionType;
+use App\Enums\DonationStatus;
 use App\Models\Concerns\BelongsToOrganization;
+use App\Services\Settlement\Settlable;
+use Carbon\CarbonInterface;
 use Database\Factories\CampaignFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -24,7 +30,7 @@ use RuntimeException;
  * colonne (regle 80.1). C'est ce qui rend la triche impossible plutot que
  * simplement interdite.
  */
-class Campaign extends Model
+class Campaign extends Model implements Settlable
 {
     /** @use HasFactory<CampaignFactory> */
     use BelongsToOrganization, HasFactory;
@@ -259,5 +265,66 @@ class Campaign extends Model
         return $this->cover_path
             ? Storage::disk('public')->url($this->cover_path)
             : $this->posterUrl();
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Reversement (contrat Settlable, decision D-041)
+     * ---------------------------------------------------------------------
+     */
+
+    public function settlementOrganization(): ?Organization
+    {
+        return $this->organization;
+    }
+
+    /**
+     * Les commissions des dons CONFIRMES de cette collecte.
+     *
+     * Un don en attente ou echoue n'a rien encaisse ; le reverser creerait de
+     * l'argent qui n'existe pas. Les remboursements, eux, sont deja soustraits
+     * par leur ligne d'ajustement de commission (section 47).
+     */
+    public function constrainCommissions(QueryBuilder $query): void
+    {
+        $query->join('donations', function ($join) {
+            $join->on('commissions.commissionable_id', '=', 'donations.id')
+                ->where('commissions.commissionable_type', '=', (new Donation)->getMorphClass());
+        })
+            ->where('donations.campaign_id', $this->getKey())
+            ->where('donations.status', DonationStatus::Confirmed->value);
+    }
+
+    public function settlementCommissionType(): CommissionType
+    {
+        return CommissionType::Donation;
+    }
+
+    /**
+     * Quand la collecte s'est arretee — ou null si elle continue.
+     *
+     * C'EST LE POINT QUI DECIDE DU REVERSEMENT (decision D-045). Tant qu'une
+     * collecte est ouverte, elle peut recevoir un don a la minute suivante :
+     * reverser reviendrait a la decouper en tranches arbitraires, alors que le
+     * produit ne prevoit qu'un seul virement par objet. L'organisateur qui veut
+     * ses fonds cloture sa collecte — un geste qui a un sens pour ses
+     * donateurs, contrairement a un bouton « retirer » que la section 21.2
+     * exclut.
+     *
+     * Une collecte suspendue n'est PAS terminee : elle peut rouvrir.
+     */
+    public function settlementEndsAt(): ?CarbonInterface
+    {
+        return match ($this->status) {
+            CampaignStatus::Completed => $this->completed_at,
+            CampaignStatus::Cancelled => $this->cancelled_at,
+            CampaignStatus::Expired => $this->ends_at,
+            default => null,
+        };
+    }
+
+    public function settlementLabel(): string
+    {
+        return Str::limit($this->name, 20, '');
     }
 }

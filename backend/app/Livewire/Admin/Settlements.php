@@ -50,7 +50,7 @@ class Settlements extends Component
             ->acrossOrganizations()
             ->with([
                 'organization',
-                'event' => fn ($query) => $query->acrossOrganizations(),
+                'settlable' => fn ($query) => $query,
             ])
             ->when($this->filter === 'attention', fn ($query) => $query
                 // Les deux etats sur lesquels quelqu'un doit se pencher : un

@@ -8,7 +8,7 @@ use App\Models\Concerns\BelongsToOrganization;
 use App\Support\Money;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use RuntimeException;
 
 /**
@@ -28,7 +28,8 @@ class Settlement extends Model
     use BelongsToOrganization;
 
     protected $fillable = [
-        'event_id',
+        'settlable_type',
+        'settlable_id',
         'reference',
         'gross_amount',
         'commission_amount',
@@ -67,7 +68,7 @@ class Settlement extends Model
             $frozen = [
                 'gross_amount', 'commission_amount', 'net_amount',
                 'recipient_phone', 'recipient_operator',
-                'event_id', 'organization_id', 'idempotency_key',
+                'settlable_type', 'settlable_id', 'organization_id', 'idempotency_key',
             ];
 
             if ($settlement->isDirty($frozen)) {
@@ -83,9 +84,27 @@ class Settlement extends Model
         });
     }
 
-    public function event(): BelongsTo
+    /**
+     * Ce qui est reverse : un evenement, une collecte (decision D-041).
+     *
+     * Polymorphe depuis que les collectes encaissent : la regle du virement
+     * unique et du montant fige ne depend pas de ce qui a rapporte l'argent.
+     */
+    public function settlable(): MorphTo
     {
-        return $this->belongsTo(Event::class);
+        return $this->morphTo();
+    }
+
+    /**
+     * Nom de ce qui est reverse, pour les ecrans et les notifications.
+     *
+     * Les deux types reversables portent un `name` ; le lire ici evite que
+     * chaque vue teste le type, et qu'une nouvelle sorte de reversement oblige
+     * a les reprendre toutes.
+     */
+    public function settlableName(): ?string
+    {
+        return $this->settlable?->name;
     }
 
     /** Date annoncee a l'organisateur, ou date reelle si le virement est parti. */

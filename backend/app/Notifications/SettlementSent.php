@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Models\Campaign;
 use App\Models\Settlement;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,19 +40,30 @@ class SettlementSent extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $settlement = $this->settlement;
-        $eventName = $settlement->event?->name ?? 'votre evenement';
+        $name = $settlement->settlableName() ?? 'votre activite';
+
+        /*
+         * Le libelle du brut depend de ce qui est reverse : « billets vendus »
+         * pour un evenement, « dons recus » pour une collecte. Le meme mot pour
+         * les deux ferait lire a un organisateur de collecte un email qui parle
+         * de billets qu'il n'a jamais vendus.
+         */
+        $grossLabel = $settlement->settlable instanceof Campaign
+            ? 'Dons recus'
+            : 'Billets vendus';
 
         $mail = (new MailMessage)
-            ->subject('Votre reversement pour '.$eventName)
+            ->subject('Votre reversement pour '.$name)
             ->greeting('Bonjour,')
             ->line(sprintf(
                 'Le reversement de vos recettes pour « %s » vient d\'etre %s.',
-                $eventName,
+                $name,
                 $settlement->isSettled() ? 'effectue' : 'programme',
             ))
             ->line('**Montant verse : '.$settlement->formattedNet().'**')
             ->line(sprintf(
-                'Billets vendus : %s. Commission Pass241 : %s.',
+                '%s : %s. Commission Pass241 : %s.',
+                $grossLabel,
                 $settlement->formattedGross(),
                 $settlement->formattedCommission(),
             ));

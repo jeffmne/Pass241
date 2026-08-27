@@ -300,7 +300,8 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
   - [ ] **La table `payments` n'a pas été créée** (décision D-043) : elle n'aurait rien rapporté tant que `orders` ne peut pas y migrer. Ce qui devait être partagé était la logique, pas le schéma
   - [ ] Reçu de don (section 53) — avec le module de reçus, jalon 7.5
 - [x] **Jalon 7.3 — Transparence, fait le 2026-08-27 (décision D-044)** : historique public des dons avec « voir plus » et total toujours annoncé, anonymat appliqué en un seul point (`publicDonorName`) — **y compris pour l'organisateur** —, `CampaignStatistics` (collecté, donateurs, don moyen, plus gros don, net, évolution sur 30 jours), écran organisateur en lecture seule définitive. 11 tests
-- [ ] **Jalon 7.4 — Remboursement partiel** (section 47) et reversement : `settlements` polymorphe
+- [x] **Jalon 7.4 — Remboursement partiel et reversement, fait le 2026-08-27 (décision D-045)** : `donation_refunds` en opération liée — le don n'est jamais modifié —, ajustement de commission au taux figé, montant collecté et montant public du don recalculés seuls, remboursement depuis l'écran des dons sous `finances.refund`. `settlements` devient polymorphe (`settlable_type` / `settlable_id`), `SettleEvent` devient `SettleFunds` sur un contrat `Settlable`, et la commande planifiée balaie événements **et** collectes closes. 29 tests
+  - [ ] **Une collecte longue ne touche rien avant sa clôture** (décision D-045) : contrainte assumée. La sortie, si l'usage l'impose, est le reversement périodique — plusieurs virements par collecte, donc unicité à lever et cumul à tenir
 - [ ] **Jalon 7.5 — Anti-fraude et reçus.** Les sept tests obligatoires de la section 75, l'audit (section 51), le reçu de don (section 53)
 - [ ] Commission 2,5 %, calculée automatiquement
 

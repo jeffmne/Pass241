@@ -4,7 +4,7 @@ use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Organizations\SetPayoutDestination;
 use App\Actions\Refunds\DecideRefund;
 use App\Actions\Refunds\RequestRefund;
-use App\Actions\Settlements\SettleEvent;
+use App\Actions\Settlements\SettleFunds;
 use App\Enums\AuditAction;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentProvider;
@@ -326,7 +326,7 @@ it('deduit le remboursement du reversement a l organisateur', function () {
         'ends_at' => now()->subDays(2),
     ])->save());
 
-    $settlement = app(SettleEvent::class)->handle($this->event->fresh()->load('organization'));
+    $settlement = app(SettleFunds::class)->handle($this->event->fresh()->load('organization'));
 
     /*
      * 3 billets a 10 000 = 30 000, moins 5 % = 28 500 de net.
@@ -349,7 +349,7 @@ it('ne reverse rien quand tout a ete rembourse', function () {
         'ends_at' => now()->subDays(2),
     ])->save());
 
-    expect(app(SettleEvent::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
+    expect(app(SettleFunds::class)->handle($this->event->fresh()->load('organization')))->toBeNull();
 });
 
 /*

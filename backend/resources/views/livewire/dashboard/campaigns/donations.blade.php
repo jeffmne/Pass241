@@ -123,24 +123,92 @@
 
         <div class="mt-4 space-y-2">
             @forelse ($donations as $donation)
-                <div class="flex items-center justify-between gap-4 rounded-2xl border border-grey-200 bg-white p-3.5">
-                    <div class="flex min-w-0 items-center gap-3">
-                        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-azure-100">
-                            <x-lucide-user class="size-4 text-azure-700" stroke-width="1.75" />
-                        </span>
-                        <div class="min-w-0">
-                            {{-- Section 41 : « Donateur anonyme » vaut aussi pour
-                                 l'organisateur. Un anonymat qu'il peut lever n'est
-                                 pas un anonymat. --}}
-                            <p class="truncate font-medium text-ink">{{ $donation->publicDonorName() }}</p>
-                            <p class="text-xs text-grey-400 tabular">
-                                {{ $donation->confirmed_at?->timezone($tz)->translatedFormat('j F Y \a\ H\hi') }}
-                                · {{ $donation->reference }}
-                            </p>
+                <div class="rounded-2xl border border-grey-200 bg-white p-3.5">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-azure-100">
+                                <x-lucide-user class="size-4 text-azure-700" stroke-width="1.75" />
+                            </span>
+                            <div class="min-w-0">
+                                {{-- Section 41 : « Donateur anonyme » vaut aussi pour
+                                     l'organisateur. Un anonymat qu'il peut lever n'est
+                                     pas un anonymat. --}}
+                                <p class="truncate font-medium text-ink">{{ $donation->publicDonorName() }}</p>
+                                <p class="text-xs text-grey-400 tabular">
+                                    {{ $donation->confirmed_at?->timezone($tz)->translatedFormat('j F Y \a\ H\hi') }}
+                                    · {{ $donation->reference }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex shrink-0 items-center gap-3">
+                            <div class="text-right">
+                                <p class="font-semibold text-ink tabular">{{ $donation->formattedNetAmount() }}</p>
+                                @if ($donation->isRefunded())
+                                    <p class="text-xs text-grey-400 tabular">
+                                        {{ $donation->isFullyRefunded() ? 'Rembourse' : 'Sur '.$donation->formattedSubtotal() }}
+                                    </p>
+                                @endif
+                            </div>
+
+                            @if ($canRefund && ! $donation->isFullyRefunded() && $refundingId !== $donation->id)
+                                <button type="button" wire:click="startRefund({{ $donation->id }})"
+                                        class="btn btn-ghost btn-pill text-sm">
+                                    Rembourser
+                                </button>
+                            @endif
                         </div>
                     </div>
 
-                    <p class="shrink-0 font-semibold text-ink tabular">{{ $donation->formattedSubtotal() }}</p>
+                    @if ($refundingId === $donation->id)
+                        {{-- Rembourser n'efface rien : le don reste confirme et
+                             visible, une operation nouvelle s'ajoute a lui
+                             (sections 46, 47). --}}
+                        <div class="mt-3 rounded-xl border border-azure-200 bg-azure-50 p-3.5">
+                            <p class="text-sm font-semibold text-ink">
+                                Rembourser {{ $donation->publicDonorName() }}
+                            </p>
+                            <p class="mt-1 text-xs text-grey-500">
+                                Le don reste dans l'historique. Seul le montant qu'il represente change,
+                                et le total collecte se recalcule.
+                            </p>
+
+                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label for="refundAmount" class="mb-1.5 block text-sm font-medium text-ink">
+                                        Montant <span class="font-normal text-grey-400">(vide = tout le restant)</span>
+                                    </label>
+                                    <input id="refundAmount" type="number" min="1" inputmode="numeric"
+                                           wire:model="refundAmount" class="field tabular"
+                                           placeholder="{{ $donation->netAmount() }}">
+                                    @error('refundAmount')
+                                        <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                <div>
+                                    <label for="refundReason" class="mb-1.5 block text-sm font-medium text-ink">
+                                        Motif
+                                    </label>
+                                    <input id="refundReason" type="text" wire:model="refundReason"
+                                           class="field" placeholder="Don en double">
+                                    @error('refundReason')
+                                        <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
+                                    @enderror
+                                </div>
+                            </div>
+
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <button type="button" wire:click="refund" class="btn btn-primary btn-pill text-sm"
+                                        wire:loading.attr="disabled">
+                                    Confirmer le remboursement
+                                </button>
+                                <button type="button" wire:click="cancelRefund" class="btn btn-ghost btn-pill text-sm">
+                                    Revenir
+                                </button>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @empty
                 <div class="py-10 text-center">

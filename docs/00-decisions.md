@@ -182,6 +182,37 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-045 — Une collecte se reverse quand elle se clôture, pas avant
+**2026-08-27**
+
+Jalon 7.4. La spécification dit quand reverser un événement — après sa fin (décision D-026) — mais **ne dit rien pour une collecte**, qui peut rester ouverte indéfiniment. Il fallait trancher.
+
+### La règle retenue
+
+Le net d'une collecte part quand elle est **terminée, annulée ou échue**. Tant qu'elle est ouverte — ou seulement suspendue, car une suspension se lève — rien ne bouge.
+
+Une collecte ouverte peut recevoir un don à la minute suivante. La reverser reviendrait à la découper en tranches arbitraires, alors que le produit ne prévoit qu'**un seul virement par objet** — c'est cette unicité, garantie en base, qui empêche de payer deux fois après un échec transitoire.
+
+### Ce que cela implique, et qui est assumé
+
+Un organisateur qui mène une collecte sur six mois **ne touche rien avant de l'avoir clôturée**. C'est une contrainte réelle, et c'est le principal défaut de ce choix.
+
+Elle a une contrepartie : clôturer est un geste qui a un sens pour les donateurs — la collecte affiche son résultat final — alors qu'un bouton « retirer » n'en a aucun, et que la section 21.2 l'exclut explicitement. L'organisateur qui veut ses fonds plus tôt clôture et rouvre une nouvelle collecte ; c'est plus honnête vis-à-vis de ceux qui ont donné qu'un retrait discret en cours de route.
+
+**À rouvrir si** l'usage montre que les collectes longues sont la norme. La sortie serait alors des reversements périodiques — plusieurs virements par collecte — ce qui demande de lever la contrainte d'unicité et de tenir un cumul de ce qui a déjà été versé. C'est une évolution, pas une réécriture.
+
+### Une collecte annulée se reverse quand même
+
+L'annulation ne rembourse pas automatiquement (décision D-042) : les dons reçus restent acquis, don par don. Ils doivent donc pouvoir être reversés — ne pas le faire immobiliserait l'argent des donateurs sans que personne l'ait décidé.
+
+### Le reversement est devenu polymorphe
+
+`settlements.event_id` devient `settlable_type` / `settlable_id`, et l'unicité passe au couple. `SettleEvent` devient `SettleFunds`, typé sur un contrat `Settlable` — symétrique de `Payable` : l'un décrit ce qui entre, l'autre ce qui sort.
+
+Le grand livre ne sait plus s'il compte des billets ou des dons : le `Settlable` dit **quelles commissions sont les siennes**, et la règle de calcul — somme signée des lignes figées, ajustements de remboursement soustraits — reste écrite une seule fois. C'était la dernière pièce non générique du parcours financier.
+
+---
+
 ## D-044 — L'anonymat vaut aussi contre l'organisateur
 **2026-08-27**
 

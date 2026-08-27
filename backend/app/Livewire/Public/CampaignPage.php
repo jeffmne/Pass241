@@ -75,6 +75,20 @@ class CampaignPage extends Component
             ->acrossOrganizations()
             ->where('campaign_id', $this->campaign->getKey())
             ->confirmed()
+            /*
+             * Section 47 : le montant affiche est le NET apres remboursement.
+             * Somme preparee en une requete plutot qu'une par ligne.
+             *
+             * LA PORTEE EST LEVEE SUR L'AGREGAT AUSSI. Sans cela, la
+             * sous-requete des remboursements est filtree par la portee
+             * globale — vide hors contexte d'organisation — et la page publique
+             * afficherait le montant d'origine d'un don rembourse. Le piege
+             * s'est deja referme plusieurs fois sur ce chemin.
+             */
+            ->withSum(
+                ['refunds' => fn ($query) => $query->acrossOrganizations()],
+                'amount'
+            )
             ->orderByDesc('confirmed_at')
             ->orderByDesc('id')
             ->limit($this->visible)
