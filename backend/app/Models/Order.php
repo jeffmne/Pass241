@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrderOrigin;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentProvider;
 use App\Models\Concerns\BelongsToOrganization;
@@ -61,6 +62,7 @@ class Order extends Model
             'psp_fee_amount' => 'integer',
             'psp_fee_basis_points' => 'integer',
             'psp_fee_fixed' => 'integer',
+            'origin' => OrderOrigin::class,
             'status' => OrderStatus::class,
             'payment_provider' => PaymentProvider::class,
             'expires_at' => 'datetime',

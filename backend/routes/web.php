@@ -14,12 +14,14 @@ use App\Livewire\Dashboard\Events\AccessControl as EventAccessControl;
 use App\Livewire\Dashboard\Events\Entries as EventEntries;
 use App\Livewire\Dashboard\Events\Form as EventForm;
 use App\Livewire\Dashboard\Events\Index as EventIndex;
+use App\Livewire\Dashboard\Events\Invitations as EventInvitations;
 use App\Livewire\Dashboard\Events\TicketTypes as EventTicketTypes;
 use App\Livewire\Dashboard\Overview;
 use App\Livewire\Dashboard\Refunds as DashboardRefunds;
 use App\Livewire\Organizations\Create as CreateOrganization;
 use App\Livewire\Organizations\Settings as OrganizationSettings;
 use App\Livewire\Public\EventPage;
+use App\Livewire\Public\InvitationPage;
 use App\Livewire\Public\MyTickets;
 use App\Livewire\Public\OrderStatus;
 use App\Livewire\Public\TicketPage;
@@ -89,6 +91,21 @@ Route::get('/billet/{reference}', TicketPage::class)
 Route::get('/mes-billets', MyTickets::class)->name('tickets.mine');
 
 /*
+ * Invitation (section 25).
+ *
+ * Pas de signature ici, contrairement au billet : c'est le JETON qui fait
+ * l'acces, et il est deja imprevisible. Une signature en plus rendrait le lien
+ * intransmissible par copier-coller — or une invitation circule dans un
+ * message, c'est meme sa raison d'etre.
+ *
+ * Limitation de debit : le jeton est long, mais rien n'empeche d'essayer. Elle
+ * ferme la porte a qui voudrait en deviner un.
+ */
+Route::get('/invitation/{token}', InvitationPage::class)
+    ->middleware('throttle:30,1')
+    ->name('invitations.show');
+
+/*
  * Simulation d'une reponse d'operateur — developpement uniquement.
  * Le controleur refuse lui-meme de repondre hors de ce cadre.
  */
@@ -154,6 +171,11 @@ Route::middleware('auth')->group(function () {
         // scans est en ajout seul, et aucun ecran ne le corrigera.
         Route::get('/evenements/{event}/entrees', EventEntries::class)
             ->name('events.entries');
+
+        // Section 25 : places offertes, qui retiennent du stock des leur
+        // creation.
+        Route::get('/evenements/{event}/invitations', EventInvitations::class)
+            ->name('events.invitations');
 
         // Section 24.1 : le client demande, l'organisateur decide.
         Route::get('/remboursements', DashboardRefunds::class)->name('refunds.index');

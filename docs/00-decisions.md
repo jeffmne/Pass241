@@ -182,6 +182,84 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-040 — Le lien d'invitation part par email, et les codes promo attendent
+**2026-08-27**
+
+Deux décisions prises ensemble, parce qu'elles referment la phase 6.
+
+### L'email vient en plus du lien, jamais à sa place
+
+La décision D-039 laissait l'envoi entièrement à l'organisateur. Ce choix reste juste pour le canal principal — ici une invitation circule dans un message — mais il faisait recopier une adresse déjà saisie : la liste collée accepte « Nom, adresse », et cette adresse ne servait qu'après l'acceptation, pour le billet.
+
+L'email part donc désormais à la création, pour les invités qui ont une adresse, avec une case décochable pour l'organisateur qui prépare ses invitations à l'avance. **Le lien reste affiché pour tout le monde** : les invités sans adresse sont le cas courant, pas l'exception.
+
+**Le statut est posé après l'envoi, jamais à la mise en file.** « Envoyée » doit vouloir dire que le message est parti. Si le serveur de messagerie refuse, l'invitation reste « créée » et l'organisateur voit qu'il lui reste quelque chose à faire — transmettre le lien lui-même, ce qu'il sait faire. Un statut posé à l'avance lui aurait caché le problème, et l'invité se serait présenté à une porte sans rien.
+
+Le journal d'audit distingue les deux canaux (`channel` : `email` ou `manuel`). C'est la seule façon de savoir, six mois plus tard, si un invité qui affirme n'avoir rien reçu peut être cru.
+
+**La réponse revient à l'organisateur** (`Reply-To` sur l'adresse de contact de l'organisation), pas à la plateforme : un invité répond toujours à ce genre de message, et seul celui qui invite peut lui répondre.
+
+Le renvoi est limité à une fois par minute. Un organisateur qui ne voit rien arriver reclique ; sans garde-fou, l'invité reçoit cinq fois le même message et l'adresse d'expédition finit en indésirable.
+
+### Les codes promo sont reportés
+
+La section 26 reste au périmètre, mais pas au lancement. Un code promo est un levier commercial — il suppose une audience installée et des partenaires à mesurer, ce qu'un organisateur n'a pas le premier jour. L'invitation, elle, est indispensable dès le premier événement : la liste d'invités existe toujours, et sans elle les places offertes ne sont décomptées d'aucun stock.
+
+Rien n'a été écrit côté codes promo : il n'y a donc aucune dette à porter, seulement une décision à reprendre. Quand elle le sera, quatre points sont déjà tranchés et à ne pas rouvrir sans raison : la commission s'assied sur le montant **réellement payé**, un seul code par commande, la limite par personne s'appuie sur le numéro de téléphone (l'acheteur n'a pas de compte), et la remise à 100 % est refusée — offrir une place a déjà son outil.
+
+---
+
+## D-039 — Invitations : une commande à zéro franc, et surtout pas une vente
+**2026-08-26**
+
+Phase 6, section 25. Une invitation est **une place mise de côté** pour quelqu'un, qui devient un billet le jour où il l'accepte.
+
+### Elle emprunte le chemin des commandes
+
+Chaque invitation porte une commande à zéro franc. Ce n'est pas une coquetterie comptable : c'est la commande qui **retient le stock**. La décision D-017 définit « réservé » comme une commande en attente non expirée — une invitation est exactement cela, et hérite donc gratuitement de tout le mécanisme, y compris de sa meilleure propriété : *la place revient au public à la seconde où l'échéance passe, sans qu'aucune tâche n'ait à s'exécuter*.
+
+Le même choix donne, sans une ligne de plus : le billet, le QR signé, le PDF, l'espace « Mes billets », le contrôle à l'entrée. Un invité franchit la porte exactement comme un acheteur, et l'agent n'a rien à savoir des invitations.
+
+**L'alternative examinée** — une entité indépendante, avec `tickets.order_id` rendu nullable — aurait été plus « pure » mais aurait touché la table la plus sensible du produit et tout ce qui lit `ticket->orderItem` : prix payé sur le PDF, reçus, statistiques par tarif. Le rayon d'explosion décidait.
+
+### Mais elle n'est jamais une vente, et la base le garantit
+
+`orders.origin` distingue `PURCHASE` de `INVITATION`. Sans cette colonne, le tableau de bord annoncerait des billets vendus qui n'ont rien rapporté — un organisateur qui invite cinquante personnes lirait un chiffre faux.
+
+Trois garde-fous vivent **en base**, donc valables aussi pour un import, une commande artisan ou une correction manuelle :
+
+- une invitation a forcément `amount = subtotal = 0` ;
+- un achat a forcément son opérateur et son numéro, une invitation n'en a **jamais** — écrire « AIRTEL » sur une commande qui n'a jamais touché Airtel corromprait la seule colonne sur laquelle on rapproche les paiements ;
+- les statuts et leurs dates vont ensemble dans les deux sens.
+
+**Aucune commission n'est enregistrée** à l'acceptation. Une ligne à zéro franc encombrerait un journal financier qui doit rester lisible, et laisserait croire qu'une vente a eu lieu.
+
+Les statistiques comptent désormais `sold` et `invited` séparément — mais **les places restantes retranchent les deux** : un siège offert est un siège occupé.
+
+### Accepter est un geste explicite
+
+Émettre le billet à la simple ouverture du lien remplirait l'événement de billets jamais réclamés : un lien s'ouvre par curiosité, souvent depuis un groupe où il a été transféré. La place n'est définitivement prise que lorsque quelqu'un le dit.
+
+Rouvrir le lien après acceptation ramène **au billet**, jamais à une erreur : c'est le geste du jour de l'événement, quand on cherche son QR.
+
+Le lien n'est pas signé, contrairement au billet : c'est le **jeton** (40 caractères aléatoires) qui fait l'accès. Une signature en plus rendrait le lien intransmissible par copier-coller — or une invitation circule dans un message, c'est sa raison d'être.
+
+### `USED` n'est pas stocké
+
+La section 25 liste six états ; cinq vivent en base. Le sixième se lit **sur le billet** : le passage à l'entrée est enregistré par le contrôle d'accès, qui ne sait rien des invitations. Le dupliquer donnerait deux vérités pour un même fait, et la seconde serait fausse dès qu'un scan hors connexion remonterait après coup (section 31.1).
+
+### L'envoi reste à l'organisateur
+
+*Amendé par la décision D-040 : l'email vient en plus du lien, pour les invités qui ont une adresse. Ce qui suit reste vrai du canal principal.*
+
+La plateforme ne prétend pas envoyer l'invitation : elle affiche le lien, et enregistre que l'organisateur dit l'avoir transmis. C'est ce que `SENT` signifie ici. Sur ce marché, une invitation part dans un message — pas dans un email que personne n'ouvrira.
+
+### Refactorisation au passage
+
+L'émission des billets quitte `ConfirmPayment` pour `TicketIssuer`. Deux chemins produisent des billets, et ils doivent en produire exactement les mêmes ; une seconde implémentation aurait fini par diverger, du côté le moins parcouru — donc celui où un billet mal formé se serait vu le plus tard, à une porte, un soir.
+
+---
+
 ## D-038 — Application agent : React Native, Expo SDK 57, et le cœur en modules purs
 **2026-08-26**
 

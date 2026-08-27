@@ -3,6 +3,7 @@
 namespace App\Services\Statistics;
 
 use App\Enums\CommissionType;
+use App\Enums\OrderOrigin;
 use App\Enums\TicketStatus;
 use App\Models\Organization;
 use App\Services\Commission\CommissionCalculator;
@@ -47,8 +48,8 @@ class TicketingStatistics
      * Chiffres consolides de l'organisation.
      *
      * @return array{
-     *     sold: int, revenue: int, net: int, capacity: int, remaining: int,
-     *     entries: int, attendanceRate: float|null, hasEntries: bool
+     *     sold: int, invited: int, revenue: int, net: int, capacity: int,
+     *     remaining: int, entries: int, attendanceRate: float|null, hasEntries: bool
      * }
      */
     public function forOrganization(Organization $organization): array
@@ -68,8 +69,8 @@ class TicketingStatistics
      * — comment se vend sa categorie VIP, pas comment se vend la ligne 47.
      *
      * @return Collection<int, array{
-     *     name: string, sold: int, capacity: int, remaining: int,
-     *     revenue: int, share: float
+     *     name: string, sold: int, invited: int, capacity: int,
+     *     remaining: int, revenue: int, share: float
      * }>
      */
     public function byTicketType(Organization $organization): Collection
@@ -84,7 +85,9 @@ class TicketingStatistics
 
         return collect($rows)
             ->map(function (array $row) use ($totalSold) {
-                $row['remaining'] = max(0, $row['capacity'] - $row['sold']);
+                // Les invitations prennent des places : les ignorer ici
+                // annoncerait comme disponibles des sieges deja attribues.
+                $row['remaining'] = max(0, $row['capacity'] - $row['sold'] - $row['invited']);
                 // Part des ventes, pas de la capacite : c'est la repartition
                 // de ce qui est parti qui renseigne, pas celle de l'offre.
                 // Cast explicite : une division PHP rend un entier quand elle
@@ -107,21 +110,35 @@ class TicketingStatistics
 
     /**
      * @return array{
-     *     sold: int, revenue: int, net: int, capacity: int, remaining: int,
-     *     entries: int, attendanceRate: float|null, hasEntries: bool
+     *     sold: int, invited: int, revenue: int, net: int, capacity: int,
+     *     remaining: int, entries: int, attendanceRate: float|null, hasEntries: bool
      * }
      */
     private function compute(Organization $organization): array
     {
+        /*
+         * Les invitations sont comptees A PART (section 25, decision D-039).
+         *
+         * Elles produisent de vrais billets, occupent de vraies places et
+         * franchissent la porte comme les autres — mais ce ne sont pas des
+         * ventes. Les additionner ferait lire a un organisateur qui invite
+         * cinquante personnes un chiffre de ventes qui n'a rien rapporte.
+         */
         $sales = DB::table('tickets')
             ->join('order_items', 'order_items.id', '=', 'tickets.order_item_id')
+            ->join('orders', 'orders.id', '=', 'tickets.order_id')
             ->where('tickets.organization_id', $organization->getKey())
             ->whereIn('tickets.status', $this->soldStatuses())
             ->selectRaw('
-                COUNT(*) AS sold,
+                COUNT(*) FILTER (WHERE orders.origin = ?) AS sold,
+                COUNT(*) FILTER (WHERE orders.origin = ?) AS invited,
                 COALESCE(SUM(order_items.unit_price), 0) AS revenue,
                 COUNT(*) FILTER (WHERE tickets.status = ?) AS entries
-            ', [TicketStatus::Used->value])
+            ', [
+                OrderOrigin::Purchase->value,
+                OrderOrigin::Invitation->value,
+                TicketStatus::Used->value,
+            ])
             ->first();
 
         $capacity = (int) DB::table('ticket_types')
@@ -129,29 +146,35 @@ class TicketingStatistics
             ->sum('quantity');
 
         $sold = (int) ($sales->sold ?? 0);
+        $invited = (int) ($sales->invited ?? 0);
         $revenue = (int) ($sales->revenue ?? 0);
         $entries = (int) ($sales->entries ?? 0);
 
+        // Places prises, quelle qu'en soit la raison : c'est ce qui determine
+        // ce qu'il reste a vendre, et le denominateur du taux de presence.
+        $issued = $sold + $invited;
+
         return [
             'sold' => $sold,
+            'invited' => $invited,
             'revenue' => $revenue,
             // Ce que l'organisateur recevra reellement. Afficher la recette
             // brute seule ferait lire le reversement comme une erreur
             // (section 21.2).
             'net' => $this->commissions->netFor($revenue, CommissionType::Ticketing),
             'capacity' => $capacity,
-            'remaining' => max(0, $capacity - $sold),
+            'remaining' => max(0, $capacity - $issued),
             'entries' => $entries,
-            'attendanceRate' => $sold > 0 ? $entries / $sold * 100 : null,
-            // Le controle d'acces n'existe pas encore (phase 5). Tant qu'aucun
-            // billet n'a ete scanne, annoncer « 0 entree » et « 0 % de
-            // presence » ne renseigne sur rien et se lit comme un echec.
+            'attendanceRate' => $issued > 0 ? $entries / $issued * 100 : null,
+            // Tant qu'aucun billet n'a ete scanne, annoncer « 0 entree » et
+            // « 0 % de presence » ne renseigne sur rien et se lit comme un
+            // echec. Les deux apparaissent au premier scan.
             'hasEntries' => $entries > 0,
         ];
     }
 
     /**
-     * @return list<array{name: string, sold: int, capacity: int, revenue: int}>
+     * @return list<array{name: string, sold: int, invited: int, capacity: int, revenue: int}>
      */
     private function computeByType(Organization $organization): array
     {
@@ -162,13 +185,15 @@ class TicketingStatistics
          */
         $sold = DB::table('tickets')
             ->join('order_items', 'order_items.id', '=', 'tickets.order_item_id')
+            ->join('orders', 'orders.id', '=', 'tickets.order_id')
             ->whereIn('tickets.status', $this->soldStatuses())
             ->groupBy('tickets.ticket_type_id')
             ->selectRaw('
                 tickets.ticket_type_id,
-                COUNT(*) AS sold,
+                COUNT(*) FILTER (WHERE orders.origin = ?) AS sold,
+                COUNT(*) FILTER (WHERE orders.origin = ?) AS invited,
                 COALESCE(SUM(order_items.unit_price), 0) AS revenue
-            ');
+            ', [OrderOrigin::Purchase->value, OrderOrigin::Invitation->value]);
 
         return DB::table('ticket_types')
             ->leftJoinSub($sold, 'sold', 'sold.ticket_type_id', '=', 'ticket_types.id')
@@ -178,6 +203,7 @@ class TicketingStatistics
                 ticket_types.name AS name,
                 COALESCE(SUM(ticket_types.quantity), 0) AS capacity,
                 COALESCE(SUM(sold.sold), 0) AS sold,
+                COALESCE(SUM(sold.invited), 0) AS invited,
                 COALESCE(SUM(sold.revenue), 0) AS revenue
             ')
             ->get()
@@ -185,6 +211,7 @@ class TicketingStatistics
                 'name' => (string) $row->name,
                 'capacity' => (int) $row->capacity,
                 'sold' => (int) $row->sold,
+                'invited' => (int) $row->invited,
                 'revenue' => (int) $row->revenue,
             ])
             ->all();

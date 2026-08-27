@@ -114,6 +114,32 @@
         </a>
     @endif
 
+    {{-- Meme regle que ci-dessus : le lien n'apparait qu'a qui peut s'en
+         servir. Une invitation retient une place, ce n'est pas un geste
+         anodin. --}}
+    @if ($isEditing && auth()->user()->can(App\Enums\PermissionName::InvitationsManage->value))
+        <a href="{{ route('events.invitations', $event) }}" wire:navigate
+           class="surface mb-5 flex items-center justify-between gap-4 p-4 transition-colors hover:border-azure-300 sm:p-5">
+            <span class="flex min-w-0 items-center gap-3.5">
+                <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-azure-100 text-azure-700">
+                    <x-lucide-mail class="size-5" stroke-width="1.5" />
+                </span>
+                <span class="min-w-0">
+                    <span class="block font-display text-base font-bold text-ink">Invitations</span>
+                    <span class="mt-0.5 block text-sm text-grey-500">
+                        @php $invitationCount = $event->invitations()->count(); @endphp
+                        @if ($invitationCount === 0)
+                            Offrir une place a un partenaire, un artiste, un proche
+                        @else
+                            {{ $invitationCount }} invitation{{ $invitationCount > 1 ? 's' : '' }} — chacune retient une place
+                        @endif
+                    </span>
+                </span>
+            </span>
+            <x-lucide-chevron-right class="size-5 shrink-0 text-grey-400" stroke-width="1.75" />
+        </a>
+    @endif
+
     @if ($locked)
         <div class="mb-5 flex items-start gap-2.5 rounded-xl border border-grey-200 bg-white px-4 py-3 text-sm text-grey-500">
             <x-lucide-lock class="mt-0.5 size-4 shrink-0" stroke-width="1.75" />

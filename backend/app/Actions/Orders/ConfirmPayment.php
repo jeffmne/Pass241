@@ -7,11 +7,11 @@ use App\Enums\CommissionType;
 use App\Enums\OrderStatus;
 use App\Jobs\SendTicketsEmail;
 use App\Models\Order;
-use App\Models\Ticket;
 use App\Models\TicketType;
 use App\Services\Audit\AuditLogger;
 use App\Services\Commission\CommissionCalculator;
 use App\Services\Ticketing\StockLedger;
+use App\Services\Ticketing\TicketIssuer;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -45,6 +45,7 @@ class ConfirmPayment
         private readonly CommissionCalculator $commissions,
         private readonly AuditLogger $audit,
         private readonly OrganizationContext $context,
+        private readonly TicketIssuer $tickets,
     ) {}
 
     /**
@@ -99,7 +100,7 @@ class ConfirmPayment
                     'failure_reason' => null,
                 ])->save();
 
-                $tickets = $this->issueTickets($fresh);
+                $tickets = $this->tickets->issue($fresh);
 
                 /*
                  * Section 21.2 : la commission est calculee automatiquement,
@@ -188,65 +189,8 @@ class ConfirmPayment
         }
     }
 
-    /**
-     * Emet un billet par unite commandee (section 15.1).
-     *
-     * Le porteur est l'acheteur : la plateforme ne demande pas le nom de chaque
-     * participant a l'achat (section 16), et inventer des porteurs distincts
-     * serait faux.
-     *
-     * @return int nombre de billets emis
-     */
-    private function issueTickets(Order $order): int
-    {
-        $issued = 0;
-
-        foreach ($order->items as $item) {
-            for ($i = 0; $i < $item->quantity; $i++) {
-                Ticket::create([
-                    'event_id' => $order->event_id,
-                    'order_id' => $order->getKey(),
-                    'order_item_id' => $item->getKey(),
-                    'ticket_type_id' => $item->ticket_type_id,
-                    'reference' => $this->uniqueTicketReference(),
-                    'holder_name' => $order->buyerName(),
-                ]);
-
-                $issued++;
-            }
-        }
-
-        $this->audit->log(
-            AuditAction::TicketCreated,
-            $order,
-            ['reference' => $order->reference, 'count' => $issued],
-            actor: null,
-            organizationId: $order->organization_id,
-        );
-
-        return $issued;
-    }
-
-    /**
-     * Reference lisible d'un billet, imprimee dessus.
-     *
-     * Ce n'est pas un secret : le QR encode un jeton signe, jamais cette valeur
-     * (section 18). Elle sert au support et a la recherche manuelle a l'entree.
-     */
-    private function uniqueTicketReference(): string
-    {
-        $alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-
-        do {
-            $block = fn (int $length) => collect(range(1, $length))
-                ->map(fn () => $alphabet[random_int(0, strlen($alphabet) - 1)])
-                ->implode('');
-
-            $reference = 'T-'.$block(4).'-'.$block(4);
-        } while (Ticket::query()->acrossOrganizations()->where('reference', $reference)->exists());
-
-        return $reference;
-    }
+    // L'emission des billets vit dans `TicketIssuer` : les invitations
+    // produisent les memes billets par le meme geste (decision D-039).
 
     /**
      * Marque un paiement comme echoue (section 21.1).

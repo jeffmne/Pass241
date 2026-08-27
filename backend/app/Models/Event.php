@@ -107,6 +107,12 @@ class Event extends Model
         return $this->hasMany(EventAgent::class);
     }
 
+    /** Places offertes (section 25). Chacune retient un siege des sa creation. */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(Invitation::class);
+    }
+
     /**
      * Reversement du net a l'organisateur (section 21.2).
      *

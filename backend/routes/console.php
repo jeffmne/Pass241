@@ -59,3 +59,17 @@ Schedule::command('pass241:reconcile-settlements')
     ->timezone($timezone)
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+ * Fermeture des invitations restees sans reponse (section 25).
+ *
+ * Toutes les heures, comme les autres fermetures. La place, elle, est deja
+ * revenue au public a l'echeance (decision D-017) : cette tache met les mots
+ * justes sur un fait acquis, elle ne libere rien. Si elle prend du retard,
+ * aucune place n'est perdue ni vendue deux fois.
+ */
+Schedule::command('pass241:expire-invitations')
+    ->hourly()
+    ->timezone($timezone)
+    ->withoutOverlapping()
+    ->runInBackground();

@@ -276,10 +276,19 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 - [ ] Révocation d'un appareil à distance (section 27.3) — le serveur sait révoquer une affectation, l'application ne l'apprend qu'à sa requête suivante
 - [ ] Signature asymétrique du jeton, pour une vérification hors ligne sans empreintes (section 18, décision D-018)
 
-### Phase 6 — Invitations et promotions
-- [ ] Invitations (section 25)
-- [ ] Codes promo (section 26)
-- [ ] Statistiques
+### Phase 6 — Invitations *(promotions reportées)*
+
+**Invitations faites le 2026-08-26 (décision D-039)** : une place mise de côté, qui devient un billet à l'acceptation. Elle emprunte le chemin des commandes — à zéro franc — pour hériter du stock, du QR signé, du PDF et du contrôle à l'entrée, sans jamais compter comme une vente. 31 tests.
+
+**Envoi par email fait le 2026-08-27 (décision D-040)** : le lien part à la création pour les invités qui ont une adresse, avec une case décochable et un bouton de renvoi. Le statut « envoyée » n'est posé qu'après l'envoi réel, et le journal distingue les deux canaux. 9 tests.
+
+- [x] Invitations (section 25) : création par liste collée, lien à transmettre, acceptation publique sans compte, annulation, expiration automatique, suivi
+- [x] Envoi par email du lien d'invitation, réponse adressée à l'organisateur, renvoi limité à une fois par minute
+- [x] Statistiques : couvertes par le tableau de bord organisateur (décision D-031), qui compte les invités à part des ventes et retranche les deux des places restantes
+
+**Reporté, décidé le 2026-08-27 (décision D-040) :**
+- [ ] **Codes promo (section 26).** Levier commercial, pas une brique de lancement : il suppose une audience installée et des partenaires à mesurer. Rien n'a été écrit, donc aucune dette — seulement une décision à reprendre. Quatre points déjà tranchés dans D-040 : commission sur le montant réellement payé, un seul code par commande, limite par personne portée par le numéro de téléphone, remise à 100 % refusée
+- [ ] Statistiques par code promo — sans objet tant que les codes n'existent pas
 
 ### Phase 7 — Collectes *(bloquée tant que la billetterie n'est pas validée)*
 - [ ] Campagnes, pages publiques

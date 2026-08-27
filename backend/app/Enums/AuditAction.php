@@ -97,6 +97,19 @@ enum AuditAction: string
     case DonationFailed = 'DON_FAILED';
     case DonationRefunded = 'DON_REFUNDED';
 
+    /*
+     * Invitations (section 25).
+     *
+     * Journalisees a part des commandes : une invitation est une place offerte,
+     * pas une vente. C'est ce qui permet de repondre, six mois plus tard, a la
+     * question « qui a fait entrer cette personne gratuitement ? ».
+     */
+    case InvitationCreated = 'INVITATION_CREATED';
+    case InvitationSent = 'INVITATION_SENT';
+    case InvitationAccepted = 'INVITATION_ACCEPTED';
+    case InvitationCancelled = 'INVITATION_CANCELLED';
+    case InvitationExpired = 'INVITATION_EXPIRED';
+
     // Controle d'acces
     case AgentCreated = 'AGENT_CREATED';
     case AgentDisabled = 'AGENT_DISABLED';
@@ -170,6 +183,12 @@ enum AuditAction: string
             self::DonationConfirmed => 'Don confirme',
             self::DonationFailed => 'Don echoue',
             self::DonationRefunded => 'Don rembourse',
+
+            self::InvitationCreated => 'Invitation creee',
+            self::InvitationSent => 'Invitation envoyee',
+            self::InvitationAccepted => 'Invitation acceptee',
+            self::InvitationCancelled => 'Invitation annulee',
+            self::InvitationExpired => 'Invitation expiree',
 
             self::AgentCreated => 'Agent cree',
             self::AgentDisabled => 'Agent desactive',
