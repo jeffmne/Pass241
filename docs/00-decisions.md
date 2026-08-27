@@ -182,6 +182,25 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-046 — Le reçu nomme le donateur, même quand le don est anonyme
+**2026-08-27**
+
+Jalon 7.5, dernier de la phase 7. Une seule décision méritait d'être écrite, et c'est la seule apparente contradiction du module.
+
+### L'anonymat ne s'applique pas au reçu
+
+La décision D-044 pose que le donateur anonyme n'est nommé nulle part — pas même pour l'organisateur. **Son reçu fait exception, et ce n'en est pas une** : l'anonymat porte sur l'affichage *public* (sections 40, 41), et ce document n'est pas public. Il est remis au donateur seul, par un lien signé qu'il est le seul à posséder.
+
+Y écrire « Donateur anonyme » rendrait à ce donateur **son propre reçu inutilisable** — or c'est exactement la pièce qu'il joint à une note de frais ou classe dans sa comptabilité. Le reçu mentionne en revanche que le don est anonyme publiquement, pour qu'il voie que son choix a été pris en compte.
+
+Le reste du reçu suit les règles du reçu de billetterie (décision D-029), pour les mêmes raisons : **le bénéficiaire est l'organisateur**, jamais Pass241 (section 21.2) ; **la commission n'y figure pas**, le donateur ne l'a pas payée ; **les frais de paiement y figurent** sur leur propre ligne, sans quoi le donateur ne peut pas réconcilier avec son relevé mobile money. Un remboursement ultérieur y apparaît — un reçu qui continuerait d'attester un don intégral serait faux.
+
+### Les sept tests obligatoires sont rassemblés, pas dispersés
+
+La section 75 nomme sept tests anti-fraude et les déclare obligatoires. Ils vivent désormais dans un seul fichier, numérotés comme dans la spécification, pour qu'on vérifie d'un coup d'œil qu'aucun ne manque. Chacun est écrit contre le chemin réel — l'écran, l'action ou la base — jamais contre un raccourci qui prouverait seulement que le test sait appeler une méthode.
+
+---
+
 ## D-045 — Une collecte se reverse quand elle se clôture, pas avant
 **2026-08-27**
 

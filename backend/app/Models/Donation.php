@@ -6,6 +6,7 @@ use App\Enums\AuditAction;
 use App\Enums\CommissionType;
 use App\Enums\DonationStatus;
 use App\Enums\PaymentProvider;
+use App\Jobs\SendDonationReceipt;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Services\Payments\Payable;
 use App\Support\Money;
@@ -279,6 +280,18 @@ class Donation extends Model implements Payable
         return URL::signedRoute('donations.show', ['reference' => $this->reference]);
     }
 
+    /**
+     * Adresse du recu de don, signee et sans expiration (section 53).
+     *
+     * Meme raison que le suivi : le donateur n'a pas de compte, et la signature
+     * empeche de parcourir les recus en devinant des references — l'identite
+     * d'un donateur figure sur le sien.
+     */
+    public function receiptUrl(): string
+    {
+        return URL::signedRoute('donations.receipt', ['reference' => $this->reference]);
+    }
+
     /*
      * ---------------------------------------------------------------------
      * Encaissement (contrat Payable, decision D-041)
@@ -384,13 +397,22 @@ class Donation extends Model implements Payable
     }
 
     /**
-     * Rien pour l'instant.
+     * Envoie la confirmation et le recu, si le donateur a laisse une adresse
+     * (sections 53, 69).
      *
-     * Le recu de don (section 53) arrive avec le module de recus du jalon
-     * suivant. Il partira d'ici, par un job, comme la copie du billet — jamais
-     * dans la requete qui confirme le paiement.
+     * Delegue a un job : l'email porte un PDF, dont le rendu coute trop cher
+     * pour le webhook de l'operateur, qui abandonne s'il attend. L'email reste
+     * une COMMODITE — le don est deja compte, et le recu se telecharge depuis
+     * la page de suivi.
      */
-    public function afterPaymentConfirmed(): void {}
+    public function afterPaymentConfirmed(): void
+    {
+        if (! $this->donor_email) {
+            return;
+        }
+
+        SendDonationReceipt::dispatch($this->getKey());
+    }
 
     public function applyPaymentFailed(string $reason): void
     {

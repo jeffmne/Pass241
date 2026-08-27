@@ -94,7 +94,15 @@
                 </div>
             @endif
 
-            <p class="mt-6 rounded-xl bg-canvas px-4 py-3 text-sm text-grey-500">
+            {{-- Section 53 : le recu se telecharge. C'est une piece comptable
+                 qu'on classe ou qu'on joint a une note de frais — le PDF est
+                 son format naturel. --}}
+            <a href="{{ $donation->receiptUrl() }}" class="btn btn-ghost btn-pill mt-6">
+                <x-lucide-download class="size-4" stroke-width="1.75" />
+                Telecharger mon recu
+            </a>
+
+            <p class="mt-4 rounded-xl bg-canvas px-4 py-3 text-sm text-grey-500">
                 Reference de votre don : <span class="font-semibold text-ink">{{ $donation->reference }}</span>.
                 Conservez ce lien, il vous ramenera ici.
             </p>

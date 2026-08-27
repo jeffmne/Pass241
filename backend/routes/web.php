@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Dev\SimulatePaymentController;
+use App\Http\Controllers\DonationReceiptController;
 use App\Http\Controllers\ReceiptController;
 use App\Livewire\Admin\AuditTrail as AdminAuditTrail;
 use App\Livewire\Admin\Organizations as AdminOrganizations;
@@ -92,6 +93,16 @@ Route::get('/commande/{reference}/recu', ReceiptController::class)
 Route::get('/don/{reference}', DonationStatus::class)
     ->middleware('signed')
     ->name('donations.show');
+
+/*
+ * Recu de don (section 53).
+ *
+ * Piece comptable qu'on classe ou qu'on joint a une note de frais : elle se
+ * telecharge, contrairement au billet qui reste un objet a l'ecran.
+ */
+Route::get('/don/{reference}/recu', DonationReceiptController::class)
+    ->middleware('signed')
+    ->name('donations.receipt');
 
 /*
  * Le billet (sections 15.1, 15.2).

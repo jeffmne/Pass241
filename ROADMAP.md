@@ -302,8 +302,15 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 - [x] **Jalon 7.3 — Transparence, fait le 2026-08-27 (décision D-044)** : historique public des dons avec « voir plus » et total toujours annoncé, anonymat appliqué en un seul point (`publicDonorName`) — **y compris pour l'organisateur** —, `CampaignStatistics` (collecté, donateurs, don moyen, plus gros don, net, évolution sur 30 jours), écran organisateur en lecture seule définitive. 11 tests
 - [x] **Jalon 7.4 — Remboursement partiel et reversement, fait le 2026-08-27 (décision D-045)** : `donation_refunds` en opération liée — le don n'est jamais modifié —, ajustement de commission au taux figé, montant collecté et montant public du don recalculés seuls, remboursement depuis l'écran des dons sous `finances.refund`. `settlements` devient polymorphe (`settlable_type` / `settlable_id`), `SettleEvent` devient `SettleFunds` sur un contrat `Settlable`, et la commande planifiée balaie événements **et** collectes closes. 29 tests
   - [ ] **Une collecte longue ne touche rien avant sa clôture** (décision D-045) : contrainte assumée. La sortie, si l'usage l'impose, est le reversement périodique — plusieurs virements par collecte, donc unicité à lever et cumul à tenir
-- [ ] **Jalon 7.5 — Anti-fraude et reçus.** Les sept tests obligatoires de la section 75, l'audit (section 51), le reçu de don (section 53)
-- [ ] Commission 2,5 %, calculée automatiquement
+- [x] **Jalon 7.5 — Anti-fraude et reçus, fait le 2026-08-27 (décision D-046)** : les sept tests de la section 75 rassemblés et numérotés dans un seul fichier, audit vérifié (acteur, action, ressource, IP, metadata), reçu de don en PDF sur lien signé et joint à l'email de confirmation. 22 tests
+- [x] Commission 2,5 %, calculée automatiquement, jamais saisie — assise sur le don et non sur le montant débité
+
+**Phase 7 terminée le 2026-08-27. 643 tests, 1642 assertions.**
+
+**Reste ouvert sur les collectes, non bloquant :**
+- [ ] Une collecte longue ne touche rien avant sa clôture (décision D-045) — sortie possible : reversements périodiques
+- [ ] Le donateur ne peut pas demander lui-même un remboursement : c'est l'organisateur qui décide (contrairement à la billetterie, section 24.1). À rouvrir si le besoin apparaît
+- [ ] Vue consolidée des collectes au tableau de bord général (l'entrée de menu mène à la liste, pas à des chiffres agrégés)
 
 ### Phase 8 — Optimisation
 - [ ] Exports, analytics
