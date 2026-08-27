@@ -219,7 +219,7 @@
                     <li class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <div class="min-w-0">
                             <p class="truncate font-medium text-ink">
-                                {{ $settlement->event?->name ?? 'Evenement' }}
+                                {{ $settlement->settlableName() ?? 'Reversement' }}
                             </p>
                             <p class="mt-0.5 text-xs text-grey-500 tabular">
                                 {{ $settlement->reference }}

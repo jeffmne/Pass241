@@ -322,3 +322,64 @@ it('sert les memes chiffres depuis le cache sans requeter', function () {
     expect($second)->toBe($first)
         ->and($queries)->toBeEmpty();
 });
+
+/*
+ * ---------------------------------------------------------------------------
+ * Reversements affiches sur la vue generale
+ * ---------------------------------------------------------------------------
+ */
+
+it('affiche les derniers reversements, quel que soit leur objet', function () {
+    /*
+     * REGRESSION DU 2026-08-27.
+     *
+     * La vue generale chargeait `with('event')` sur les reversements, relation
+     * disparue quand le reversement est devenu polymorphe (decision D-041).
+     * Aucun test ne l'a vu : Laravel ne resout une relation d'`eager loading`
+     * que s'il y a des lignes a hydrater, et aucun test n'avait de reversement
+     * sur son organisation. Le dashboard tombait donc uniquement chez ceux qui
+     * en avaient un — c'est-a-dire en production, et nulle part ailleurs.
+     */
+    $event = $this->event;
+
+    [$settlement, $campaign] = forOrganization($this->organization, function () use ($event) {
+        $settlement = App\Models\Settlement::create([
+            'settlable_type' => $event->getMorphClass(),
+            'settlable_id' => $event->getKey(),
+            'reference' => 'RV-TEST-100',
+            'gross_amount' => 20_000,
+            'commission_amount' => 1_000,
+            'net_amount' => 19_000,
+            'recipient_phone' => '074000000',
+            'recipient_operator' => 'AIRTEL',
+            'status' => App\Enums\PayoutState::Succeeded->value,
+            'idempotency_key' => 'test-overview-1',
+        ]);
+
+        $campaign = App\Models\Campaign::factory()->published()->create(['name' => 'Collecte reversee']);
+
+        App\Models\Settlement::create([
+            'settlable_type' => $campaign->getMorphClass(),
+            'settlable_id' => $campaign->getKey(),
+            'reference' => 'RV-TEST-101',
+            'gross_amount' => 50_000,
+            'commission_amount' => 1_250,
+            'net_amount' => 48_750,
+            'recipient_phone' => '074000000',
+            'recipient_operator' => 'AIRTEL',
+            'status' => App\Enums\PayoutState::Succeeded->value,
+            'idempotency_key' => 'test-overview-2',
+        ]);
+
+        return [$settlement, $campaign];
+    });
+
+    actAsOrganization($this->organization);
+
+    // Les deux objets reversables s'affichent par leur nom, sur le meme ecran.
+    Livewire::actingAs($this->owner)
+        ->test(Overview::class)
+        ->assertOk()
+        ->assertSee($event->name)
+        ->assertSee('Collecte reversee');
+});

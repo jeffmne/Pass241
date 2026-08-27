@@ -52,8 +52,10 @@ class Overview extends Component
             // Section 21.2 : l'organisateur doit savoir quand son argent
             // arrive. C'est la question la plus posee au support d'une
             // billetterie, et la seule reponse acceptable est une date.
+            // `settlable` et non `event` : un reversement porte desormais sur
+            // un evenement OU une collecte (decision D-041).
             'settlements' => Settlement::query()
-                ->with('event')
+                ->with('settlable')
                 ->latest()
                 ->limit(5)
                 ->get(),
