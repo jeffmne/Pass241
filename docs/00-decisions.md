@@ -182,6 +182,62 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-041 — La couche paiement devient générique en phase 7, pas en phase 9
+**2026-08-27**
+
+Analyse d'architecture du module Votes (phase 9), menée à la demande de Jeff avant toute écriture. Le détail fonctionnel et le modèle de données proposé vivent dans [docs/11-votes-futur.md](11-votes-futur.md), sections 86.4 et 86.5. Ce qui est décidé ici est ce qui engage les **autres** modules.
+
+### Le constat
+
+Le chemin de l'argent est typé sur `Order` de bout en bout : `CollectionProvider` prend un `Order` dans ses quatre méthodes, `payment_webhooks` porte une clé étrangère `order_id`, `ProcessPaymentWebhook` résout `payload['order_reference']`, `RefundRequest` est par commande, `settlements.event_id` est unique.
+
+Seule la commission est déjà polymorphe — et sa contrainte en base n'accepte que `TICKETING` et `DONATION`.
+
+**Les collectes butent sur ce mur avant les votes.** Un don n'est pas une commande : pas d'événement, pas de type de billet, pas de stock. La consigne « ne pas dupliquer le système de paiement » ne peut donc pas être tenue en l'état, quel que soit le module qui arrive ensuite.
+
+### Ce qui est décidé
+
+**L'extraction d'un contrat `Payable` appartient à la phase 7**, en construisant les dons — pas à la phase 9. La faire au moment des votes reviendrait à écrire le chemin de l'argent une troisième fois, et à laisser entre-temps une seconde implémentation de l'idempotence diverger de la première.
+
+```php
+interface Payable {
+    public function paymentReference(): string;
+    public function payableAmount(): int;    // ce que le PSP encaisse
+    public function commissionBase(): int;   // l'assiette, jamais le total débité
+    public function commissionType(): CommissionType;
+    public function organization(): Organization;
+    public function onPaymentConfirmed(Payment $payment): void;
+    public function onPaymentFailed(Payment $payment, string $reason): void;
+}
+```
+
+Implémenté par `Order` (billetterie, existant), `Donation` (phase 7) et `Ballot` (phase 9). `ConfirmPayment` porte alors l'idempotence, le verrou, la vérification de montant et la commission **une seule fois pour les trois modules** ; ce que fait aujourd'hui `TicketIssuer` devient le `onPaymentConfirmed` de la commande.
+
+**`orders` n'est pas touchée.** Rendre `event_id` nullable pour y loger dons et bulletins atteindrait la table la plus sensible du produit — celle que lisent les statistiques, les reversements, les remboursements et les reçus. C'est le raisonnement de rayon d'explosion de la décision D-039, qui conclut ici dans l'autre sens : une invitation a un événement, un don et un bulletin n'en ont pas.
+
+**Les 517 tests existants sont le filet.** Ce refactor ne change aucun comportement observable de la billetterie ; s'il en change un, un test tombe.
+
+### À préparer pendant la phase 7, dans la même passe
+
+Par ordre d'importance :
+
+1. **`Payable` et la table `payments`** — le point unique dont dépend tout le reste.
+2. **`settlements` polymorphe** (`settlable_type` / `settlable_id`, unique) — sinon l'argent des campagnes, puis des votes, est encaissé sans chemin de reversement. La règle « un seul virement, pas un par transaction » est conservée.
+3. **Ouvrir `commissions_type_check`** aux types à venir dès la migration des dons.
+4. **Figer les préfixes d'URL** : `/e/` billetterie, `/collecte/` collectes, `/vote/` votes. Un slug créé après coup ne doit pas pouvoir entrer en collision.
+
+### Ce qui reste à trancher, et n'engage rien pour l'instant
+
+Le **taux de commission des votes** n'existe nulle part dans la spécification (`CLAUDE.md` fixe 5 % billetterie et 2,5 % collectes). Recommandation consignée : 5 %, comme la billetterie — un vote payant est une vente de service, pas un don.
+
+La **protection du vote gratuit** est structurellement limitée sans compte ni OTP SMS. Les trois issues sont écrites en section 86.5 ; aucune n'est choisie aujourd'hui.
+
+### Ce qui ne change pas
+
+La règle de séquencement de `CLAUDE.md` tient : collectes (phase 7) avant votes (phase 9). Cette analyse ne fait pas commencer les votes — elle évite seulement de construire la phase 7 d'une façon qui obligerait à tout reprendre à la phase 9.
+
+---
+
 ## D-040 — Le lien d'invitation part par email, et les codes promo attendent
 **2026-08-27**
 

@@ -290,13 +290,16 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 - [ ] **Codes promo (section 26).** Levier commercial, pas une brique de lancement : il suppose une audience installée et des partenaires à mesurer. Rien n'a été écrit, donc aucune dette — seulement une décision à reprendre. Quatre points déjà tranchés dans D-040 : commission sur le montant réellement payé, un seul code par commande, limite par personne portée par le numéro de téléphone, remise à 100 % refusée
 - [ ] Statistiques par code promo — sans objet tant que les codes n'existent pas
 
-### Phase 7 — Collectes *(bloquée tant que la billetterie n'est pas validée)*
-- [ ] Campagnes, pages publiques
-- [ ] Dons publics et anonymes
-- [ ] Transparence financière, calcul automatique
-- [ ] Remboursement partiel
-- [ ] Tests anti-fraude obligatoires (section 75)
-- [ ] Commission 2,5 %
+### Phase 7 — Collectes
+
+**Ordre des jalons arrêté le 2026-08-27.** L'analyse du module Votes (décision D-041) a montré que la couche paiement est typée sur `Order` de bout en bout : un don n'est pas une commande, et la généraliser une fois sert aussi les votes. Elle est donc faite ici, pas plus tard.
+
+- [ ] **Jalon 7.1 — Campagne et page publique.** `Campaign`, statuts (section 35), slug, page publique avec objectif et progression, QR de campagne. Aucun argent : rien de la couche paiement n'est touché
+- [ ] **Jalon 7.2 — Couche paiement générique + premier don payé** (décision D-041) : contrat `Payable`, table `payments`, `payment_webhooks` polymorphe, `ConfirmPayment` commun aux trois modules. La billetterie ne change pas de comportement — les 517 tests existants sont le filet
+- [ ] **Jalon 7.3 — Transparence.** Historique public, anonymat (identité seule, montant toujours public), calcul automatique du collecté et du pourcentage, statistiques (section 55)
+- [ ] **Jalon 7.4 — Remboursement partiel** (section 47) et reversement : `settlements` polymorphe
+- [ ] **Jalon 7.5 — Anti-fraude et reçus.** Les sept tests obligatoires de la section 75, l'audit (section 51), le reçu de don (section 53)
+- [ ] Commission 2,5 %, calculée automatiquement
 
 ### Phase 8 — Optimisation
 - [ ] Exports, analytics
@@ -304,4 +307,8 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 - [ ] Monitoring, sécurité, performance
 
 ### Phase 9 — Votes *(fonctionnalité future)*
-- [ ] Module de vote (section 86)
+
+**Analyse d'architecture faite le 2026-08-27, avant toute écriture** — périmètre détaillé, modèle de données, routes, organisation du code et stratégie anti-fraude en sections 86.4 et 86.5 de [docs/11-votes-futur.md](docs/11-votes-futur.md). Ce qui engage les autres modules est consigné dans la décision D-041, et traité en phase 7.
+
+- [ ] Module de vote (section 86) : `Poll`, `PollCategory`, `Candidate`, `Ballot`, `VoterQuota`, `poll_results`
+- [ ] **À trancher avant d'implémenter** : le taux de commission des votes (rien dans la spec — 5 % recommandé), et le sort du vote gratuit, structurellement limité sans compte ni OTP SMS
