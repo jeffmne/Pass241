@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\Access\ValidateTicket;
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\AuditAction;
 use App\Enums\ScanResult;
 use App\Enums\TicketStatus;

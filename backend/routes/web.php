@@ -23,6 +23,7 @@ use App\Livewire\Dashboard\Refunds as DashboardRefunds;
 use App\Livewire\Organizations\Create as CreateOrganization;
 use App\Livewire\Organizations\Settings as OrganizationSettings;
 use App\Livewire\Public\CampaignPage;
+use App\Livewire\Public\DonationStatus;
 use App\Livewire\Public\EventPage;
 use App\Livewire\Public\InvitationPage;
 use App\Livewire\Public\MyTickets;
@@ -78,6 +79,18 @@ Route::get('/commande/{reference}', OrderStatus::class)
 Route::get('/commande/{reference}/recu', ReceiptController::class)
     ->middleware('signed')
     ->name('orders.receipt');
+
+/*
+ * Suivi d'un don (sections 21.1, 39).
+ *
+ * Meme parti pris que le suivi de commande : lien signe sans expiration, parce
+ * que le donateur n'a pas de compte et conserve ce lien. La signature empeche
+ * de parcourir les dons en devinant des references — un don anonyme y perdrait
+ * son anonymat (section 41).
+ */
+Route::get('/don/{reference}', DonationStatus::class)
+    ->middleware('signed')
+    ->name('donations.show');
 
 /*
  * Le billet (sections 15.1, 15.2).

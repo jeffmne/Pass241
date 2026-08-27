@@ -4,7 +4,7 @@ namespace Database\Seeders;
 
 use App\Actions\Access\AssignAgent;
 use App\Actions\Access\ValidateTicket;
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\EventCategory;
 use App\Enums\EventStatus;
 use App\Models\EntryPoint;

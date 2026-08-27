@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\AuditAction;
 use App\Enums\OrderStatus;
 use App\Enums\TicketStatus;

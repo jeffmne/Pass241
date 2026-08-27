@@ -182,6 +182,46 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-043 — Le contrat `Payable` suffit : la table `payments` n'a pas été créée
+**2026-08-27**
+
+Jalon 7.2. La décision D-041 annonçait deux choses : un contrat `Payable` **et** une table `payments` polymorphe. Le contrat a été construit. **La table, non** — et c'est un revirement assumé, motivé par ce qu'on a vu en écrivant le code.
+
+### Pourquoi la table ne rapportait rien
+
+Une table `payments` ne paie que si **tout** y migre. Or la billetterie ne peut pas y migrer à bon compte : `orders` porte ses colonnes de paiement depuis le début, et elles sont lues par les statistiques, les reversements, les remboursements, les reçus et la console d'administration.
+
+Restaient deux options, toutes deux mauvaises :
+
+- migrer `orders` vers `payments` — un refactor du cœur financier pour un bénéfice de forme ;
+- créer `payments` pour les seuls dons — deux vérités pour un même concept, une jointure de plus, et la billetterie qui continue comme avant. Le pire des deux.
+
+**Ce qui devait être partagé n'était pas le schéma, c'était la logique.** Chaque encaissable porte ses propres colonnes ; l'idempotence, le verrou de ligne, la vérification de montant, la commission et le journal vivent une seule fois, dans `ConfirmPayment`.
+
+### Ce qui est effectivement partagé
+
+- `ConfirmPayment` — déplacé de `Actions\Orders` vers `Actions\Payments`, il ne sait plus ce qu'il confirme.
+- `CollectionProvider` et `FakeProvider` — typés sur `Payable` : un prestataire encaisse un montant vers un numéro, il n'a aucune raison de savoir si c'est un billet ou un don.
+- `payment_webhooks` — `order_id` devient `payable_type` / `payable_id`, lignes existantes reportées.
+- `PayableResolver` — retrouve ce qu'un webhook paie à partir de sa référence. **Le seul endroit à modifier quand un module encaissable s'ajoute.**
+- `PspFeeCalculator` et `CommissionCalculator` — déjà génériques, inchangés.
+
+Ce qui reste propre à chaque module tient dans le contrat : une commande vérifie son stock et émet des billets, un don n'a rien à vérifier et n'émet rien.
+
+### La preuve que le refactor est neutre
+
+**547 tests de billetterie, inchangés, tous verts après le déplacement.** C'était le filet, et c'est la seule raison pour laquelle ce refactor pouvait être fait sans risque. Aucun comportement observable n'a bougé.
+
+### Ce que le module Votes aura à faire
+
+`Ballot implements Payable`, et une ligne dans `PayableResolver`. Rien d'autre du chemin de l'argent n'est à écrire.
+
+### Ce qui reste ouvert
+
+`settlements.event_id` est toujours une clé étrangère unique vers un événement : le reversement des collectes n'a pas encore de chemin. C'est le jalon 7.4, et c'est la dernière pièce non générique du parcours financier.
+
+---
+
 ## D-042 — La campagne ne porte aucun chiffre financier, et ne revient jamais au brouillon
 **2026-08-27**
 

@@ -5,6 +5,7 @@ use App\Enums\PayoutState;
 use App\Models\Order;
 use App\Services\Payments\CollectionProvider;
 use App\Services\Payments\FakeProvider;
+use App\Services\Payments\Payable;
 use App\Services\Payments\PaymentCapabilities;
 use App\Services\Payments\PaymentManager;
 use App\Services\Payments\PaymentResult;
@@ -92,12 +93,12 @@ it('echoue bruyamment quand le prestataire ne sait pas reverser', function () {
                     return new PaymentCapabilities;
                 }
 
-                public function initializePayment(Order $order): PaymentResult
+                public function initializePayment(Payable $payable): PaymentResult
                 {
                     throw new RuntimeException('non utilise');
                 }
 
-                public function checkPaymentStatus(Order $order): PaymentResult
+                public function checkPaymentStatus(Payable $payable): PaymentResult
                 {
                     throw new RuntimeException('non utilise');
                 }
@@ -107,7 +108,7 @@ it('echoue bruyamment quand le prestataire ne sait pas reverser', function () {
                     return null;
                 }
 
-                public function refund(Order $order, int $amount, string $reason): PaymentResult
+                public function refund(Payable $payable, int $amount, string $reason): PaymentResult
                 {
                     throw new RuntimeException('non utilise');
                 }

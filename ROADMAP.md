@@ -296,7 +296,9 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 
 - [x] **Jalon 7.1 — Campagne et page publique, fait le 2026-08-27 (décision D-042)** : `Campaign` et ses six statuts, slug figé à la publication, écrans organisateur, page publique `/collecte/{slug}` avec progression et QR de partage, tâche `pass241:expire-campaigns`. **Aucune colonne de montant collecté** — tout est calculé par `CampaignProgress`. 30 tests
   - [ ] Bouton « Faire un don » rendu inerte tant que le jalon 7.2 n'a pas ouvert le paiement — visible plutôt que masqué, comme les entrées de menu non prêtes
-- [ ] **Jalon 7.2 — Couche paiement générique + premier don payé** (décision D-041) : contrat `Payable`, table `payments`, `payment_webhooks` polymorphe, `ConfirmPayment` commun aux trois modules. La billetterie ne change pas de comportement — les 517 tests existants sont le filet
+- [x] **Jalon 7.2 — Couche paiement générique + premier don payé, fait le 2026-08-27 (décisions D-041, D-043)** : contrat `Payable`, `ConfirmPayment` déplacé et commun, `CollectionProvider` typé sur `Payable`, `payment_webhooks` polymorphe, `PayableResolver`. `Donation` avec anonymat, immuabilité garantie par déclencheur PostgreSQL, commission 2,5 %, formulaire public et page de suivi. 34 tests, dont les sept tests anti-fraude de la section 75. **La billetterie n'a pas changé de comportement : ses 547 tests sont passés inchangés.**
+  - [ ] **La table `payments` n'a pas été créée** (décision D-043) : elle n'aurait rien rapporté tant que `orders` ne peut pas y migrer. Ce qui devait être partagé était la logique, pas le schéma
+  - [ ] Reçu de don (section 53) — avec le module de reçus, jalon 7.5
 - [ ] **Jalon 7.3 — Transparence.** Historique public, anonymat (identité seule, montant toujours public), calcul automatique du collecté et du pourcentage, statistiques (section 55)
 - [ ] **Jalon 7.4 — Remboursement partiel** (section 47) et reversement : `settlements` polymorphe
 - [ ] **Jalon 7.5 — Anti-fraude et reçus.** Les sept tests obligatoires de la section 75, l'audit (section 51), le reçu de don (section 53)

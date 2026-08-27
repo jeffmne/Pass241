@@ -2,7 +2,6 @@
 
 namespace App\Services\Payments;
 
-use App\Models\Order;
 use Illuminate\Http\Request;
 
 /**
@@ -18,9 +17,13 @@ use Illuminate\Http\Request;
  * Le reversement vit dans SettlementProvider, que ce meme driver implemente
  * ou non.
  *
- * Aucune methode ne modifie le statut d'une commande. Un provider decrit ce
+ * Aucune methode ne modifie le statut de la transaction. Un provider decrit ce
  * que dit le prestataire ; c'est ConfirmPayment qui en tire les consequences.
  * Cette separation est ce qui rend l'idempotence possible (section 23).
+ *
+ * Le sujet est un `Payable` et non une commande (decision D-041) : un
+ * prestataire encaisse un montant vers un numero, il n'a aucune raison de
+ * savoir si ce qu'on lui fait payer est un billet ou un don.
  */
 interface CollectionProvider
 {
@@ -42,7 +45,7 @@ interface CollectionProvider
      * Retourne l'etat immediat, en general PENDING — l'acheteur doit encore
      * valider sur son telephone.
      */
-    public function initializePayment(Order $order): PaymentResult;
+    public function initializePayment(Payable $payable): PaymentResult;
 
     /**
      * Interroge le prestataire sur l'etat d'une transaction.
@@ -51,7 +54,7 @@ interface CollectionProvider
      * webhooks mobile money peuvent etre en retard ou manquants selon
      * l'operateur (section 21.1).
      */
-    public function checkPaymentStatus(Order $order): PaymentResult;
+    public function checkPaymentStatus(Payable $payable): PaymentResult;
 
     /**
      * Verifie l'authenticite d'un webhook et le traduit.
@@ -70,8 +73,8 @@ interface CollectionProvider
      * mauvaise poche.
      *
      * Le montant est en entiers XAF. L'operation est traitee comme une
-     * transaction distincte, liee a la commande d'origine, jamais comme une
+     * transaction distincte, liee a la transaction d'origine, jamais comme une
      * modification du paiement initial (section 46).
      */
-    public function refund(Order $order, int $amount, string $reason): PaymentResult;
+    public function refund(Payable $payable, int $amount, string $reason): PaymentResult;
 }

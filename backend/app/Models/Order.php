@@ -2,10 +2,16 @@
 
 namespace App\Models;
 
+use App\Enums\AuditAction;
+use App\Enums\CommissionType;
 use App\Enums\OrderOrigin;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentProvider;
+use App\Jobs\SendTicketsEmail;
 use App\Models\Concerns\BelongsToOrganization;
+use App\Services\Payments\Payable;
+use App\Services\Ticketing\StockLedger;
+use App\Services\Ticketing\TicketIssuer;
 use App\Support\Money;
 use Database\Factories\OrderFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,8 +29,13 @@ use RuntimeException;
  * Le montant, une fois la commande payee, est une donnee financiere figee :
  * il ne se corrige pas par une mise a jour mais par un remboursement, seul
  * mecanisme tracable (sections 46, 67).
+ *
+ * `Payable` (decision D-041) : la commande est encaissee par le meme chemin
+ * qu'un don ou, demain, qu'un vote payant. Tout ce qui suit la section
+ * « Encaissement » est ce que ce chemin partage ne peut pas savoir — le stock
+ * et les billets n'existent que dans la billetterie.
  */
-class Order extends Model
+class Order extends Model implements Payable
 {
     /** @use HasFactory<OrderFactory> */
     use BelongsToOrganization, HasFactory;
@@ -285,5 +296,184 @@ class Order extends Model
     public function hasPspFee(): bool
     {
         return $this->psp_fee_amount > 0;
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Encaissement (contrat Payable, decision D-041)
+     *
+     * Ce que `ConfirmPayment` ne peut pas savoir : le stock a reverifier, les
+     * billets a emettre, l'email a envoyer. Le reste — idempotence, verrou,
+     * commission, journal — vit une seule fois, dans l'action partagee.
+     * ---------------------------------------------------------------------
+     */
+
+    public function paymentReference(): string
+    {
+        return $this->reference;
+    }
+
+    public function paymentAmount(): int
+    {
+        return (int) $this->amount;
+    }
+
+    public function providerReference(): ?string
+    {
+        return $this->provider_reference;
+    }
+
+    public function payerPhone(): ?string
+    {
+        return $this->payer_phone;
+    }
+
+    public function paymentOperator(): ?PaymentProvider
+    {
+        return $this->payment_provider;
+    }
+
+    /**
+     * Assiette de la commission : le prix des billets seuls.
+     *
+     * JAMAIS `amount`, qui contient en plus les frais du prestataire avances
+     * par l'acheteur (decision D-023). Les confondre ferait prelever a Pass241
+     * une commission sur l'argent d'un tiers, et gonflerait mecaniquement le
+     * net reverse a l'organisateur.
+     */
+    public function commissionBase(): int
+    {
+        return (int) $this->subtotal;
+    }
+
+    public function commissionType(): CommissionType
+    {
+        return CommissionType::Ticketing;
+    }
+
+    public function paymentOrganization(): ?Organization
+    {
+        return $this->organization;
+    }
+
+    public function isPaymentConfirmed(): bool
+    {
+        return $this->isPaid();
+    }
+
+    public function isPaymentPending(): bool
+    {
+        return $this->isPending();
+    }
+
+    public function paymentRefusalReason(): ?string
+    {
+        if ($this->status === OrderStatus::Cancelled || $this->status === OrderStatus::Refunded) {
+            return sprintf('Une commande %s ne peut plus etre payee.', $this->status->label());
+        }
+
+        return null;
+    }
+
+    public function lockedForPayment(): ?static
+    {
+        $fresh = static::query()
+            ->acrossOrganizations()
+            ->lockForUpdate()
+            ->find($this->getKey());
+
+        // Les lignes sont rechargees avec leur type de billet : la verification
+        // de stock et l'emission en ont besoin, et les relire une par une
+        // multiplierait les requetes sous verrou.
+        $fresh?->setRelation('items', $this->items()->with('ticketType')->get());
+
+        return $fresh;
+    }
+
+    /**
+     * Section 17.1, second niveau de protection.
+     *
+     * La reservation de cette commande a pu expirer entre le moment ou
+     * l'acheteur a valide sur son telephone et celui ou le callback est arrive.
+     * Le stock est donc reverifie, sous verrou, avant toute emission.
+     */
+    public function guardPaymentConfirmation(): void
+    {
+        $stock = app(StockLedger::class);
+
+        foreach ($this->items as $item) {
+            $ticketType = $item->ticketType
+                ?? TicketType::query()->acrossOrganizations()->find($item->ticket_type_id);
+
+            if (! $ticketType) {
+                throw new RuntimeException('Un des billets de cette commande n\'existe plus.');
+            }
+
+            $stock->commit($ticketType, $item->quantity, $this->getKey());
+        }
+    }
+
+    public function applyPaymentConfirmed(?string $providerReference): void
+    {
+        $this->forceFill([
+            'status' => OrderStatus::Paid,
+            'paid_at' => now(),
+            'provider_reference' => $providerReference ?? $this->provider_reference,
+            'expires_at' => null,
+            'failed_at' => null,
+            'failure_reason' => null,
+        ])->save();
+
+        // Emission par le service partage : une invitation acceptee produit
+        // exactement les memes billets (decision D-039).
+        $this->issuedTicketCount = app(TicketIssuer::class)->issue($this);
+    }
+
+    /**
+     * Envoie la copie du billet, si une adresse a ete renseignee (section 69).
+     *
+     * Delegue a un job : l'email porte le billet en PDF, dont le rendu coute
+     * trop cher pour le webhook de l'operateur, qui abandonne s'il attend.
+     * L'email reste une COMMODITE — le billet est deja emis et consultable.
+     */
+    public function afterPaymentConfirmed(): void
+    {
+        if (! $this->email) {
+            return;
+        }
+
+        SendTicketsEmail::dispatch($this->getKey());
+    }
+
+    public function applyPaymentFailed(string $reason): void
+    {
+        $this->forceFill([
+            'status' => OrderStatus::Failed,
+            'failed_at' => now(),
+            'failure_reason' => $reason,
+        ])->save();
+    }
+
+    /** Billets emis lors de la confirmation, pour le journal. */
+    private int $issuedTicketCount = 0;
+
+    public function paymentAuditContext(): array
+    {
+        return [
+            'reference' => $this->reference,
+            'amount' => $this->amount,
+            'tickets' => $this->issuedTicketCount,
+            'provider_reference' => $this->provider_reference,
+        ];
+    }
+
+    public function confirmedAuditAction(): AuditAction
+    {
+        return AuditAction::PaymentConfirmed;
+    }
+
+    public function failedAuditAction(): AuditAction
+    {
+        return AuditAction::PaymentFailed;
     }
 }

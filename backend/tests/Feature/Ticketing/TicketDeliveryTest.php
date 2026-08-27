@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\TicketStatus;
 use App\Livewire\Public\MyTickets;
 use App\Mail\TicketsIssued;

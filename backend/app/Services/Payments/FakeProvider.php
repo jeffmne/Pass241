@@ -5,7 +5,6 @@ namespace App\Services\Payments;
 use App\Enums\PaymentProvider;
 use App\Enums\PaymentState;
 use App\Enums\PayoutState;
-use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -53,28 +52,28 @@ class FakeProvider implements CollectionProvider, SettlementProvider
         );
     }
 
-    public function initializePayment(Order $order): PaymentResult
+    public function initializePayment(Payable $payable): PaymentResult
     {
         $reference = 'FAKE-'.Str::upper(Str::random(12));
 
-        $this->remember($order, PaymentState::Pending);
+        $this->remember($payable, PaymentState::Pending);
 
         return new PaymentResult(
             state: PaymentState::Pending,
             providerReference: $reference,
-            orderReference: $order->reference,
-            amount: $order->amount,
-            raw: ['simulated' => true, 'pushed_to' => $order->payer_phone],
+            orderReference: $payable->paymentReference(),
+            amount: $payable->paymentAmount(),
+            raw: ['simulated' => true, 'pushed_to' => $payable->payerPhone()],
         );
     }
 
-    public function checkPaymentStatus(Order $order): PaymentResult
+    public function checkPaymentStatus(Payable $payable): PaymentResult
     {
         return new PaymentResult(
-            state: $this->recall($order),
-            providerReference: $order->provider_reference,
-            orderReference: $order->reference,
-            amount: $order->amount,
+            state: $this->recall($payable),
+            providerReference: $payable->providerReference(),
+            orderReference: $payable->paymentReference(),
+            amount: $payable->paymentAmount(),
         );
     }
 
@@ -107,12 +106,12 @@ class FakeProvider implements CollectionProvider, SettlementProvider
         );
     }
 
-    public function refund(Order $order, int $amount, string $reason): PaymentResult
+    public function refund(Payable $payable, int $amount, string $reason): PaymentResult
     {
         return new PaymentResult(
             state: PaymentState::Succeeded,
             providerReference: 'FAKE-REFUND-'.Str::upper(Str::random(10)),
-            orderReference: $order->reference,
+            orderReference: $payable->paymentReference(),
             amount: $amount,
             raw: ['simulated' => true, 'reason' => $reason],
         );
@@ -152,21 +151,21 @@ class FakeProvider implements CollectionProvider, SettlementProvider
     }
 
     /** Etat simule, tel qu'un ecran de simulation l'a positionne. */
-    private function recall(Order $order): PaymentState
+    private function recall(Payable $payable): PaymentState
     {
-        $stored = Cache::get($this->key($order));
+        $stored = Cache::get($this->key($payable));
 
         return $stored ? PaymentState::from($stored) : PaymentState::Unknown;
     }
 
-    public function remember(Order $order, PaymentState $state): void
+    public function remember(Payable $payable, PaymentState $state): void
     {
-        Cache::put($this->key($order), $state->value, now()->addHour());
+        Cache::put($this->key($payable), $state->value, now()->addHour());
     }
 
-    private function key(Order $order): string
+    private function key(Payable $payable): string
     {
-        return 'fake-payment:'.$order->reference;
+        return 'fake-payment:'.$payable->paymentReference();
     }
 
     /*

@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\Events\PublishEvent;
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Refunds\DecideRefund;
 use App\Actions\Refunds\RequestRefund;
 use App\Enums\OrderStatus;

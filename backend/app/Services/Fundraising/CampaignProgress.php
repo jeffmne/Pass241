@@ -2,7 +2,9 @@
 
 namespace App\Services\Fundraising;
 
+use App\Enums\DonationStatus;
 use App\Models\Campaign;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Progression d'une campagne (sections 37, 38, 65).
@@ -15,11 +17,9 @@ use App\Models\Campaign;
  * Le frontend n'est jamais la source de verite (sections 49, 50) : une requete
  * qui enverrait `collectedAmount` n'a aucun champ ou atterrir.
  *
- * ETAT AU JALON 7.1 : la table des dons n'existe pas encore, les valeurs sont
- * donc nulles — ce qui est la reponse exacte, et non un bouchon : une campagne
- * ne peut aujourd'hui avoir recu aucun don confirme. L'agregation SQL arrive
- * avec les dons (jalon 7.2), au meme endroit, sans que la page publique ni le
- * tableau de bord n'aient a changer.
+ * L'agregation se fait en SQL, sur les dons CONFIRMES uniquement (section 39).
+ * Un don en attente n'est pas de l'argent recu : le compter ferait mentir la
+ * page publique a chaque paiement abandonne.
  */
 class CampaignProgress
 {
@@ -33,11 +33,37 @@ class CampaignProgress
     {
         $goal = max(0, (int) $campaign->goal_amount);
 
-        // Section 39 : seuls les dons CONFIRMES comptent, diminues de leurs
-        // remboursements (section 47). Zero don confirme aujourd'hui.
-        $collected = 0;
-        $donations = 0;
-        $donors = 0;
+        /*
+         * `subtotal` et non `amount` : le montant collecte est ce qui a ete
+         * DONNE, pas ce qui a ete debite. Le total debite contient les frais du
+         * prestataire, avances par le donateur pour que la cause recoive le
+         * montant annonce (decision D-023) — les afficher gonflerait la
+         * progression d'argent que la campagne ne recevra jamais.
+         *
+         * Aucune portee par organisation n'est appliquee, et il n'y a pas de
+         * fuite possible : la requete est bornee a UNE campagne, dont
+         * l'identifiant vient du serveur. La page publique est lue par des
+         * visiteurs qui n'appartiennent a aucune organisation.
+         *
+         * Les remboursements viendront se deduire ici (section 47), au jalon
+         * ou ils existeront — au meme endroit, sans que la page change.
+         */
+        $row = DB::table('donations')
+            ->where('campaign_id', $campaign->getKey())
+            ->where('status', DonationStatus::Confirmed->value)
+            ->selectRaw('
+                COALESCE(SUM(subtotal), 0) AS collected,
+                COUNT(*) AS donations,
+                COUNT(DISTINCT payer_phone) AS donors
+            ')
+            ->first();
+
+        $collected = (int) ($row->collected ?? 0);
+        $donations = (int) ($row->donations ?? 0);
+        // Par numero de telephone : c'est la seule identite dont on dispose a
+        // coup sur, le donateur n'ayant pas de compte. Deux dons du meme
+        // numero, c'est un donateur.
+        $donors = (int) ($row->donors ?? 0);
 
         // Cast explicite : une division PHP rend un ENTIER quand elle tombe
         // juste, et le type declare de ce tableau serait faux une fois sur dix.

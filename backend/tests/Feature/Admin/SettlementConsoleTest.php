@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Organizations\SetPayoutDestination;
 use App\Actions\Settlements\SettleEvent;
 use App\Enums\PaymentProvider;

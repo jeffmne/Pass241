@@ -172,14 +172,10 @@
                      boutons principaux du produit. Un bouton pleine largeur en
                      grande taille ecrasait le bloc de progression, qui est ce
                      que le visiteur vient lire en premier. --}}
-                <button type="button" class="btn btn-primary btn-pill mt-6"
-                        disabled aria-disabled="true">
+                <a href="#donner" class="btn btn-primary btn-pill mt-6">
                     <x-lucide-hand-coins class="size-4" stroke-width="2" />
                     Faire un don
-                </button>
-                <p class="mt-2 text-xs text-grey-500">
-                    Le don par Airtel Money et Moov Money ouvre tres prochainement.
-                </p>
+                </a>
             @else
                 <p class="mt-6 rounded-xl bg-canvas px-4 py-3 text-sm text-grey-500">
                     Cette collecte n'accepte plus de dons.
@@ -189,6 +185,25 @@
                 </p>
             @endif
         </div>
+
+        {{-- ---------------------------------------------------------------
+             Le don (sections 39, 40)
+
+             Sur la page elle-meme, sans page intermediaire : chaque ecran de
+             plus entre l'intention et le paiement fait perdre des donateurs.
+        ---------------------------------------------------------------- --}}
+        @if ($open)
+            <div id="donner" class="surface mt-6 scroll-mt-24 p-5 sm:p-7" data-reveal>
+                <h2 class="font-display text-lg font-bold text-ink">Faire un don</h2>
+                <p class="mt-1 text-sm text-grey-500">
+                    Par Airtel Money ou Moov Money. Sans compte et sans inscription.
+                </p>
+
+                <div class="mt-5">
+                    <livewire:public.donation-form :campaign="$campaign" />
+                </div>
+            </div>
+        @endif
 
         {{-- ---------------------------------------------------------------
              Description et beneficiaire

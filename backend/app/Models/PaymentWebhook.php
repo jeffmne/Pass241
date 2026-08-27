@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * Message recu d'un operateur de paiement (sections 22, 23).
@@ -21,7 +21,8 @@ class PaymentWebhook extends Model
     protected $fillable = [
         'provider',
         'event_id',
-        'order_id',
+        'payable_type',
+        'payable_id',
         'signature_valid',
         'payload',
         'processed_at',
@@ -39,9 +40,17 @@ class PaymentWebhook extends Model
         ];
     }
 
-    public function order(): BelongsTo
+    /**
+     * Ce que ce message paie : une commande, un don (decision D-041).
+     *
+     * Nullable, et ce n'est pas une facilite : un message malforme, ou dont la
+     * reference ne correspond a rien, doit etre conserve tel quel. C'est ce qui
+     * permet de comprendre apres coup pourquoi un paiement n'a pas ete
+     * confirme.
+     */
+    public function payable(): MorphTo
     {
-        return $this->belongsTo(Order::class);
+        return $this->morphTo();
     }
 
     /** Un message deja traite ne doit jamais produire un second effet. */

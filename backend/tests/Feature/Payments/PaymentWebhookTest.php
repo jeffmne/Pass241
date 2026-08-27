@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\OrderStatus;
 use App\Jobs\ProcessPaymentWebhook;
 use App\Models\Commission;
@@ -10,6 +10,7 @@ use App\Models\PaymentWebhook;
 use App\Models\Ticket;
 use App\Models\TicketType;
 use App\Services\Payments\FakeProvider;
+use App\Services\Payments\PayableResolver;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Support\Str;
 
@@ -69,7 +70,10 @@ beforeEach(function () {
 function drainWebhooks(): void
 {
     foreach (PaymentWebhook::whereNull('processed_at')->where('signature_valid', true)->get() as $webhook) {
-        (new ProcessPaymentWebhook($webhook->id))->handle(app(ConfirmPayment::class));
+        (new ProcessPaymentWebhook($webhook->id))->handle(
+            app(ConfirmPayment::class),
+            app(PayableResolver::class),
+        );
     }
 }
 
@@ -181,7 +185,7 @@ it('conserve un message dont la commande est introuvable', function () {
 
     drainWebhooks();
 
-    expect(PaymentWebhook::firstOrFail()->outcome)->toContain('Commande introuvable');
+    expect(PaymentWebhook::firstOrFail()->outcome)->toContain('Transaction introuvable');
 });
 
 it('ignore un provider inconnu sans en reveler la liste', function () {
@@ -196,7 +200,12 @@ it('rattache le message a sa commande', function () {
     ($this->send)();
     drainWebhooks();
 
-    expect(PaymentWebhook::firstOrFail()->order_id)->toBe($this->order->id);
+    $webhook = PaymentWebhook::firstOrFail();
+
+    // Rattachement polymorphe depuis la decision D-041 : le meme journal
+    // accueille les webhooks des dons, et demain ceux des votes payants.
+    expect($webhook->payable_id)->toBe($this->order->id)
+        ->and($webhook->payable_type)->toBe($this->order->getMorphClass());
 });
 
 it('signale les cas a rembourser quand le stock ne suffit plus', function () {
@@ -229,7 +238,7 @@ it('signale les cas a rembourser quand le stock ne suffit plus', function () {
 
     // L'argent est encaisse mais aucun billet ne peut etre emis : le message
     // porte le motif, pour que ces cas soient retrouvables.
-    expect(PaymentWebhook::where('order_id', $this->order->id)->firstOrFail()->outcome)
+    expect(PaymentWebhook::where('payable_id', $this->order->id)->firstOrFail()->outcome)
         ->toContain('A rembourser');
 
     expect(Ticket::query()->acrossOrganizations()->count())->toBe(10);

@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Dev;
 
 use App\Enums\PaymentState;
 use App\Http\Controllers\Controller;
-use App\Models\Order;
 use App\Services\Payments\FakeProvider;
+use App\Services\Payments\PayableResolver;
 use App\Services\Payments\PaymentManager;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,16 +27,23 @@ use Illuminate\Support\Str;
  */
 class SimulatePaymentController extends Controller
 {
-    public function __invoke(Request $request, string $reference, PaymentManager $payments): RedirectResponse
-    {
+    public function __invoke(
+        Request $request,
+        string $reference,
+        PaymentManager $payments,
+        PayableResolver $payables,
+    ): RedirectResponse {
         abort_unless($payments->isFake() && app()->environment('local'), 404);
 
-        $order = Order::query()->acrossOrganizations()->where('reference', $reference)->firstOrFail();
+        // Une commande de billets ou un don, indifferemment : depuis la
+        // decision D-041, la simulation ne sait plus ce qu'elle paie — comme le
+        // vrai webhook.
+        $payable = $payables->byReference($reference) ?? abort(404);
 
         $outcome = $request->string('outcome')->toString();
 
         // « Ne rien renvoyer » : c'est le cas le plus interessant, celui ou
-        // l'operateur reste muet. La commande doit alors expirer d'elle-meme
+        // l'operateur reste muet. La transaction doit alors expirer d'elle-meme
         // (section 21.1).
         if ($outcome === 'TIMEOUT') {
             return back();
@@ -44,15 +51,15 @@ class SimulatePaymentController extends Controller
 
         $payload = [
             'event_id' => 'fake-'.Str::uuid()->toString(),
-            'order_reference' => $order->reference,
+            'order_reference' => $payable->paymentReference(),
             'status' => $outcome === 'SUCCEEDED' ? 'SUCCEEDED' : 'FAILED',
-            'amount' => $order->amount,
-            'provider_reference' => $order->provider_reference ?? 'FAKE-'.Str::upper(Str::random(12)),
+            'amount' => $payable->paymentAmount(),
+            'provider_reference' => $payable->providerReference() ?? 'FAKE-'.Str::upper(Str::random(12)),
             'failure_reason' => $outcome === 'SUCCEEDED' ? null : 'Solde insuffisant.',
         ];
 
         app(FakeProvider::class)->remember(
-            $order,
+            $payable,
             $outcome === 'SUCCEEDED' ? PaymentState::Succeeded : PaymentState::Failed,
         );
 

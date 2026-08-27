@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\PayoutState;
 use App\Livewire\Admin\AuditTrail;
 use App\Livewire\Admin\Organizations as AdminOrganizations;

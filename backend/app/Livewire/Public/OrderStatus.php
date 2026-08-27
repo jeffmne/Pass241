@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Public;
 
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Refunds\RequestRefund;
 use App\Enums\PaymentState;
 use App\Models\Order;

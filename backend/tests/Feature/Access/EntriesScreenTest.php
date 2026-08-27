@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Orders\ConfirmPayment;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\RoleName;
 use App\Enums\ScanResult;
 use App\Enums\TicketStatus;
