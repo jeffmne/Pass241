@@ -7,6 +7,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 
@@ -34,6 +35,26 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => CheckForAnyAbility::class,
             'agent-token' => EnsureAgentToken::class,
         ]);
+
+        /*
+         * LE CONTEXTE D'ORGANISATION AVANT LA LIAISON DE ROUTE.
+         *
+         * Sans cette priorite, `SubstituteBindings` resout `{event}` AVANT que
+         * `EnsureOrganizationContext` n'ait pose l'organisation courante. La
+         * requete part alors sans contexte, la portee globale se ferme — elle
+         * est fermee par defaut, et c'est voulu (section 9) — et la liaison ne
+         * trouve rien : tous les ecrans rattaches a un evenement ou a une
+         * collecte repondent 404.
+         *
+         * Le defaut ne se voyait pas dans les tests : ceux-ci posent le
+         * contexte a la main avant d'appeler, ce qu'une vraie requete ne fait
+         * jamais. Voir `tests/Feature/Tenancy/RouteBindingTest.php`, ecrit
+         * exactement sans ce raccourci.
+         */
+        $middleware->prependToPriorityList(
+            before: SubstituteBindings::class,
+            prepend: EnsureOrganizationContext::class,
+        );
 
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo('/dashboard');

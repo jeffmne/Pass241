@@ -2,11 +2,13 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\EnsureOrganizationContext;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,5 +37,28 @@ class AppServiceProvider extends ServiceProvider
         Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
 
         Date::use(Carbon::class);
+
+        /*
+         * LE CONTEXTE D'ORGANISATION SURVIT AUX REQUETES LIVEWIRE.
+         *
+         * Un clic sur un ecran Livewire ne rejoue pas la route d'origine : il
+         * poste sur `/livewire/update`, et Livewire n'y rejoue qu'une LISTE
+         * BLANCHE de middlewares — l'authentification, l'autorisation, et rien
+         * d'autre par defaut.
+         *
+         * Sans cet enregistrement, la requete arrive donc sans organisation
+         * courante. La portee globale se ferme (elle est fermee par defaut,
+         * section 9), la rehydratation d'une propriete `public Event $event` ne
+         * retrouve plus son modele, et le clic repond 404 — alors que la page
+         * elle-meme s'etait affichee sans probleme.
+         *
+         * C'est ce qui rendait « Ajouter une porte » et « Ajouter un agent »
+         * inutilisables. Le defaut ne pouvait pas apparaitre dans les tests :
+         * `Livewire::test()` n'exerce aucun middleware et pose le contexte
+         * lui-meme.
+         */
+        Livewire::addPersistentMiddleware([
+            EnsureOrganizationContext::class,
+        ]);
     }
 }

@@ -154,7 +154,14 @@
     @forelse ($ticketTypes as $ticketType)
         @php
             $sold = $ticketType->soldCount();
-            $remaining = $ticketType->remainingStock();
+            /*
+             * Ce qu'un acheteur peut encore prendre MAINTENANT : les billets
+             * immobilises par une commande en cours de paiement en sont deja
+             * retires (section 17.1). L'organisateur voit donc le meme chiffre
+             * que le public, ce qui evite la question « pourquoi la page
+             * annonce-t-elle moins de places que mon tableau de bord ? ».
+             */
+            $remaining = $ticketType->availableStock();
             $reason = $ticketType->unavailabilityReason();
         @endphp
 

@@ -5,17 +5,25 @@
 
     /*
      * Mobile-first : la meme liste sert la barre inferieure sur telephone et la
-     * colonne laterale a partir de lg. Les entrees dont le module n'existe pas
-     * encore sont marquees `ready => false` et rendues inertes plutot que
-     * masquees : l'organisateur voit ou va le produit, sans cliquer dans le vide.
+     * colonne laterale a partir de lg.
+     *
+     * PLUS AUCUNE ENTREE INERTE. Le menu annoncait « Billetterie » et
+     * « Controle d'acces » en gris, en attendant leur module. Ces deux modules
+     * existent depuis — mais ils ne sont pas des destinations : ils vivent DANS
+     * un evenement, et l'ecran d'un evenement y mene. Une entree grise
+     * permanente ne dit plus « c'est pour bientot », elle se lit comme une
+     * panne.
+     *
+     * Ce qui figure ici mene donc quelque part, toujours.
      */
     $navigation = [
         ['label' => 'Vue generale', 'icon' => 'layout-dashboard', 'route' => 'dashboard', 'ready' => true],
         ['label' => 'Evenements', 'icon' => 'calendar-days', 'route' => 'events.index', 'match' => 'events.*', 'ready' => true, 'permission' => PermissionName::EventsView->value],
-        ['label' => 'Billetterie', 'icon' => 'ticket', 'route' => null, 'ready' => false],
-        ['label' => 'Controle d\'acces', 'icon' => 'scan-line', 'route' => null, 'ready' => false],
         ['label' => 'Collectes', 'icon' => 'hand-coins', 'route' => 'campaigns.index', 'match' => 'campaigns.*', 'ready' => true, 'permission' => PermissionName::CampaignsView->value],
-        ['label' => 'Finances', 'icon' => 'wallet', 'route' => null, 'ready' => false, 'permission' => PermissionName::FinancesView->value],
+        // Remboursements : le seul ecran financier transverse. Les reversements,
+        // eux, s'affichent sur la vue generale — l'organisateur n'a rien a y
+        // decider (section 21.2).
+        ['label' => 'Finances', 'icon' => 'wallet', 'route' => 'refunds.index', 'match' => 'refunds.*', 'ready' => true, 'permission' => PermissionName::FinancesView->value],
         ['label' => 'Parametres', 'icon' => 'settings', 'route' => 'organization.settings', 'ready' => true],
     ];
 
