@@ -54,7 +54,7 @@
 
     {{-- Progression, en lecture seule (sections 37, 38). --}}
     @if ($isEditing && $progress)
-        <div class="surface mb-6 p-4 sm:p-5">
+        <div class="surface mb-6 p-4 sm:p-5" data-reveal>
             <div class="flex flex-wrap items-end justify-between gap-4">
                 <div>
                     <p class="text-xs font-semibold tracking-wide text-grey-500 uppercase">Collecte</p>
@@ -70,8 +70,8 @@
             </div>
 
             <div class="mt-4 h-2 w-full overflow-hidden rounded-full bg-azure-100">
-                <div class="h-full rounded-full bg-gradient-to-r from-azure-500 to-azure-600"
-                     style="width: {{ $progress['displayPercentage'] }}%"></div>
+                <div class="progress-fill h-full rounded-full bg-gradient-to-r from-azure-500 to-azure-600"
+                     style="--progress: {{ $progress['displayPercentage'] }}%"></div>
             </div>
 
             <p class="mt-3 text-xs text-grey-500">

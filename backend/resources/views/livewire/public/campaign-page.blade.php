@@ -36,7 +36,12 @@
             <div aria-hidden="true" class="azure-wash absolute inset-0 -z-10"></div>
         @endif
 
-        <div class="mx-auto w-full max-w-5xl px-5 pt-24 pb-10 sm:px-6 sm:pt-32">
+        {{-- Retrait bas genereux, et ce n'est pas de l'aeration : le voile du
+             heros fond vers la couleur de page sur ses derniers pour-cent
+             (`event-hero-scrim`). Un texte pose la devient blanc sur blanc. La
+             page evenement s'en tire parce qu'elle finit sur un bouton plein ;
+             ici la derniere ligne est du texte, elle doit remonter. --}}
+        <div class="mx-auto w-full max-w-5xl px-5 pt-24 pb-20 sm:px-6 sm:pt-32 sm:pb-24">
             @if ($state === CampaignStatus::Cancelled)
                 {{-- L'annulation passe avant tout : quelqu'un qui rouvre le lien
                      recu doit la lire immediatement, pas la deduire. --}}
@@ -67,9 +72,12 @@
                 {{ $campaign->name }}
             </h1>
 
+            {{-- Blanc plein et ombre portee, comme le titre : ces deux lignes
+                 vivent sur la partie la plus claire du voile, la ou une
+                 opacite reduite les effacerait. --}}
             <p @class([
                 'mt-5 text-sm font-medium',
-                'text-white/90' => $cover,
+                'text-white [text-shadow:0_1px_12px_rgba(16,19,26,0.55)]' => $cover,
                 'text-grey-500' => ! $cover,
             ])>
                 Au profit de <span class="font-semibold">{{ $campaign->beneficiary_label }}</span>
@@ -77,7 +85,7 @@
 
             <p @class([
                 'mt-1.5 text-sm',
-                'text-white/70' => $cover,
+                'text-white/85 [text-shadow:0_1px_12px_rgba(16,19,26,0.55)]' => $cover,
                 'text-grey-500' => ! $cover,
             ])>
                 Organise par <span class="font-semibold">{{ $campaign->organization->name }}</span>
@@ -104,30 +112,30 @@
              alors qu'un objectif depasse est une bonne nouvelle ; le montant,
              lui, reste affiche tel quel.
         ---------------------------------------------------------------- --}}
-        <div class="surface p-5 sm:p-7">
-            <div class="flex flex-wrap items-end justify-between gap-4">
-                <div>
-                    <p class="text-xs font-semibold tracking-wide text-grey-500 uppercase">Collecte</p>
-                    <p class="mt-1 font-display text-3xl font-extrabold text-ink tabular sm:text-4xl">
-                        {{ $money($progress['collected']) }}
-                    </p>
-                </div>
-                <div class="text-right">
-                    <p class="text-xs font-semibold tracking-wide text-grey-500 uppercase">Objectif</p>
-                    <p class="mt-1 font-display text-xl font-bold text-grey-500 tabular">
-                        {{ $money($progress['goal']) }}
-                    </p>
-                </div>
-            </div>
+        <div class="surface p-5 sm:p-7" data-reveal>
+            {{-- Une seule colonne, alignee a gauche, du telephone au grand
+                 ecran. Deux blocs opposes se cassaient sur un ecran etroit :
+                 l'objectif passait a la ligne en restant aligne a droite, et
+                 les deux chiffres ne se lisaient plus ensemble. --}}
+            <p class="text-xs font-semibold tracking-wide text-grey-500 uppercase">Collecte</p>
+            <p class="mt-1 font-display text-3xl leading-none font-extrabold text-ink tabular sm:text-4xl">
+                {{ $money($progress['collected']) }}
+            </p>
+            <p class="mt-1.5 text-sm text-grey-500 tabular">
+                sur {{ $money($progress['goal']) }} d'objectif
+            </p>
 
             <div class="mt-5">
+                {{-- `aria-valuenow` porte la valeur reelle des le rendu : le
+                     remplissage progressif est un effet visuel, il ne doit rien
+                     changer a ce qu'annonce un lecteur d'ecran. --}}
                 <div class="h-3 w-full overflow-hidden rounded-full bg-azure-100"
                      role="progressbar"
                      aria-valuenow="{{ (int) round($progress['displayPercentage']) }}"
                      aria-valuemin="0" aria-valuemax="100"
                      aria-label="Progression de la collecte">
-                    <div class="h-full rounded-full bg-gradient-to-r from-azure-500 to-azure-600 transition-[width] duration-700"
-                         style="width: {{ $progress['displayPercentage'] }}%"></div>
+                    <div class="progress-fill h-full rounded-full bg-gradient-to-r from-azure-500 to-azure-600"
+                         style="--progress: {{ $progress['displayPercentage'] }}%"></div>
                 </div>
 
                 <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -160,7 +168,11 @@
                 entrees de menu du tableau de bord.
             --}}
             @if ($open)
-                <button type="button" class="btn btn-primary btn-pill btn-lg mt-6 w-full sm:w-auto"
+                {{-- Taille normale, largeur au contenu : c'est la mesure des
+                     boutons principaux du produit. Un bouton pleine largeur en
+                     grande taille ecrasait le bloc de progression, qui est ce
+                     que le visiteur vient lire en premier. --}}
+                <button type="button" class="btn btn-primary btn-pill mt-6"
                         disabled aria-disabled="true">
                     <x-lucide-hand-coins class="size-4" stroke-width="2" />
                     Faire un don
@@ -182,7 +194,7 @@
              Description et beneficiaire
         ---------------------------------------------------------------- --}}
         @if ($campaign->description)
-            <div class="surface mt-6 p-5 sm:p-7">
+            <div class="surface mt-6 p-5 sm:p-7" data-reveal>
                 <h2 class="font-display text-lg font-bold text-ink">La collecte</h2>
                 <div class="mt-3 leading-relaxed whitespace-pre-line text-grey-500">
                     {{ $campaign->description }}
@@ -191,7 +203,7 @@
         @endif
 
         <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_auto]">
-            <div class="surface p-5 sm:p-7">
+            <div class="surface p-5 sm:p-7" data-reveal>
                 <h2 class="font-display text-lg font-bold text-ink">Qui recoit les fonds</h2>
                 <p class="mt-3 flex items-center gap-2.5 text-ink">
                     <x-lucide-heart-handshake class="size-5 shrink-0 text-azure-600" stroke-width="1.5" />
@@ -206,14 +218,22 @@
 
             {{-- Section 54 : le QR ramene a cette page. Utile pour une affiche,
                  un flyer ou un ecran en salle. --}}
-            <div class="surface flex flex-col items-center p-5 sm:p-7">
+            <div class="surface flex flex-col items-center p-5 text-center sm:p-7"
+                 data-reveal data-reveal-step="1">
                 <h2 class="font-display text-lg font-bold text-ink">Partager</h2>
                 {{-- Encart blanc opaque, jamais de verre derriere un QR
-                     (regle 70.4) : la lisibilite au scan prime. --}}
-                <div class="mt-4 rounded-2xl bg-white p-3">
-                    {!! $qrCode !!}
+                     (regle 70.4) : la lisibilite au scan prime.
+
+                     Le SVG est rendu a taille fixe par QrRenderer : sans ce
+                     conteneur dimensionne, il sort de sa carte sur un
+                     telephone et decale tout le bloc. Meme motif que le billet
+                     (`[&>svg]:size-full`). --}}
+                <div class="mt-4 rounded-2xl bg-white p-3 shadow-[0_2px_12px_rgba(20,84,155,0.12)]">
+                    <div class="size-36 [&>svg]:size-full sm:size-44">
+                        {!! $qrCode !!}
+                    </div>
                 </div>
-                <p class="mt-3 max-w-[16rem] text-center text-xs break-all text-grey-500">
+                <p class="mt-3 max-w-[16rem] text-xs break-all text-grey-500">
                     {{ $campaign->publicUrl() }}
                 </p>
             </div>
@@ -226,7 +246,7 @@
              suit le choix du donateur (sections 40, 41). La liste arrive avec
              les dons, au jalon suivant.
         ---------------------------------------------------------------- --}}
-        <div class="surface mt-6 p-5 sm:p-7">
+        <div class="surface mt-6 p-5 sm:p-7" data-reveal>
             <h2 class="font-display text-lg font-bold text-ink">Derniers dons</h2>
 
             <div class="py-8 text-center">

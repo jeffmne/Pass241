@@ -59,7 +59,11 @@
     @forelse ($campaigns as $campaign)
         @php $bar = $progress[$campaign->id]; @endphp
 
-        <article class="surface mb-3 p-4 transition-colors hover:border-azure-300 sm:p-5">
+        {{-- Revelation en cascade, comme les listes de la console
+             d'administration : l'ordre de lecture porte une information, les
+             collectes arrivent donc dans cet ordre. --}}
+        <article class="surface mb-3 p-4 transition-colors hover:border-azure-300 sm:p-5"
+                 data-reveal data-reveal-step="{{ $loop->index % 5 }}">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
@@ -78,8 +82,8 @@
                          chercher. Calcule, jamais stocke (regle 80.1). --}}
                     <div class="mt-3 max-w-md">
                         <div class="h-2 w-full overflow-hidden rounded-full bg-azure-100">
-                            <div class="h-full rounded-full bg-gradient-to-r from-azure-500 to-azure-600"
-                                 style="width: {{ $bar['displayPercentage'] }}%"></div>
+                            <div class="progress-fill h-full rounded-full bg-gradient-to-r from-azure-500 to-azure-600"
+                                 style="--progress: {{ $bar['displayPercentage'] }}%"></div>
                         </div>
                         <p class="mt-1.5 text-sm text-grey-500 tabular">
                             <span class="font-semibold text-ink">{{ $money($bar['collected']) }}</span>

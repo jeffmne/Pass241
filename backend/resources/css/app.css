@@ -382,6 +382,39 @@
             transform var(--duration-view) var(--ease-out-expo);
     }
 
+    /*
+     * ---------------------------------------------------------------------
+     * Barre de progression d'une collecte
+     * ---------------------------------------------------------------------
+     *
+     * Le remplissage part de zero et rejoint sa valeur quand le bloc entre
+     * dans l'ecran. Sur une page de collecte, la progression est ce que le
+     * visiteur vient lire en premier : la voir monter la raconte mieux qu'un
+     * pourcentage pose la. C'est le seul mouvement mis en scene de la page.
+     *
+     * La largeur finale vit dans `--progress`, ecrite par le serveur — jamais
+     * calculee par le navigateur (sections 49, 50).
+     *
+     * Sans JavaScript, la barre s'affiche directement a sa valeur : la regle
+     * de depart n'existe que sous `[data-reveal='on']`, que seul app.js pose.
+     * Meme garantie que la revelation ci-dessus, et pour la meme raison — une
+     * page a demi chargee doit rester exacte.
+     */
+    .progress-fill {
+        width: var(--progress, 0%);
+    }
+
+    :root[data-reveal='on'] [data-reveal] .progress-fill {
+        width: 0;
+    }
+
+    :root[data-reveal='on'] [data-reveal].is-revealed .progress-fill {
+        width: var(--progress, 0%);
+        /* Leger retard : la carte finit d'arriver, puis la barre se remplit.
+           Les deux mouvements en meme temps se lisent comme un seul. */
+        transition: width var(--duration-focal) var(--ease-out-expo) 140ms;
+    }
+
     /* Entree du billet : le seul moment vraiment mis en scene de la page. */
     @keyframes ticket-arrive {
         from {
