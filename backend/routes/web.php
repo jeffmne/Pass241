@@ -10,6 +10,7 @@ use App\Livewire\Admin\Settlements as AdminSettlements;
 use App\Livewire\Admin\Transactions as AdminTransactions;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\Register;
+use App\Livewire\Dashboard\Campaigns\Donations as CampaignDonations;
 use App\Livewire\Dashboard\Campaigns\Form as CampaignForm;
 use App\Livewire\Dashboard\Campaigns\Index as CampaignIndex;
 use App\Livewire\Dashboard\Events\AccessControl as EventAccessControl;
@@ -208,6 +209,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/collectes', CampaignIndex::class)->name('campaigns.index');
         Route::get('/collectes/nouvelle', CampaignForm::class)->name('campaigns.create');
         Route::get('/collectes/{campaign}/modifier', CampaignForm::class)->name('campaigns.edit');
+
+        // Sections 44 a 48 : les dons recus, en lecture seule definitive. Aucun
+        // chemin d'ecriture n'existe sur cet ecran, et un test le verifie.
+        Route::get('/collectes/{campaign}/dons', CampaignDonations::class)
+            ->name('campaigns.donations');
 
         // Section 24.1 : le client demande, l'organisateur decide.
         Route::get('/remboursements', DashboardRefunds::class)->name('refunds.index');

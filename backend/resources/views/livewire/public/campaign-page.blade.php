@@ -262,16 +262,67 @@
              les dons, au jalon suivant.
         ---------------------------------------------------------------- --}}
         <div class="surface mt-6 p-5 sm:p-7" data-reveal>
-            <h2 class="font-display text-lg font-bold text-ink">Derniers dons</h2>
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="font-display text-lg font-bold text-ink">Derniers dons</h2>
+                @if ($progress['donations'] > 0)
+                    {{-- Le TOTAL est annonce, pas seulement ce qui est affiche :
+                         c'est lui qui fait la transparence, pas la longueur de
+                         la liste (section 37).
 
-            <div class="py-8 text-center">
-                <x-lucide-hand-coins class="mx-auto size-8 text-grey-300" stroke-width="1.5" />
-                <p class="mt-3 font-semibold text-ink">Aucun don pour l'instant</p>
-                <p class="mx-auto mt-1 max-w-sm text-sm text-grey-500">
-                    Chaque contribution apparaitra ici avec son montant. Un donateur peut choisir
-                    de rester anonyme — son montant, lui, reste public.
-                </p>
+                         Chaine assemblee en PHP plutot que coupee sur plusieurs
+                         lignes : le nombre et le mot doivent rester colles a
+                         l'affichage comme a la recherche. --}}
+                    <p class="text-sm text-grey-500 tabular">
+                        {{ number_format($progress['donations'], 0, ',', $nbsp)
+                            .' don'.($progress['donations'] > 1 ? 's' : '').' au total' }}
+                    </p>
+                @endif
             </div>
+
+            @forelse ($donations as $donation)
+                <div @class([
+                    'flex items-center justify-between gap-4 py-3',
+                    'border-t border-grey-200' => ! $loop->first,
+                ])>
+                    <div class="flex min-w-0 items-center gap-3">
+                        {{-- Meme pastille pour tout le monde : un donateur
+                             anonyme ne doit pas se distinguer visuellement, sans
+                             quoi l'anonymat deviendrait un signalement. --}}
+                        <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-azure-100">
+                            <x-lucide-user class="size-4 text-azure-700" stroke-width="1.75" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="truncate font-medium text-ink">{{ $donation->publicDonorName() }}</p>
+                            <p class="text-xs text-grey-400">
+                                {{ $donation->confirmed_at?->timezone($tz)->translatedFormat('j F Y') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    {{-- Section 40 : le montant est visible dans tous les cas,
+                         que le donateur soit nomme ou anonyme. --}}
+                    <p class="shrink-0 font-semibold text-ink tabular">
+                        {{ $donation->formattedSubtotal() }}
+                    </p>
+                </div>
+            @empty
+                <div class="py-8 text-center">
+                    <x-lucide-hand-coins class="mx-auto size-8 text-grey-300" stroke-width="1.5" />
+                    <p class="mt-3 font-semibold text-ink">Aucun don pour l'instant</p>
+                    <p class="mx-auto mt-1 max-w-sm text-sm text-grey-500">
+                        Chaque contribution apparaitra ici avec son montant. Un donateur peut choisir
+                        de rester anonyme — son montant, lui, reste public.
+                    </p>
+                </div>
+            @endforelse
+
+            @if ($hasMore)
+                <button type="button" wire:click="loadMore" class="btn btn-ghost btn-pill mt-4 w-full"
+                        wire:loading.attr="disabled">
+                    <span wire:loading.remove wire:target="loadMore">Voir plus de dons</span>
+                    <span wire:loading wire:target="loadMore">Chargement</span>
+                </button>
+            @endif
         </div>
     </section>
 </div>

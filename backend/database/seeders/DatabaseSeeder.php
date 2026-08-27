@@ -2,17 +2,22 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Donations\CreateDonation;
 use App\Actions\Organizations\CreateOrganization;
+use App\Actions\Payments\ConfirmPayment;
 use App\Enums\CampaignStatus;
 use App\Enums\EventCategory;
 use App\Enums\EventStatus;
 use App\Enums\OrganizationType;
+use App\Enums\PaymentProvider;
 use App\Models\Campaign;
+use App\Models\Donation;
 use App\Models\Event;
 use App\Models\User;
 use App\Support\Tenancy\OrganizationContext;
 use Database\Seeders\Support\PosterPlaceholder;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 
 class DatabaseSeeder extends Seeder
 {
@@ -174,22 +179,32 @@ class DatabaseSeeder extends Seeder
      * Une collecte publiee, pour que la page publique soit consultable des la
      * premiere installation (sections 34, 36).
      *
-     * Elle affiche un montant collecte a zero, et c'est exact : aucun don ne
-     * peut encore exister. Le seeder n'invente aucun chiffre — ecrire un
-     * montant collecte de demonstration reviendrait a stocker ce que la regle
-     * 80.1 interdit de stocker.
+     * Le montant collecte n'est ecrit nulle part : il est la somme des dons
+     * confirmes, eux-memes crees par les actions reelles (voir plus bas). Le
+     * seeder n'invente aucun chiffre — en poser un reviendrait a stocker ce que
+     * la regle 80.1 interdit de stocker.
+     *
+     * Rejouable : la campagne n'est creee qu'une fois, et les dons ne sont
+     * ajoutes que s'il n'y en a aucun.
      */
     private function seedDemoCampaign(): void
     {
         $slug = 'operation-cartables-2026';
 
-        if (Campaign::query()->acrossOrganizations()->where('slug', $slug)->exists()) {
-            return;
-        }
-
         $owner = User::where('email', 'awa@pass241.test')->first();
 
         if (! $owner?->current_organization_id) {
+            return;
+        }
+
+        $existing = Campaign::query()->acrossOrganizations()->where('slug', $slug)->first();
+
+        if ($existing) {
+            app(OrganizationContext::class)->runFor(
+                $owner->currentOrganization,
+                fn () => $this->seedDemoDonations($existing)
+            );
+
             return;
         }
 
@@ -214,8 +229,56 @@ class DatabaseSeeder extends Seeder
             // produire elle-meme.
             $campaign->poster_path = PosterPlaceholder::for($slug, 'Operation cartables 2026');
             $campaign->save();
+
+            $this->seedDemoDonations($campaign);
         });
 
         $this->command?->info('Collecte de demonstration : /collecte/'.$slug);
+    }
+
+    /**
+     * Quelques dons de demonstration, etales dans le temps.
+     *
+     * TOUT PASSE PAR LES ACTIONS REELLES, comme pour les billets : le don est
+     * cree par `CreateDonation` puis confirme par `ConfirmPayment`. Ecrire les
+     * lignes a la main produirait des donnees qu'aucun chemin de l'application
+     * ne sait fabriquer — et masquerait le jour ou ce chemin casse.
+     *
+     * Le temps est deplace autour de chaque don : `confirmed_at` est fige par
+     * un declencheur des la confirmation (sections 44 a 46), il n'y a donc
+     * aucun moyen de l'antidater apres coup. C'est exactement la protection
+     * qu'on veut, et elle s'applique aussi au seeder.
+     */
+    private function seedDemoDonations(Campaign $campaign): void
+    {
+        if (Donation::query()->acrossOrganizations()->where('campaign_id', $campaign->getKey())->exists()) {
+            return;
+        }
+
+        $donations = [
+            ['Marie Nzeng', 25_000, false, 9, '074000011'],
+            ['Paul Obame', 10_000, false, 7, '074000012'],
+            [null, 50_000, true, 5, '074000013'],
+            ['Yves Bekale', 5_000, false, 3, '074000014'],
+            ['Sandrine Moussavou', 15_000, false, 1, '074000015'],
+            [null, 2_000, true, 0, '074000016'],
+        ];
+
+        foreach ($donations as [$name, $amount, $anonymous, $daysAgo, $phone]) {
+            Carbon::setTestNow(now()->subDays($daysAgo)->setTime(14, 30));
+
+            $donation = app(CreateDonation::class)->handle(
+                campaign: $campaign,
+                amount: $amount,
+                provider: PaymentProvider::Airtel,
+                payerPhone: $phone,
+                donorName: $name,
+                isAnonymous: $anonymous,
+            );
+
+            app(ConfirmPayment::class)->handle($donation, 'DEMO-'.$donation->reference);
+        }
+
+        Carbon::setTestNow();
     }
 }

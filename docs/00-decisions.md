@@ -182,6 +182,33 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-044 — L'anonymat vaut aussi contre l'organisateur
+**2026-08-27**
+
+Jalon 7.3, transparence de la collecte. Une seule décision mérite d'être écrite, parce qu'elle n'est pas évidente et qu'elle sera tentante à assouplir.
+
+### L'organisateur voit « Donateur anonyme », comme tout le monde
+
+La section 41 dit que l'organisateur ne doit pas pouvoir révéler l'identité d'un donateur anonyme. Reste à savoir ce que *lui* voit sur son propre tableau de bord. La réponse retenue : **exactement ce que voit le public**.
+
+La tentation était forte de faire l'inverse — « c'est son argent, il a le droit de savoir qui donne ». Mais un anonymat que le destinataire peut lever n'est pas un anonymat, c'est une case à cocher décorative. Sur ce marché, un donateur qui coche « anonyme » se protège souvent de la pression sociale de son entourage, pas d'un inconnu.
+
+La plateforme, elle, **conserve l'identité réelle** : le paiement, l'audit, le rapprochement financier et la lutte contre la fraude en dépendent (section 41). Elle ne la montre simplement à personne. Un seul point de code applique la règle — `Donation::publicDonorName()` — pour que la page publique et le tableau de bord ne puissent pas diverger.
+
+Corollaire assumé : si un organisateur doit un jour contacter un donateur anonyme (remboursement, erreur de montant), cela passera par un chemin dédié et audité, jamais par un affichage.
+
+### L'écran des dons n'a aucune méthode d'écriture
+
+Le tableau de bord des dons est en lecture seule **définitive**, et un test vérifie qu'aucune méthode `save`, `delete`, `edit`, `hide` ou `anonymize` n'apparaît sur le composant. Le déclencheur PostgreSQL l'interdit déjà (décision D-043) ; l'écran ne doit pas même suggérer que ce serait possible.
+
+### Ce qui est public et ce qui ne l'est pas
+
+Le **montant collecté est public** (section 37) : le masquer à un membre de l'organisation n'aurait aucun sens, il suffit d'ouvrir la page de la collecte. Le **net après commission**, lui, ne l'est pas — il ne s'affiche qu'avec la permission `finances.view`.
+
+L'historique public affiche dix dons puis « voir plus », mais **annonce toujours le total** : c'est le total qui fait la transparence, pas la longueur de la liste.
+
+---
+
 ## D-043 — Le contrat `Payable` suffit : la table `payments` n'a pas été créée
 **2026-08-27**
 

@@ -78,6 +78,12 @@
                 Ces chiffres sont calcules a partir des dons confirmes. Ils ne se
                 modifient pas a la main, ni ici ni ailleurs.
             </p>
+
+            <a href="{{ route('campaigns.donations', $campaign) }}" wire:navigate
+               class="btn btn-ghost btn-pill mt-4">
+                <x-lucide-list class="size-4" stroke-width="1.75" />
+                Voir les dons recus
+            </a>
         </div>
     @endif
 

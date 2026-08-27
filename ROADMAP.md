@@ -299,7 +299,7 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 - [x] **Jalon 7.2 — Couche paiement générique + premier don payé, fait le 2026-08-27 (décisions D-041, D-043)** : contrat `Payable`, `ConfirmPayment` déplacé et commun, `CollectionProvider` typé sur `Payable`, `payment_webhooks` polymorphe, `PayableResolver`. `Donation` avec anonymat, immuabilité garantie par déclencheur PostgreSQL, commission 2,5 %, formulaire public et page de suivi. 34 tests, dont les sept tests anti-fraude de la section 75. **La billetterie n'a pas changé de comportement : ses 547 tests sont passés inchangés.**
   - [ ] **La table `payments` n'a pas été créée** (décision D-043) : elle n'aurait rien rapporté tant que `orders` ne peut pas y migrer. Ce qui devait être partagé était la logique, pas le schéma
   - [ ] Reçu de don (section 53) — avec le module de reçus, jalon 7.5
-- [ ] **Jalon 7.3 — Transparence.** Historique public, anonymat (identité seule, montant toujours public), calcul automatique du collecté et du pourcentage, statistiques (section 55)
+- [x] **Jalon 7.3 — Transparence, fait le 2026-08-27 (décision D-044)** : historique public des dons avec « voir plus » et total toujours annoncé, anonymat appliqué en un seul point (`publicDonorName`) — **y compris pour l'organisateur** —, `CampaignStatistics` (collecté, donateurs, don moyen, plus gros don, net, évolution sur 30 jours), écran organisateur en lecture seule définitive. 11 tests
 - [ ] **Jalon 7.4 — Remboursement partiel** (section 47) et reversement : `settlements` polymorphe
 - [ ] **Jalon 7.5 — Anti-fraude et reçus.** Les sept tests obligatoires de la section 75, l'audit (section 51), le reçu de don (section 53)
 - [ ] Commission 2,5 %, calculée automatiquement

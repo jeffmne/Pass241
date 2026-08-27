@@ -3,6 +3,7 @@
 namespace App\Livewire\Public;
 
 use App\Models\Campaign;
+use App\Models\Donation;
 use App\Services\Fundraising\CampaignProgress;
 use App\Services\Ticketing\QrRenderer;
 use Illuminate\Support\Str;
@@ -26,12 +27,58 @@ class CampaignPage extends Component
 {
     public Campaign $campaign;
 
+    /**
+     * Nombre de dons affiches dans l'historique public (section 43).
+     *
+     * Une page qui chargerait dix mille dons d'un coup serait illisible et
+     * couteuse sur un telephone. Le visiteur en demande davantage s'il le
+     * souhaite ; le TOTAL, lui, est toujours annonce — c'est lui qui fait la
+     * transparence, pas la longueur de la liste.
+     */
+    public int $visible = self::PAGE;
+
+    private const PAGE = 10;
+
+    /** Plafond de securite : au-dela, plus personne ne fait defiler. */
+    private const MAX_VISIBLE = 200;
+
     public function mount(string $slug): void
     {
         // `publicBySlug` leve la portee par organisation — un visiteur n'est
         // membre d'aucune — et exclut les brouillons, qui doivent renvoyer 404
         // et non une page vide.
         $this->campaign = Campaign::publicBySlug($slug) ?? abort(404);
+    }
+
+    public function loadMore(): void
+    {
+        $this->visible = min($this->visible + self::PAGE, self::MAX_VISIBLE);
+    }
+
+    /**
+     * Historique public des dons (sections 40, 41, 43).
+     *
+     * Le montant est TOUJOURS visible ; seule l'identite suit le choix du
+     * donateur, et c'est `publicDonorName()` qui l'applique — a un seul
+     * endroit, pour que la page publique et le tableau de bord de
+     * l'organisateur disent exactement la meme chose.
+     *
+     * La portee par organisation est levee : un visiteur n'appartient a aucune
+     * organisation. Il n'y a aucune fuite possible, la requete etant bornee aux
+     * dons de CETTE campagne.
+     *
+     * @return \Illuminate\Support\Collection<int, Donation>
+     */
+    private function history()
+    {
+        return Donation::query()
+            ->acrossOrganizations()
+            ->where('campaign_id', $this->campaign->getKey())
+            ->confirmed()
+            ->orderByDesc('confirmed_at')
+            ->orderByDesc('id')
+            ->limit($this->visible)
+            ->get();
     }
 
     public function render(CampaignProgress $progress, QrRenderer $qr)
@@ -49,8 +96,12 @@ class CampaignPage extends Component
             Str::of((string) $campaign->description)->stripTags()->squish()->limit(120)
         ));
 
+        $donations = $this->history();
+
         return view('livewire.public.campaign-page', [
             'progress' => $progress->forCampaign($campaign),
+            'donations' => $donations,
+            'hasMore' => $donations->count() >= $this->visible,
             // Section 54 : le QR ramene a cette page. Rendu en SVG, sans appel
             // reseau, pour qu'une affiche puisse etre montee depuis un
             // telephone.
