@@ -112,6 +112,21 @@
         </section>
     @endif
 
+    {{-- Export (sections 41, 59).
+
+         Le fichier ne nomme PAS les donateurs anonymes : l'anonymat tient dans
+         le fichier comme a l'ecran, sans quoi il suffirait d'exporter pour le
+         contourner. --}}
+    @can(App\Enums\PermissionName::ExportsGenerate->value)
+        <section class="surface mt-6 p-4 sm:p-5">
+            <x-export-buttons
+                label="Exporter les dons"
+                hint="Les donateurs anonymes y restent anonymes."
+                :csv="route('exports.donations', [$campaign, 'csv'])"
+                :xlsx="route('exports.donations', [$campaign, 'xlsx'])" />
+        </section>
+    @endcan
+
     {{-- ----------------------------------------------------------------
          Historique
     ----------------------------------------------------------------- --}}

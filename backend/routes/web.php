@@ -1,8 +1,10 @@
 <?php
 
+use App\Enums\ExportFormat;
 use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Dev\SimulatePaymentController;
 use App\Http\Controllers\DonationReceiptController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ReceiptController;
 use App\Livewire\Admin\AuditTrail as AdminAuditTrail;
 use App\Livewire\Admin\Organizations as AdminOrganizations;
@@ -228,5 +230,26 @@ Route::middleware('auth')->group(function () {
 
         // Section 24.1 : le client demande, l'organisateur decide.
         Route::get('/remboursements', DashboardRefunds::class)->name('refunds.index');
+
+        /*
+         * Exports (section 59).
+         *
+         * Dans le groupe `organization` comme tout le reste : un export lit les
+         * memes donnees que les ecrans, avec la meme portee. Le format est un
+         * segment contraint — une extension inconnue n'a pas a atteindre le
+         * controleur.
+         */
+        Route::prefix('exports')->name('exports.')->group(function () {
+            Route::get('/evenements/{event}/participants/{format}', [ExportController::class, 'participants'])
+                ->name('participants');
+            Route::get('/evenements/{event}/commandes/{format}', [ExportController::class, 'orders'])
+                ->name('orders');
+            Route::get('/evenements/{event}/controles/{format}', [ExportController::class, 'scans'])
+                ->name('scans');
+            Route::get('/collectes/{campaign}/dons/{format}', [ExportController::class, 'donations'])
+                ->name('donations');
+            Route::get('/collectes/{format}', [ExportController::class, 'campaigns'])
+                ->name('campaigns');
+        })->whereIn('format', ExportFormat::values());
     });
 });

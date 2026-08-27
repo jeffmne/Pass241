@@ -140,6 +140,42 @@
         </a>
     @endif
 
+    {{-- Exports (section 59).
+
+         Deux permissions decident de ce qui s'affiche : `exports.generate`
+         ouvre la fonctionnalite, la permission des donnees ouvre chaque ligne.
+         Un co-organisateur voit donc la liste des participants a l'ecran sans
+         pouvoir en emporter le fichier — un fichier ne se reprend pas. --}}
+    @if ($isEditing && auth()->user()->can(App\Enums\PermissionName::ExportsGenerate->value))
+        <section class="surface mb-5 space-y-4 p-4 sm:p-5">
+            <h2 class="font-display text-base font-bold text-ink">Exports</h2>
+
+            @can(App\Enums\PermissionName::AttendeesView->value)
+                <x-export-buttons
+                    label="Participants"
+                    hint="Un billet par ligne, avec son etat et son acheteur."
+                    :csv="route('exports.participants', [$event, 'csv'])"
+                    :xlsx="route('exports.participants', [$event, 'xlsx'])" />
+            @endcan
+
+            @can(App\Enums\PermissionName::FinancesView->value)
+                <x-export-buttons
+                    label="Commandes"
+                    hint="Montants detailles, frais de paiement compris."
+                    :csv="route('exports.orders', [$event, 'csv'])"
+                    :xlsx="route('exports.orders', [$event, 'xlsx'])" />
+            @endcan
+
+            @can(App\Enums\PermissionName::AttendeesView->value)
+                <x-export-buttons
+                    label="Controles a l'entree"
+                    hint="Tous les scans, refus et admissions manuelles compris."
+                    :csv="route('exports.scans', [$event, 'csv'])"
+                    :xlsx="route('exports.scans', [$event, 'xlsx'])" />
+            @endcan
+        </section>
+    @endif
+
     @if ($locked)
         <div class="mb-5 flex items-start gap-2.5 rounded-xl border border-grey-200 bg-white px-4 py-3 text-sm text-grey-500">
             <x-lucide-lock class="mt-0.5 size-4 shrink-0" stroke-width="1.75" />

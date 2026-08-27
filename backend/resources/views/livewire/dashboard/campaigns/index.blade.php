@@ -146,4 +146,19 @@
     @if ($campaigns->hasPages())
         <div class="mt-6">{{ $campaigns->links() }}</div>
     @endif
+
+    {{-- Export de toutes les collectes (sections 57, 59). Les chiffres viennent
+         du meme calcul que la page publique : le fichier ne peut pas la
+         contredire. --}}
+    @if ($totalCount > 0)
+        @can(App\Enums\PermissionName::ExportsGenerate->value)
+            <section class="surface mt-6 p-4 sm:p-5">
+                <x-export-buttons
+                    label="Exporter les collectes"
+                    hint="Objectif, collecte, progression et nombre de dons."
+                    :csv="route('exports.campaigns', 'csv')"
+                    :xlsx="route('exports.campaigns', 'xlsx')" />
+            </section>
+        @endcan
+    @endif
 </div>
