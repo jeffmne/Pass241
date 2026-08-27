@@ -21,13 +21,21 @@ class SlugGenerator
     /**
      * @param  class-string<Model>  $model
      * @param  int|null  $ignoreId  ligne a ignorer lors d'une mise a jour
+     * @param  string  $fallback  base du slug quand le nom n'en produit aucune —
+     *                            un titre entierement compose de ponctuation ou
+     *                            d'ideogrammes ne laisse rien apres `Str::slug`
      */
-    public function unique(string $model, string $source, string $column = 'slug', ?int $ignoreId = null): string
-    {
+    public function unique(
+        string $model,
+        string $source,
+        string $column = 'slug',
+        ?int $ignoreId = null,
+        string $fallback = 'evenement',
+    ): string {
         $base = Str::slug($source);
 
         if ($base === '') {
-            $base = 'evenement';
+            $base = $fallback;
         }
 
         // Marge pour le suffixe numerique, sous la limite d'une colonne string.

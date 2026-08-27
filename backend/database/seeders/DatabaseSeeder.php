@@ -3,9 +3,11 @@
 namespace Database\Seeders;
 
 use App\Actions\Organizations\CreateOrganization;
+use App\Enums\CampaignStatus;
 use App\Enums\EventCategory;
 use App\Enums\EventStatus;
 use App\Enums\OrganizationType;
+use App\Models\Campaign;
 use App\Models\Event;
 use App\Models\User;
 use App\Support\Tenancy\OrganizationContext;
@@ -61,6 +63,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->seedDemoEvents();
+        $this->seedDemoCampaign();
 
         /*
          * Une soiree deja passee, avec ses entrees. Separee des deux
@@ -165,5 +168,54 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->command?->info('Evenements de demonstration : /e/concert-afro-2026 et /e/gala-des-entrepreneurs');
+    }
+
+    /**
+     * Une collecte publiee, pour que la page publique soit consultable des la
+     * premiere installation (sections 34, 36).
+     *
+     * Elle affiche un montant collecte a zero, et c'est exact : aucun don ne
+     * peut encore exister. Le seeder n'invente aucun chiffre — ecrire un
+     * montant collecte de demonstration reviendrait a stocker ce que la regle
+     * 80.1 interdit de stocker.
+     */
+    private function seedDemoCampaign(): void
+    {
+        $slug = 'operation-cartables-2026';
+
+        if (Campaign::query()->acrossOrganizations()->where('slug', $slug)->exists()) {
+            return;
+        }
+
+        $owner = User::where('email', 'awa@pass241.test')->first();
+
+        if (! $owner?->current_organization_id) {
+            return;
+        }
+
+        app(OrganizationContext::class)->runFor($owner->currentOrganization, function () use ($owner, $slug) {
+            $campaign = new Campaign([
+                'name' => 'Operation cartables 2026',
+                'description' => "Cent cartables complets pour la rentree des eleves de l'ecole "
+                    ."publique de Nzeng-Ayong.\n\n"
+                    .'Collecte de demonstration, creee par le seeder local. Elle sert a verifier '
+                    .'la page publique, la barre de progression et le QR de partage.',
+                'goal_amount' => 1_000_000,
+                'beneficiary_label' => 'Ecole publique de Nzeng-Ayong',
+                'ends_at' => now(config('app.display_timezone'))->addMonths(2)->setTime(23, 59)->utc(),
+            ]);
+
+            $campaign->slug = $slug;
+            $campaign->status = CampaignStatus::Published;
+            $campaign->published_at = now();
+            $campaign->created_by = $owner->getKey();
+            // Le modele exige une image pour publier : une collecte de demo
+            // sans image serait un etat que l'application refuserait de
+            // produire elle-meme.
+            $campaign->poster_path = PosterPlaceholder::for($slug, 'Operation cartables 2026');
+            $campaign->save();
+        });
+
+        $this->command?->info('Collecte de demonstration : /collecte/'.$slug);
     }
 }

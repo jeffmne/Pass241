@@ -294,7 +294,8 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 
 **Ordre des jalons arrêté le 2026-08-27.** L'analyse du module Votes (décision D-041) a montré que la couche paiement est typée sur `Order` de bout en bout : un don n'est pas une commande, et la généraliser une fois sert aussi les votes. Elle est donc faite ici, pas plus tard.
 
-- [ ] **Jalon 7.1 — Campagne et page publique.** `Campaign`, statuts (section 35), slug, page publique avec objectif et progression, QR de campagne. Aucun argent : rien de la couche paiement n'est touché
+- [x] **Jalon 7.1 — Campagne et page publique, fait le 2026-08-27 (décision D-042)** : `Campaign` et ses six statuts, slug figé à la publication, écrans organisateur, page publique `/collecte/{slug}` avec progression et QR de partage, tâche `pass241:expire-campaigns`. **Aucune colonne de montant collecté** — tout est calculé par `CampaignProgress`. 30 tests
+  - [ ] Bouton « Faire un don » rendu inerte tant que le jalon 7.2 n'a pas ouvert le paiement — visible plutôt que masqué, comme les entrées de menu non prêtes
 - [ ] **Jalon 7.2 — Couche paiement générique + premier don payé** (décision D-041) : contrat `Payable`, table `payments`, `payment_webhooks` polymorphe, `ConfirmPayment` commun aux trois modules. La billetterie ne change pas de comportement — les 517 tests existants sont le filet
 - [ ] **Jalon 7.3 — Transparence.** Historique public, anonymat (identité seule, montant toujours public), calcul automatique du collecté et du pourcentage, statistiques (section 55)
 - [ ] **Jalon 7.4 — Remboursement partiel** (section 47) et reversement : `settlements` polymorphe

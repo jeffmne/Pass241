@@ -73,3 +73,17 @@ Schedule::command('pass241:expire-invitations')
     ->timezone($timezone)
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+ * Fermeture des collectes arrivees a leur date de fin (section 35).
+ *
+ * Meme propriete que la tache precedente : la collecte refuse deja les dons
+ * hors delai, `Campaign::acceptsDonations()` verifiant la date et non le
+ * statut. Un retard de cette tache ne laisse donc passer aucun don — il laisse
+ * seulement une etiquette en retard.
+ */
+Schedule::command('pass241:expire-campaigns')
+    ->hourly()
+    ->timezone($timezone)
+    ->withoutOverlapping()
+    ->runInBackground();

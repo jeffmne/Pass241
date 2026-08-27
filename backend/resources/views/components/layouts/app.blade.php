@@ -14,7 +14,7 @@
         ['label' => 'Evenements', 'icon' => 'calendar-days', 'route' => 'events.index', 'match' => 'events.*', 'ready' => true, 'permission' => PermissionName::EventsView->value],
         ['label' => 'Billetterie', 'icon' => 'ticket', 'route' => null, 'ready' => false],
         ['label' => 'Controle d\'acces', 'icon' => 'scan-line', 'route' => null, 'ready' => false],
-        ['label' => 'Collectes', 'icon' => 'hand-coins', 'route' => null, 'ready' => false],
+        ['label' => 'Collectes', 'icon' => 'hand-coins', 'route' => 'campaigns.index', 'match' => 'campaigns.*', 'ready' => true, 'permission' => PermissionName::CampaignsView->value],
         ['label' => 'Finances', 'icon' => 'wallet', 'route' => null, 'ready' => false, 'permission' => PermissionName::FinancesView->value],
         ['label' => 'Parametres', 'icon' => 'settings', 'route' => 'organization.settings', 'ready' => true],
     ];

@@ -10,6 +10,8 @@ use App\Livewire\Admin\Settlements as AdminSettlements;
 use App\Livewire\Admin\Transactions as AdminTransactions;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\Register;
+use App\Livewire\Dashboard\Campaigns\Form as CampaignForm;
+use App\Livewire\Dashboard\Campaigns\Index as CampaignIndex;
 use App\Livewire\Dashboard\Events\AccessControl as EventAccessControl;
 use App\Livewire\Dashboard\Events\Entries as EventEntries;
 use App\Livewire\Dashboard\Events\Form as EventForm;
@@ -20,6 +22,7 @@ use App\Livewire\Dashboard\Overview;
 use App\Livewire\Dashboard\Refunds as DashboardRefunds;
 use App\Livewire\Organizations\Create as CreateOrganization;
 use App\Livewire\Organizations\Settings as OrganizationSettings;
+use App\Livewire\Public\CampaignPage;
 use App\Livewire\Public\EventPage;
 use App\Livewire\Public\InvitationPage;
 use App\Livewire\Public\MyTickets;
@@ -41,6 +44,17 @@ Route::view('/', 'welcome')->name('home');
  * L'adresse reste courte et lisible pour tenir sur une affiche imprimee.
  */
 Route::get('/e/{slug}', EventPage::class)->name('events.public');
+
+/*
+ * Page publique d'une collecte (sections 36, 54).
+ *
+ * Meme parti pris que l'evenement : hors authentification, hors contexte
+ * d'organisation, isolee par un slug unique sur la plateforme. Le prefixe
+ * `/collecte/` est distinct de `/e/` et le restera — deux espaces de nommage
+ * separes evitent qu'une campagne et un evenement se disputent un slug, et
+ * laissent la place au prefixe `/vote/` du module a venir (decision D-041).
+ */
+Route::get('/collecte/{slug}', CampaignPage::class)->name('campaigns.public');
 
 /*
  * Suivi d'une commande (sections 15.1, 21.1).
@@ -176,6 +190,11 @@ Route::middleware('auth')->group(function () {
         // creation.
         Route::get('/evenements/{event}/invitations', EventInvitations::class)
             ->name('events.invitations');
+
+        // Sections 34, 35 : collectes de fonds.
+        Route::get('/collectes', CampaignIndex::class)->name('campaigns.index');
+        Route::get('/collectes/nouvelle', CampaignForm::class)->name('campaigns.create');
+        Route::get('/collectes/{campaign}/modifier', CampaignForm::class)->name('campaigns.edit');
 
         // Section 24.1 : le client demande, l'organisateur decide.
         Route::get('/remboursements', DashboardRefunds::class)->name('refunds.index');

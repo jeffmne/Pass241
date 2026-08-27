@@ -182,6 +182,39 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-042 — La campagne ne porte aucun chiffre financier, et ne revient jamais au brouillon
+**2026-08-27**
+
+Jalon 7.1 : la campagne de collecte et sa page publique, sans une ligne de paiement. Trois choix méritent d'être écrits.
+
+### Le montant collecté n'existe pas en colonne
+
+`campaigns` n'a ni `collected_amount`, ni `percentage`, ni `donations_count`. Ce n'est pas un oubli : c'est la règle 80.1 traduite en schéma.
+
+Le montant collecté est la somme des dons confirmés, moins les remboursements (sections 38, 47). Une colonne le porterait en double, et cette seconde vérité serait modifiable — par un formulaire, par une commande artisan, par une correction manuelle un soir de panique. **On ne falsifie pas ce qui n'existe pas.**
+
+Le calcul vit dans `CampaignProgress`, seul point de vérité, appelé aussi bien par la page publique que par le tableau de bord : le visiteur et l'organisateur lisent le même chiffre, produit par le même code. Un test vérifie l'absence des colonnes interdites — il tombera si quelqu'un les ajoute par commodité.
+
+### Aucun retour au brouillon, contrairement aux événements
+
+Un événement publié peut revenir en brouillon. Une campagne, non — et c'est délibéré : elle a pu recevoir des dons, et son historique est public (section 43). La repasser en brouillon masquerait des dons confirmés, ce que les sections 44 et 45 interdisent.
+
+La **suspension** existe pour cela : elle ferme les dons en laissant la page et son historique en ligne. Le donateur qui revient retrouve sa contribution ; le visiteur lit que la collecte est fermée.
+
+Même raisonnement pour la suppression : seul un brouillon jamais publié se supprime. Au-delà, la suppression emporterait les dons avec la campagne.
+
+### L'objectif et le bénéficiaire sont figés à la publication
+
+Après publication, seules la description et les images restent modifiables. L'objectif, le bénéficiaire et les dates engagent ceux qui ont déjà donné : les changer après coup reviendrait à **déplacer la cible**, et un donateur qui a contribué pour 1 000 000 F ne doit pas découvrir que l'objectif est descendu à 50 000 F pour afficher 100 %.
+
+### Deux points de méthode, repris de la billetterie
+
+L'échéance est vérifiée **sur la date, jamais sur le statut** : `Campaign::acceptsDonations()` refuse un don passé la date de fin même si la tâche planifiée n'a pas encore tourné. `pass241:expire-campaigns` met ensuite les mots justes sur un fait acquis — si elle prend trois jours de retard, aucun don hors délai n'est accepté pour autant.
+
+L'annulation d'une campagne **ne rembourse pas automatiquement**, contrairement à l'annulation d'un événement (décision D-028). Un billet non honoré n'a plus d'objet ; un don remis à une cause a pu être employé. La décision revient à l'organisateur, don par don.
+
+---
+
 ## D-041 — La couche paiement devient générique en phase 7, pas en phase 9
 **2026-08-27**
 

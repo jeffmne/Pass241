@@ -120,6 +120,7 @@ enum AuditAction: string
     case CampaignPublished = 'CAMPAIGN_PUBLISHED';
     case CampaignPaused = 'CAMPAIGN_PAUSED';
     case CampaignCompleted = 'CAMPAIGN_COMPLETED';
+    case CampaignCancelled = 'CAMPAIGN_CANCELLED';
 
     // Exports
     case ExportGenerated = 'EXPORT_GENERATED';
@@ -198,6 +199,7 @@ enum AuditAction: string
             self::CampaignPublished => 'Campagne publiee',
             self::CampaignPaused => 'Campagne suspendue',
             self::CampaignCompleted => 'Campagne terminee',
+            self::CampaignCancelled => 'Campagne annulee',
 
             self::ExportGenerated => 'Export genere',
         };
