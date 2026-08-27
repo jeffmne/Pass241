@@ -90,6 +90,38 @@ class Donation extends Model implements Payable
     }
 
     /**
+     * La campagne, TOUJOURS lisible, meme hors contexte d'organisation.
+     *
+     * A utiliser sur tout chemin public. La relation ordinaire porte la portee
+     * globale : hors contexte, elle produit un `where 1 = 0` et rend `null` —
+     * la page de suivi perdait alors le nom de la collecte et sa progression.
+     *
+     * Le piege ne se voit pas au premier rendu, ou la relation est chargee par
+     * `publicByReference()`. Il se referme au rendu SUIVANT : Livewire
+     * rehydrate le modele sans ses relations, et le premier acces refait la
+     * requete, scopee cette fois. C'est la septieme fois que cette portee
+     * pietine un chemin public — d'ou cette methode, plutot qu'un `with()`
+     * repete a chaque appelant.
+     *
+     * Aucune fuite : la requete est bornee a la campagne de CE don.
+     */
+    public function publicCampaign(): ?Campaign
+    {
+        if ($this->relationLoaded('campaign') && $this->campaign !== null) {
+            return $this->campaign;
+        }
+
+        $campaign = Campaign::query()
+            ->acrossOrganizations()
+            ->with('organization')
+            ->find($this->campaign_id);
+
+        $this->setRelation('campaign', $campaign);
+
+        return $campaign;
+    }
+
+    /**
      * Commission retenue par la plateforme (2,5 %, section 21.2).
      *
      * La ligne D'ORIGINE seulement : un remboursement ajoute un ajustement

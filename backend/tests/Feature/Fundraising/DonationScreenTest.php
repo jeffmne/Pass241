@@ -121,6 +121,35 @@ it('confirme le don depuis la page de suivi quand l operateur a valide', functio
     expect($donation->fresh()->status)->toBe(DonationStatus::Confirmed);
 });
 
+it('garde la collecte visible au rafraichissement de la page de suivi', function () {
+    ($this->form)()->call('donate');
+
+    $donation = Donation::query()->acrossOrganizations()->firstOrFail();
+
+    app(FakeProvider::class)->remember($donation, PaymentState::Succeeded);
+
+    /*
+     * LE BUG DU 2026-08-27, ET SA REGRESSION.
+     *
+     * Livewire rehydrate le modele SANS ses relations a chaque rafraichissement.
+     * Le premier rendu passait, parce que `publicByReference()` avait charge la
+     * campagne hors portee ; le suivant refaisait la requete, scopee cette
+     * fois, et la campagne revenait nulle — le donateur perdait le nom de la
+     * collecte et sa progression au moment meme ou son don etait confirme.
+     *
+     * Le modele reconstruit a la main reproduit exactement cet etat.
+     */
+    $rehydrated = Donation::query()->acrossOrganizations()->findOrFail($donation->getKey());
+
+    expect($rehydrated->relationLoaded('campaign'))->toBeFalse();
+
+    Livewire::test(DonationStatusPage::class, ['reference' => $donation->reference])
+        ->call('refreshStatus')
+        ->assertOk()
+        ->assertSee('Operation cartables 2026')
+        ->assertSee('Merci pour votre don');
+});
+
 it('protege le suivi d un don par la signature du lien', function () {
     ($this->form)()->call('donate');
 

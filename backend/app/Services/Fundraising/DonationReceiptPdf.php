@@ -42,15 +42,19 @@ class DonationReceiptPdf
 {
     public function render(Donation $donation): string
     {
+        // `publicCampaign()` et non la relation : le recu se rend aussi depuis
+        // un worker de file d'attente, ou aucun contexte d'organisation
+        // n'existe et ou la portee globale rendrait la campagne nulle.
+        $campaign = $donation->publicCampaign();
+
         $donation->loadMissing([
-            'campaign' => fn ($query) => $query->acrossOrganizations()->with('organization'),
             'refunds' => fn ($query) => $query->acrossOrganizations()->latest(),
         ]);
 
         return Pdf::loadView('pdf.donation-receipt', [
             'donation' => $donation,
-            'campaign' => $donation->campaign,
-            'organization' => $donation->campaign?->organization,
+            'campaign' => $campaign,
+            'organization' => $campaign?->organization,
             'reference' => $this->reference($donation),
             'refunds' => $donation->refunds,
             'tz' => config('app.display_timezone'),

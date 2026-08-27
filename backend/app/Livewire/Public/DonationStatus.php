@@ -73,7 +73,13 @@ class DonationStatus extends Component
 
     public function render(CampaignProgress $progress)
     {
-        $campaign = $this->donation->campaign;
+        /*
+         * Jamais `$this->donation->campaign` : Livewire rehydrate le modele
+         * sans ses relations a chaque rafraichissement, et la relation
+         * ordinaire porte la portee par organisation — elle reviendrait nulle
+         * ici, ou personne n'appartient a une organisation.
+         */
+        $campaign = $this->donation->publicCampaign();
 
         return view('livewire.public.donation-status', [
             'campaign' => $campaign,

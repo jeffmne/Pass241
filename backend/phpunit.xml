@@ -39,6 +39,19 @@
         <env name="DB_PASSWORD" value="secret"/>
         <env name="DB_URL" value=""/>
 
+        <!--
+            Vues compilees dans un dossier a part.
+
+            La suite tourne en root depuis `docker compose exec`, les workers
+            PHP-FPM en www-data. Partager le meme dossier fait qu'une vue
+            compilee par les tests appartient a root : le worker peut ensuite
+            l'ecrire, mais pas fixer sa date de modification — `touch()` sur un
+            fichier qu'on ne possede pas est refuse par le noyau. La page tombe
+            alors en « Utime failed: Operation not permitted », et seulement
+            APRES avoir lance les tests, ce qui rend le lien difficile a voir.
+        -->
+        <env name="VIEW_COMPILED_PATH" value="storage/framework/testing/views"/>
+
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

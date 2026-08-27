@@ -39,7 +39,9 @@ class DonationReceived extends Mailable
 
     public function envelope(): Envelope
     {
-        $organization = $this->donation->campaign?->organization;
+        // `publicCampaign()` : cet email se rend depuis un worker, sans contexte
+        // d'organisation, ou la relation ordinaire reviendrait nulle.
+        $organization = $this->donation->publicCampaign()?->organization;
 
         $replyTo = $organization?->contact_email
             ? [new Address($organization->contact_email, $organization->name)]
@@ -53,12 +55,14 @@ class DonationReceived extends Mailable
 
     public function content(): Content
     {
+        $campaign = $this->donation->publicCampaign();
+
         return new Content(
             markdown: 'mail.donation-received',
             with: [
                 'donation' => $this->donation,
-                'campaign' => $this->donation->campaign,
-                'organization' => $this->donation->campaign?->organization,
+                'campaign' => $campaign,
+                'organization' => $campaign?->organization,
                 'tz' => config('app.display_timezone'),
             ],
         );
