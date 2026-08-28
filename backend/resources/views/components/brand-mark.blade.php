@@ -1,33 +1,79 @@
+@props([
+    /*
+     * `color` : le logo Pass241 tel qu'il a ete fourni, en couleur. C'est le
+     *           defaut, et l'aspect voulu partout ou il se pose sur une surface
+     *           claire ou sur le verre.
+     * `mono`  : le contour du pictogramme en `currentColor`. Reserve aux
+     *           endroits ou la couleur ne peut pas etre garantie lisible, ou ne
+     *           survivrait pas au support : bandeau azur du billet, capture du
+     *           billet en image, impression en noir et blanc.
+     */
+    'variant' => 'color',
+])
+
 {{--
     Symbole de marque Pass241.
 
-    Extrait du logo fourni (docs/design/logo.svg), dont seul le PICTOGRAMME est
-    repris : le mot-symbole « Pass241 » reste du TEXTE VIVANT dans l'interface.
-    Un mot vectorise devient flou en dessous de vingt pixels, ne se selectionne
-    pas, ne se lit pas a la voix, et ne suit pas la graisse du reste de la page.
-    La signature « Vivez, reservez, profitez. » du logo suit la meme regle : elle
-    reste du texte, la ou elle sert.
+    Seul le PICTOGRAMME est repris du logo. Le mot-symbole « Pass241 » reste du
+    TEXTE VIVANT dans l'interface, rendu par `<x-brand-word>` : un mot vectorise
+    devient flou en dessous de vingt pixels, ne se selectionne pas, ne se lit pas
+    a la voix, et ne suit pas la graisse du reste de la page.
 
-    Le trace fourni est monochrome. `currentColor` en tire parti : le symbole
-    prend la couleur de son contexte — azur sur fond clair, blanc sur le bandeau
-    du billet — sans qu'aucun fichier ne soit duplique.
+    ----------------------------------------------------------------------
+    LA SOURCE EST LE PNG, PAS LE SVG
+    ----------------------------------------------------------------------
 
-    CADRAGE, releve a l'encre et non aux coordonnees du fichier. Le logo a ete
-    rasterise puis parcouru pixel par pixel : le pictogramme occupe x 275..799 et
-    y 215..681, et une bande parfaitement vide (682..705) le separe du
-    mot-symbole. Deduire le cadrage des coordonnees du fichier donne un resultat
-    decentre — les points de controle des courbes debordent du dessin.
+    Les deux fichiers fournis ne se valent pas. `logo.svg` est une VECTORISATION
+    AUTOMATIQUE du rendu : 235 traces, 233 teintes, 114 Ko, et surtout une perte
+    reelle — le billet blanc y devient bleu et l'ombre portee disparait. Il n'est
+    pas le logo, c'est une approximation du logo.
 
-    QUATRE TRACES, VOLONTAIREMENT SEPARES. Le fichier d'origine repartit le
-    dessin sur quatre traces en `fill-rule="evenodd"` ; les fusionner en un seul
-    changerait le dessin, deux contours superposes s'y soustrayant au lieu de
-    s'additionner. Le creux du P viendrait alors trouer le plein d'un autre
-    trace.
+    `logo.png` est le rendu d'origine : degrades propres, billet blanc, ombre
+    portee, et un canal alpha veritable (67 % de pixels transparents). C'est lui
+    la source.
 
-    Seuls les sous-traces du pictogramme sont conserves : ceux du mot-symbole et
-    de la signature sont retires du balisage plutot que caches par le cadrage —
-    inutile de faire descendre a chaque page un dessin que personne ne verra.
+    Il est donc RECADRE sur le seul pictogramme puis reduit a 128 pixels de haut
+    — quatre fois la plus grande taille d'affichage du produit (32 px), ce qui
+    couvre les ecrans a tres haute densite. On passe ainsi de 1,2 Mo a 8 Ko en
+    WebP. Servir l'original tel quel ferait telecharger 1,2 Mo pour dessiner un
+    carre de 24 pixels ; sur les connexions du marche vise, ce n'est pas une
+    coquetterie (section 72).
+
+    `<picture>` sert le WebP quand le navigateur l'accepte, et le PNG sinon.
+    Les deux dimensions sont ecrites sur la balise : sans elles, le navigateur
+    ignore la place a reserver et la ligne du logo saute a l'arrivee de l'image.
+
+    ----------------------------------------------------------------------
+    VARIANTE MONO : le contour, en ligne
+    ----------------------------------------------------------------------
+
+    Elle ne peut pas etre une image : sa couleur doit suivre celle du texte
+    voisin, ce qu'un fichier ne sait pas faire. Elle reprend donc le contour net
+    du pictogramme, en quatre traces, peint en `currentColor`.
+
+    Elle sert aussi la capture du billet en image (resources/js/ticket-image.js),
+    ou la technique repose sur un <foreignObject> SVG : une image externe n'y
+    survit pas.
+
+    QUATRE TRACES, VOLONTAIREMENT SEPARES. Le contour repartit le dessin sur
+    quatre traces en `fill-rule="evenodd"` ; les fusionner changerait le dessin,
+    deux contours superposes s'y soustrayant au lieu de s'additionner. Le creux
+    du P viendrait alors trouer le plein d'un autre trace.
 --}}
+@if ($variant === 'color')
+    {{-- `alt` vide et `aria-hidden` : le nom « Pass241 » est deja porte par le
+         texte pose juste a cote. L'annoncer deux fois ferait entendre
+         « Pass241 Pass241 » a chaque page. --}}
+    <picture>
+        <source srcset="{{ asset('brand/pass241-mark.webp') }}" type="image/webp">
+        <img src="{{ asset('brand/pass241-mark.png') }}"
+             alt=""
+             aria-hidden="true"
+             width="144" height="128"
+             decoding="async"
+             {{ $attributes->merge(['class' => 'h-6 w-auto']) }}>
+    </picture>
+@else
 <svg {{ $attributes->merge(['class' => 'h-6 w-auto']) }}
      viewBox="275 215 525 467"
      role="img"
@@ -46,3 +92,4 @@
         fill="currentColor" fill-rule="evenodd"
         stroke="currentColor" stroke-width="0.25" stroke-linejoin="round" />
 </svg>
+@endif

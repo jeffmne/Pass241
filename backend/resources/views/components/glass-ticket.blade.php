@@ -70,6 +70,17 @@
     prevoit pas.
 --}}
 <div
+    {{-- ILOT CLAIR, quel que soit le theme de la page.
+         Le billet est un DOCUMENT, pas un ecran : il porte un QR Code qu'un
+         lecteur d'entree de gamme doit lire, et il est capture en image pour
+         circuler sur WhatsApp, ou il sera vu sur l'appareil de quelqu'un
+         d'autre. Un billet dont l'apparence depend du reglage de celui qui
+         l'ouvre n'est plus un document.
+         Le systeme de themes prevoit exactement ce cas (section 2 du CSS) :
+         `data-theme="light"` rend un ilot clair a l'interieur d'une page
+         sombre. Sans lui, le bandeau `bg-azure-700` — clair en mode sombre —
+         recevrait du texte blanc, illisible. --}}
+    data-theme="light"
     {{ $attributes->class([
         'glass glass-specular relative w-full max-w-sm overflow-hidden select-none',
         'ticket-arrive' => $animate,
@@ -81,8 +92,13 @@
     <div class="relative bg-azure-700 px-5 pt-4 pb-3.5">
         <div class="flex items-center gap-3">
             <span class="flex items-center gap-1.5 font-display text-base font-extrabold tracking-tight text-white">
+                {{-- Le logo en couleur tient sur ce bandeau : son « P » cyan se
+                     detache franchement de l'aplat azur soutenu. Et la capture
+                     en image le supporte — `ticket-image.js` attend le
+                     chargement de chaque `<img>` du clone avant de declencher
+                     le rendu, precisement pour ce cas. --}}
                 <x-brand-mark class="h-6 w-auto" />
-                Pass241
+                <x-brand-word variant="light" />
             </span>
             <span class="h-4 w-px bg-white/25"></span>
             <span class="text-[11px] text-azure-100">Vivez vos evenements autrement</span>

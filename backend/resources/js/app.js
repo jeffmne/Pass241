@@ -16,6 +16,136 @@
 const root = document.documentElement;
 
 /* -------------------------------------------------------------------------
+ * Theme clair / sombre
+ * ---------------------------------------------------------------------- */
+
+/*
+ * Le theme est APPLIQUE avant le premier rendu, par un petit script pose
+ * directement dans le <head> des gabarits (`x-theme-script`). Ce module-ci
+ * n'arrive qu'ensuite : il ne fait que gerer les CHANGEMENTS.
+ *
+ * L'ordre compte. Ce fichier est charge par Vite, donc en differe : s'il
+ * portait aussi l'application initiale, la page s'afficherait en clair puis
+ * basculerait en sombre sous les yeux de l'utilisateur. Un ecran blanc d'un
+ * dixieme de seconde en pleine nuit se remarque, et se retient.
+ *
+ * Trois choix possibles, pas deux : « clair », « sombre » et « systeme ».
+ * « Systeme » n'est pas un repli faute de choix — c'est un choix a part
+ * entiere, celui de suivre le telephone, qui bascule souvent au coucher du
+ * soleil. Le retirer obligerait a revenir ici deux fois par jour.
+ */
+
+const THEME_KEY = 'pass241:theme';
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function storedChoice() {
+    try {
+        const value = localStorage.getItem(THEME_KEY);
+        return value === 'light' || value === 'dark' ? value : 'system';
+    } catch {
+        // Navigation privee, stockage refuse : on suit le systeme.
+        return 'system';
+    }
+}
+
+function resolveTheme(choice) {
+    if (choice === 'light' || choice === 'dark') {
+        return choice;
+    }
+    return systemDark.matches ? 'dark' : 'light';
+}
+
+/**
+ * Applique un theme et annonce le changement.
+ *
+ * `data-theme-switching` arme la transition de couleur le temps du fondu, puis
+ * disparait. Une transition permanente ferait trainer chaque survol de ligne
+ * de tableau : l'interface entiere paraitrait molle (voir la section 6 du CSS).
+ */
+function applyTheme(choice, { animate = true } = {}) {
+    const theme = resolveTheme(choice);
+
+    if (root.dataset.theme === theme) {
+        root.dataset.themeChoice = choice;
+        return;
+    }
+
+    if (animate && !reducedMotion.matches) {
+        root.setAttribute('data-theme-switching', '');
+        window.setTimeout(() => root.removeAttribute('data-theme-switching'), 260);
+    }
+
+    root.dataset.theme = theme;
+    root.dataset.themeChoice = choice;
+
+    // La barre d'adresse du navigateur mobile suit le fond de la page. Sans
+    // cela, un liseré clair reste colle en haut d'un ecran sombre.
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+        meta.setAttribute('content', theme === 'dark' ? '#0b0f18' : '#f7f9fb');
+    }
+
+    document.dispatchEvent(new CustomEvent('pass241:theme', { detail: { theme, choice } }));
+}
+
+window.Pass241 = window.Pass241 || {};
+
+window.Pass241.theme = {
+    get choice() {
+        return root.dataset.themeChoice || storedChoice();
+    },
+    get resolved() {
+        return root.dataset.theme || 'light';
+    },
+    set(choice) {
+        try {
+            if (choice === 'system') {
+                localStorage.removeItem(THEME_KEY);
+            } else {
+                localStorage.setItem(THEME_KEY, choice);
+            }
+        } catch {
+            // Le choix ne survivra pas au rechargement, la session reste juste.
+        }
+        applyTheme(choice);
+    },
+};
+
+/*
+ * Bascule par attribut, pour les pages SANS Alpine.
+ *
+ * La page d'accueil publique ne charge pas Livewire, donc pas Alpine : le
+ * composant `x-ui.theme-toggle` du tableau de bord n'y fonctionnerait pas. Un
+ * ecouteur delegue sur le document couvre le cas sans rien dupliquer, et
+ * continue de fonctionner si le bouton est ajoute apres coup.
+ *
+ * L'ETAT VISUEL N'EST PAS GERE ICI : il se lit en CSS depuis `data-theme` sur
+ * <html>. Aucune synchronisation a tenir, donc aucune desynchronisation
+ * possible.
+ */
+document.addEventListener('click', (event) => {
+    const bouton = event.target.closest?.('[data-theme-toggle]');
+    if (!bouton) return;
+
+    window.Pass241.theme.set(root.dataset.theme === 'dark' ? 'light' : 'dark');
+});
+
+// Le systeme bascule (coucher du soleil, mode nuit programme) : on ne suit que
+// si l'utilisateur n'a pas fait de choix explicite.
+systemDark.addEventListener('change', () => {
+    if (storedChoice() === 'system') {
+        applyTheme('system');
+    }
+});
+
+// Deux onglets ouverts : le choix fait dans l'un doit valoir dans l'autre.
+window.addEventListener('storage', (event) => {
+    if (event.key === THEME_KEY) {
+        applyTheme(storedChoice());
+    }
+});
+
+/* -------------------------------------------------------------------------
  * Qualite adaptative
  * ---------------------------------------------------------------------- */
 

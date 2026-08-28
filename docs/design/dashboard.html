@@ -1,0 +1,417 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>gotickets Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            surface: '#f7f9fb',
+            'surface-container-lowest': '#ffffff',
+            'surface-container': '#ecedef',
+            'on-surface': '#191c1e',
+            'on-surface-variant': '#41474d',
+            primary: '#007fff',
+            'on-primary': '#ffffff',
+            'primary-container': '#d3e3fd',
+            'on-primary-container': '#001c3b',
+            secondary: '#51606f',
+            error: '#ba1a1a',
+            success: '#006c4b',
+            warning: '#8e5100',
+          },
+          borderRadius: {
+            'xl': '1rem',
+            '2xl': '1.5rem',
+            '3xl': '2rem',
+          },
+          boxShadow: {
+            'glass': '0 8px 32px 0 rgba(0, 127, 255, 0.05)',
+            'glass-elevated': '0 12px 40px 0 rgba(0, 127, 255, 0.1)',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="glass-effects">
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 8px 32px 0 rgba(0, 127, 255, 0.05);
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.02);
+    }
+    .glass-button {
+      background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.6) 100%);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 0 4px 12px rgba(0, 127, 255, 0.05);
+      transition: all 0.3s ease;
+    }
+    .glass-button:hover {
+      background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 127, 255, 0.1);
+    }
+    .text-gradient {
+      background: linear-gradient(to right, #007fff, #0056b3);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+<style data-purpose="charts">
+    .chart-area {
+      position: relative;
+      width: 100%;
+      height: 200px;
+    }
+    .chart-line {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('data:image/svg+xml;utf8,<svg preserveAspectRatio="none" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M0,90 Q30,90 50,50 T100,60" fill="none" stroke="%23007fff" stroke-width="2"/><path d="M0,90 Q30,90 50,50 T100,60 L100,100 L0,100 Z" fill="url(%23grad)"/><defs><linearGradient id="grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%23007fff" stop-opacity="0.2"/><stop offset="100%" stop-color="%23007fff" stop-opacity="0"/></linearGradient></defs></svg>') no-repeat;
+      background-size: 100% 100%;
+    }
+    .bar {
+      background: #007fff;
+      border-radius: 4px 4px 0 0;
+      width: 32px;
+      display: inline-block;
+      margin: 0 10px;
+    }
+    .progress-track {
+      height: 4px;
+      background: #ecedef;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface font-sans flex h-screen overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- BEGIN: SideNavBar -->
+<aside class="glass-panel w-64 h-full flex flex-col py-8 px-4 gap-4 z-20 sticky top-0">
+<!-- Logo area -->
+<div class="px-4 mb-6">
+<div class="flex items-center gap-2">
+<span class="text-2xl font-extrabold text-on-surface tracking-tight">Pass241</span>
+</div>
+<p class="text-[10px] font-semibold text-secondary tracking-wider mt-1 uppercase">Plateforme de billetterie</p>
+</div>
+<!-- Navigation Links -->
+<nav class="flex-1 flex flex-col gap-1 overflow-y-auto no-scrollbar">
+<a class="flex items-center gap-3 px-4 py-3 bg-primary text-on-primary rounded-xl font-medium shadow-md" href="#">
+<span class="material-icons text-[20px]">dashboard</span>
+        Dashboard
+      </a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:bg-white/50 hover:text-primary rounded-xl transition-all font-medium" href="#">
+<span class="material-icons text-[20px]">calendar_today</span>
+        Mes événements
+      </a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:bg-white/50 hover:text-primary rounded-xl transition-all font-medium" href="#">
+<span class="material-icons text-[20px]">add_circle</span>
+        Créer un événement
+      </a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:bg-white/50 hover:text-primary rounded-xl transition-all font-medium" href="#">
+<span class="material-icons text-[20px]">confirmation_number</span>
+        Billets physiques
+      </a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:bg-white/50 hover:text-primary rounded-xl transition-all font-medium" href="#">
+<span class="material-icons text-[20px]">local_activity</span>
+        Tombola
+      </a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:bg-white/50 hover:text-primary rounded-xl transition-all font-medium" href="#">
+<span class="material-icons text-[20px]">campaign</span>
+        Promotions
+      </a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:bg-white/50 hover:text-primary rounded-xl transition-all font-medium" href="#">
+<span class="material-icons text-[20px]">group</span>
+        Equipe
+      </a>
+<a class="flex items-center gap-3 px-4 py-3 text-secondary hover:bg-white/50 hover:text-primary rounded-xl transition-all font-medium" href="#">
+<span class="material-icons text-[20px]">settings</span>
+        Paramètres
+      </a>
+</nav>
+<!-- Footer Actions -->
+<div class="mt-auto flex flex-col gap-3">
+<button class="bg-primary-container text-primary font-medium py-2 px-4 rounded-xl text-sm hover:bg-primary-container/80 transition-colors flex items-center justify-center gap-2">
+<span class="material-icons text-[16px]">help_outline</span>
+        Besoin d'aide ou de support ?
+      </button>
+<div class="flex items-center justify-between px-3 py-2 bg-white/40 rounded-xl border border-white/50 mt-2 cursor-pointer hover:bg-white/60 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+            DE
+          </div>
+<div class="flex flex-col">
+<span class="text-sm font-bold text-on-surface">Dakar Events</span>
+<span class="text-xs text-secondary">Organisateur</span>
+</div>
+</div>
+<span class="material-icons text-secondary hover:text-primary transition-colors">logout</span>
+</div>
+</div>
+</aside>
+<!-- END: SideNavBar -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 flex flex-col h-full overflow-y-auto bg-surface relative">
+<!-- BEGIN: TopAppBar -->
+<header class="w-full px-8 py-6 flex justify-between items-end shrink-0 z-10 sticky top-0 bg-surface/80 backdrop-blur-md">
+<div>
+<h1 class="text-3xl font-bold text-on-surface tracking-tight">Bonjour, Dakar Events</h1>
+<p class="text-secondary mt-1">Voici l'activité de votre billetterie</p>
+</div>
+</header>
+<!-- END: TopAppBar -->
+<div class="px-8 pb-8 flex flex-col gap-6 max-w-[1400px]">
+<!-- BEGIN: Stats Row -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-6">
+<div class="glass-card rounded-2xl p-6 flex flex-col gap-2">
+<div class="flex items-center gap-2 text-secondary text-sm font-bold tracking-wide uppercase">
+<span class="material-icons text-[18px] text-primary">receipt_long</span>
+            Billets vendus
+          </div>
+<div class="text-3xl font-extrabold text-on-surface">626</div>
+</div>
+<div class="glass-card rounded-2xl p-6 flex flex-col gap-2">
+<div class="flex items-center gap-2 text-secondary text-sm font-bold tracking-wide uppercase">
+<span class="material-icons text-[18px] text-error">account_balance_wallet</span>
+            Revenus totaux
+          </div>
+<div class="text-3xl font-extrabold text-on-surface">3 126 000 FCFA</div>
+<div class="text-sm text-error font-medium">- 210 000 FCFA ce mois</div>
+</div>
+<div class="glass-card rounded-2xl p-6 flex flex-col gap-2">
+<div class="flex items-center gap-2 text-secondary text-sm font-bold tracking-wide uppercase">
+<span class="material-icons text-[18px] text-warning">event</span>
+            Événements publiés
+          </div>
+<div class="text-3xl font-extrabold text-on-surface">5</div>
+</div>
+<div class="glass-card rounded-2xl p-6 flex flex-col gap-2">
+<div class="flex items-center gap-2 text-secondary text-sm font-bold tracking-wide uppercase">
+<span class="material-icons text-[18px] text-success">pie_chart</span>
+            Remplissage moyen
+          </div>
+<div class="text-3xl font-extrabold text-on-surface">46%</div>
+</div>
+</section>
+<!-- END: Stats Row -->
+<!-- BEGIN: Charts Row -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Revenue Chart -->
+<div class="glass-card rounded-2xl p-6 flex flex-col">
+<h2 class="text-lg font-bold text-on-surface mb-6">Revenus — 6 derniers mois</h2>
+<div class="chart-area flex-1 min-h-[200px]">
+<div class="chart-line"></div>
+<!-- X Axis Labels -->
+<div class="absolute bottom-0 w-full flex justify-between text-xs text-secondary px-4">
+<span class="">Fév</span>
+<span class="">Mar</span>
+<span class="">Avr</span>
+<span class="">Mai</span>
+<span class="">Juil</span>
+</div>
+</div>
+</div>
+<!-- Sales Chart -->
+<div class="glass-card rounded-2xl p-6 flex flex-col">
+<h2 class="text-lg font-bold text-on-surface mb-6">Ventes — 7 derniers jours</h2>
+<div class="flex-1 flex items-end justify-around pb-6 h-[200px] border-b border-surface-container">
+<div class="flex flex-col items-center gap-2">
+<div class="bar h-[100px]"></div>
+<span class="text-xs text-secondary">Ven</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="bar h-[70px]"></div>
+<span class="text-xs text-secondary">Sam</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="bar h-[40px]"></div>
+<span class="text-xs text-secondary">Dim</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="bar h-[140px]"></div>
+<span class="text-xs text-secondary">Lun</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="bar h-[110px]"></div>
+<span class="text-xs text-secondary">Mar</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="bar h-[10px]"></div>
+<span class="text-xs text-secondary">Mer</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="bar h-[50px]"></div>
+<span class="text-xs text-secondary">Jeu</span>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Charts Row -->
+<!-- BEGIN: Quick Actions Row -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-6">
+<button class="glass-button rounded-2xl p-6 flex flex-col items-center justify-center gap-3">
+<span class="material-icons text-primary text-2xl">add_box</span>
+<span class="font-semibold text-on-surface">Créer</span>
+</button>
+<button class="glass-button rounded-2xl p-6 flex flex-col items-center justify-center gap-3">
+<span class="material-icons text-warning text-2xl">edit</span>
+<span class="font-semibold text-on-surface">Modifier</span>
+</button>
+<button class="glass-button rounded-2xl p-6 flex flex-col items-center justify-center gap-3">
+<span class="material-icons text-error text-2xl">publish</span>
+<span class="font-semibold text-on-surface">Publier</span>
+</button>
+<button class="glass-button rounded-2xl p-6 flex flex-col items-center justify-center gap-3">
+<span class="material-icons text-secondary text-2xl">archive</span>
+<span class="font-semibold text-on-surface">Archiver</span>
+</button>
+</section>
+<!-- END: Quick Actions Row -->
+<!-- BEGIN: Bottom Lists Row -->
+<section class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-8">
+<!-- Recent Events -->
+<div class="glass-card rounded-2xl p-6">
+<div class="flex justify-between items-center mb-6">
+<h2 class="text-lg font-bold text-on-surface">Événements récents</h2>
+<a class="text-primary text-sm font-semibold hover:underline" href="#">Tout voir</a>
+</div>
+<div class="flex flex-col gap-6">
+<!-- Event Item 1 -->
+<div class="flex items-center gap-4 group cursor-pointer">
+<img alt="Fiesta Privée" class="w-16 h-16 rounded-xl object-cover shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBarF9IJkTJLPE_osYFWcabhLrPZc04JJhWckX01TOKS0L49Q21leQiIz9wN1pmDZ_-eptAJnCW5lugSVKpJJyqvTRUzMFnwvX9MDo4mQyOIpUXZ3vTwqMxHoh-KMNu33LUx4qogfv47HmI_Vc4_ryVoJ2zktJAvmZOa4kTXomPbnQW3DU87irWZ2LFUSVPR1mslPziy_A7ocTPfiR1yA-3_T-VXWMU6s1Fg-_rmgVcq-u6W8gLHoFk">
+<div class="flex-1 flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-bold text-on-surface">Fiesta Privée - Hôtel de la Détente</span>
+<span class="text-[10px] px-2 py-0.5 bg-surface-container text-secondary rounded-full font-semibold">Publiée</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex-1 progress-track">
+<div class="progress-fill bg-error" style="width: 8%"></div>
+</div>
+<span class="text-xs font-bold text-error">8%</span>
+</div>
+</div>
+<span class="material-icons text-secondary opacity-0 group-hover:opacity-100 transition-opacity">chevron_right</span>
+</div>
+<!-- Event Item 2 -->
+<div class="flex items-center gap-4 group cursor-pointer">
+<img alt="Dîner Gastronomie" class="w-16 h-16 rounded-xl object-cover shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBHVeygWKHet6vOML9UbZhITfc9EKsKsAVL57pmzq7imvTZlluu9MKadJU_tdiNpbz9AjZdr-56nDfcwGi-O9wRwHEhw5nx1EqKyRPIDemWxmVTtA_DlkcsL5KFCWmpRclHOOLqAjTU8eItQ_4xBhRTBkJKclxS2l8HRZzXDbSgpp9TOsxVjQzmQUiwkmBSUFR4Wh6IxF_xgrN5xto-hBohVnShlD9x9HIHO7U0YKyonLsrShUrLWcT">
+<div class="flex-1 flex flex-col gap-1">
+<span class="font-bold text-on-surface">Dîner &amp; Gastronomie à Teranga</span>
+<div class="flex items-center gap-3">
+<div class="flex-1 progress-track">
+<div class="progress-fill bg-error" style="width: 32%"></div>
+</div>
+<span class="text-xs font-bold text-error">32%</span>
+</div>
+</div>
+<span class="material-icons text-secondary opacity-0 group-hover:opacity-100 transition-opacity">chevron_right</span>
+</div>
+<!-- Event Item 3 -->
+<div class="flex items-center gap-4 group cursor-pointer">
+<img alt="Dakar Tech Summit" class="w-16 h-16 rounded-xl object-cover shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYcEMwjJYPSNatOVVI1d9LvqajiyPW5tLWNT6YVyySSmcensc8ltKb4xRuS91nk6h_RZOTEb02pE6Bh-Fhp1Cjbq1CZXN8Gpos6kOY5Q5-_fFlCoB8VNnx9XfSScm0ZOtaqBh07SbNm4i2qdevbJKkQ390WvVQYskaKp8AT5Nmx_Le_Fx8to44q-WRv3pxbBL1B_wo_v-XQtpqdAHUpjWjpZ7AraFg3S3t9s-14tHPbkzo0KNfYCsQ">
+<div class="flex-1 flex flex-col gap-1">
+<span class="font-bold text-on-surface">Dakar Tech Summit 2024</span>
+<div class="flex items-center gap-3">
+<div class="flex-1 progress-track">
+<div class="progress-fill bg-warning" style="width: 75%"></div>
+</div>
+<span class="text-xs font-bold text-warning">75%</span>
+</div>
+</div>
+<span class="material-icons text-secondary opacity-0 group-hover:opacity-100 transition-opacity">chevron_right</span>
+</div>
+</div>
+</div>
+<!-- Recent Sales -->
+<div class="glass-card rounded-2xl p-6">
+<h2 class="text-lg font-bold text-on-surface mb-6">Dernières ventes</h2>
+<div class="flex flex-col gap-5">
+<!-- Sale Item 1 -->
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error shrink-0">
+<span class="material-icons text-[20px]">storefront</span>
+</div>
+<div class="flex-1">
+<div class="font-semibold text-sm text-on-surface"><span class="font-bold">1 billet</span> — Nanaissy N'Diaye en terrasse!</div>
+<div class="text-xs text-secondary mt-0.5">Dakar - 12/05/2024</div>
+</div>
+<div class="font-bold text-sm text-on-surface">+20 000 FCFA</div>
+</div>
+<!-- Sale Item 2 -->
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error shrink-0">
+<span class="material-icons text-[20px]">storefront</span>
+</div>
+<div class="flex-1">
+<div class="font-semibold text-sm text-on-surface"><span class="font-bold">2 billets</span> — Nanaissy N'Diaye en terrasse!</div>
+<div class="text-xs text-secondary mt-0.5">Dakar - 12/05/2024</div>
+</div>
+<div class="font-bold text-sm text-on-surface">+39 000 FCFA</div>
+</div>
+<!-- Sale Item 3 -->
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error shrink-0">
+<span class="material-icons text-[20px]">smartphone</span>
+</div>
+<div class="flex-1">
+<div class="font-semibold text-sm text-on-surface"><span class="font-bold">1 billet</span> — Nanaissy N'Diaye en terrasse!</div>
+<div class="text-xs text-secondary mt-0.5">Dakar - 12/05/2024</div>
+</div>
+<div class="font-bold text-sm text-on-surface">+15 000 FCFA</div>
+</div>
+<!-- Sale Item 4 -->
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error shrink-0">
+<span class="material-icons text-[20px]">smartphone</span>
+</div>
+<div class="flex-1">
+<div class="font-semibold text-sm text-on-surface"><span class="font-bold">3 billets</span> — MATCH BASKETSENEGAL #orange</div>
+<div class="text-xs text-secondary mt-0.5">Dakar - 12/05/2024</div>
+</div>
+<div class="font-bold text-sm text-on-surface">+49 000 FCFA</div>
+</div>
+<!-- Sale Item 5 -->
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error shrink-0">
+<span class="material-icons text-[20px]">smartphone</span>
+</div>
+<div class="flex-1">
+<div class="font-semibold text-sm text-on-surface"><span class="font-bold">2 billets</span> — Night Lights - Sunset Party</div>
+<div class="text-xs text-secondary mt-0.5">Saly - 12/05/2024</div>
+</div>
+<div class="font-bold text-sm text-on-surface">+29 000 FCFA</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Bottom Lists Row -->
+</div>
+</main>
+<!-- END: MainContent -->
+
+
+</body></html>

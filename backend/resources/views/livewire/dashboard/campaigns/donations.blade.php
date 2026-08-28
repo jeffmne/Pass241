@@ -1,115 +1,92 @@
 @php
-    $tz = config('app.display_timezone');
-    $nbsp = "\u{202F}";
-    $money = fn (int $amount) => number_format($amount, 0, ',', $nbsp).' F';
+    use App\Enums\PermissionName;
+    use App\Support\Money;
 
-    // Hauteur des barres rapportee au meilleur jour : c'est la forme de la
-    // courbe qui renseigne, pas la valeur absolue de chaque barre.
-    $peak = max(1, $evolution->max('amount'));
+    $tz = config('app.display_timezone');
+    $money = fn (int $amount) => Money::formatShort($amount);
+
+    /*
+     * La serie d'evolution est transposee au format attendu par le composant de
+     * graphique, le meme que celui du tableau de bord de billetterie : deux
+     * ecrans qui montrent une evolution doivent la montrer de la meme facon
+     * (regle 34).
+     *
+     * Seul le premier et le dernier jour sont etiquetes : trente libelles sous
+     * un graphique large de 400px se chevauchent et ne se lisent plus.
+     */
+    $series = $evolution->values()->map(fn (array $day, int $index) => [
+        'label' => $index === 0 || $index === $evolution->count() - 1
+            ? $day['date']->translatedFormat('j M')
+            : '',
+        'value' => $day['amount'],
+        'display' => $day['date']->translatedFormat('j F').' — '.$money($day['amount']),
+    ])->all();
 @endphp
 
 {{--
     Dons recus par une collecte (sections 44 a 48, 55).
 
-    EN LECTURE SEULE. Aucun bouton ne modifie quoi que ce soit, et c'est
-    volontaire : un don confirme ne se corrige pas, il se rembourse (section 47).
-
-    Surfaces pleines : liste dense de donnees de travail (regle 70.4).
-    Aucun emoji (regle 80.6).
+    EN LECTURE SEULE pour l'essentiel. Aucun bouton ne modifie un don, et c'est
+    volontaire : un don confirme ne se corrige pas, il se rembourse
+    (section 47). Le remboursement AJOUTE une operation, il n'en efface aucune.
 --}}
-<div>
-    <header class="mb-6">
-        <a href="{{ route('campaigns.edit', $campaign) }}" wire:navigate
-           class="inline-flex items-center gap-1.5 text-sm font-medium text-grey-500 transition-colors hover:text-azure-700">
-            <x-lucide-arrow-left class="size-4" stroke-width="1.75" />
-            {{ $campaign->name }}
-        </a>
+<div class="space-y-5">
 
-        <h1 class="mt-2 font-display text-2xl font-extrabold text-ink sm:text-3xl">Dons recus</h1>
-        <p class="mt-1 text-sm text-grey-500">
-            Calcules a partir des dons confirmes. Rien ici ne se modifie a la main.
-        </p>
-    </header>
+    <x-ui.page-header
+        title="Dons recus"
+        description="Calcules a partir des dons confirmes. Rien ici ne se modifie a la main."
+        :eyebrow="$campaign->name"
+        :back="route('campaigns.edit', $campaign)"
+        :back-label="$campaign->name" />
 
-    {{-- ----------------------------------------------------------------
-         Compteurs (section 55)
-    ----------------------------------------------------------------- --}}
-    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div class="surface p-4" data-reveal data-reveal-step="0">
-            <div class="flex items-center gap-2 text-grey-500">
-                <x-lucide-hand-coins class="size-4" stroke-width="1.5" />
-                <span class="text-xs font-semibold tracking-wide uppercase">Collecte</span>
-            </div>
-            <p class="mt-2 font-display text-2xl font-extrabold text-ink tabular">{{ $money($stats['collected']) }}</p>
-            <p class="mt-0.5 text-sm text-grey-500 tabular">
-                {{ number_format($progress['displayPercentage'], 0, ',', $nbsp) }} % de l'objectif
-            </p>
-        </div>
+    {{-- Compteurs (section 55) --}}
+    <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Chiffres de la collecte">
+        <x-ui.stat-card
+            icon="hand-coins"
+            label="Collecte"
+            tone="success"
+            data-reveal data-reveal-step="0"
+            :value="$money($stats['collected'])"
+            :hint="Money::number($progress['displayPercentage']) . ' % de l\'objectif'" />
 
-        <div class="surface p-4" data-reveal data-reveal-step="1">
-            <div class="flex items-center gap-2 text-grey-500">
-                <x-lucide-users class="size-4" stroke-width="1.5" />
-                <span class="text-xs font-semibold tracking-wide uppercase">Donateurs</span>
-            </div>
-            <p class="mt-2 font-display text-2xl font-extrabold text-ink tabular">
-                {{ number_format($stats['donors'], 0, ',', $nbsp) }}
-            </p>
-            <p class="mt-0.5 text-sm text-grey-500 tabular">
-                {{ number_format($stats['donations'], 0, ',', $nbsp) }}
-                don{{ $stats['donations'] > 1 ? 's' : '' }}
-            </p>
-        </div>
+        <x-ui.stat-card
+            icon="users"
+            label="Donateurs"
+            data-reveal data-reveal-step="1"
+            :value="Money::number($stats['donors'])"
+            :hint="Money::number($stats['donations']) . ' don' . ($stats['donations'] > 1 ? 's' : '')" />
 
-        <div class="surface p-4" data-reveal data-reveal-step="2">
-            <div class="flex items-center gap-2 text-grey-500">
-                <x-lucide-chart-no-axes-column class="size-4" stroke-width="1.5" />
-                <span class="text-xs font-semibold tracking-wide uppercase">Don moyen</span>
-            </div>
-            <p class="mt-2 font-display text-2xl font-extrabold text-ink tabular">{{ $money($stats['average']) }}</p>
-            <p class="mt-0.5 text-sm text-grey-500 tabular">
-                Plus gros don : {{ $money($stats['largest']) }}
-            </p>
-        </div>
+        <x-ui.stat-card
+            icon="chart-no-axes-column"
+            label="Don moyen"
+            data-reveal data-reveal-step="2"
+            :value="$money($stats['average'])"
+            :hint="'Plus gros don : ' . $money($stats['largest'])" />
 
         @if ($canSeeNet)
-            <div class="surface p-4" data-reveal data-reveal-step="3">
-                <div class="flex items-center gap-2 text-grey-500">
-                    <x-lucide-wallet class="size-4" stroke-width="1.5" />
-                    <span class="text-xs font-semibold tracking-wide uppercase">Net a reverser</span>
-                </div>
-                <p class="mt-2 font-display text-2xl font-extrabold text-ink tabular">{{ $money($stats['net']) }}</p>
-                <p class="mt-0.5 text-sm text-grey-500">Apres commission de 2,5 %</p>
-            </div>
+            <x-ui.stat-card
+                icon="wallet"
+                label="Net a reverser"
+                tone="warning"
+                data-reveal data-reveal-step="3"
+                :value="$money($stats['net'])"
+                hint="Apres commission de 2,5 %" />
         @endif
-    </div>
+    </section>
 
-    {{-- ----------------------------------------------------------------
-         Evolution (section 55)
-    ----------------------------------------------------------------- --}}
+    {{-- Evolution (section 55) --}}
     @if ($stats['donations'] > 0)
-        <section class="surface mt-6 p-4 sm:p-6" data-reveal>
-            <h2 class="font-display text-lg font-bold text-ink">Evolution sur 30 jours</h2>
-            <p class="mt-1 text-sm text-grey-500">
-                Les jours sans don sont affiches a zero : les masquer ferait lire une
-                progression reguliere la ou il y a eu un pic puis rien.
-            </p>
-
-            <div class="mt-5 flex h-32 items-end gap-1" role="img"
-                 aria-label="Montant collecte jour par jour sur les trente derniers jours">
-                @foreach ($evolution as $day)
-                    <div class="group relative flex-1"
-                         title="{{ $day['date']->translatedFormat('j F') }} — {{ $money($day['amount']) }}">
-                        <div class="w-full rounded-t bg-gradient-to-t from-azure-500 to-azure-400 transition-opacity group-hover:opacity-80"
-                             style="height: {{ max(2, (int) round($day['amount'] / $peak * 128)) }}px"></div>
-                    </div>
-                @endforeach
-            </div>
-
-            <div class="mt-2 flex justify-between text-xs text-grey-400">
-                <span>{{ $evolution->first()['date']->translatedFormat('j F') }}</span>
-                <span>{{ $evolution->last()['date']->translatedFormat('j F') }}</span>
-            </div>
-        </section>
+        <x-ui.panel
+            variant="glass"
+            title="Evolution sur 30 jours"
+            description="Les jours sans don sont affiches a zero : les masquer ferait lire une progression reguliere la ou il y a eu un pic puis rien."
+            data-reveal>
+            <x-ui.chart.bars
+                :series="$series"
+                :height="140"
+                aria-label="Montant collecte jour par jour sur les trente derniers jours"
+                empty-label="Aucun don sur cette periode" />
+        </x-ui.panel>
     @endif
 
     {{-- Export (sections 41, 59).
@@ -117,38 +94,37 @@
          Le fichier ne nomme PAS les donateurs anonymes : l'anonymat tient dans
          le fichier comme a l'ecran, sans quoi il suffirait d'exporter pour le
          contourner. --}}
-    @can(App\Enums\PermissionName::ExportsGenerate->value)
-        <section class="surface mt-6 p-4 sm:p-5">
+    @can(PermissionName::ExportsGenerate->value)
+        <x-ui.panel>
             <x-export-buttons
                 label="Exporter les dons"
                 hint="Les donateurs anonymes y restent anonymes."
                 :csv="route('exports.donations', [$campaign, 'csv'])"
                 :xlsx="route('exports.donations', [$campaign, 'xlsx'])" />
-        </section>
+        </x-ui.panel>
     @endcan
 
     {{-- ----------------------------------------------------------------
          Historique
     ----------------------------------------------------------------- --}}
-    <section class="surface mt-6 p-4 sm:p-6">
-        <h2 class="font-display text-lg font-bold text-ink">Historique</h2>
-        <p class="mt-1 text-sm text-grey-500">
-            Un don confirme ne peut etre ni supprime, ni modifie, ni retire de cette liste.
-        </p>
+    <x-ui.panel
+        title="Historique"
+        description="Un don confirme ne peut etre ni supprime, ni modifie, ni retire de cette liste.">
 
-        <div class="mt-4 space-y-2">
+        <div class="space-y-2">
             @forelse ($donations as $donation)
-                <div class="rounded-2xl border border-grey-200 bg-white p-3.5">
+                <div wire:key="donation-{{ $donation->id }}"
+                     class="rounded-[var(--radius-md)] border border-grey-200 bg-surface p-3.5">
                     <div class="flex items-center justify-between gap-4">
                         <div class="flex min-w-0 items-center gap-3">
                             <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-azure-100">
-                                <x-lucide-user class="size-4 text-azure-700" stroke-width="1.75" />
+                                <x-lucide-user class="size-4 text-azure-700" stroke-width="2" aria-hidden="true" />
                             </span>
                             <div class="min-w-0">
                                 {{-- Section 41 : « Donateur anonyme » vaut aussi pour
                                      l'organisateur. Un anonymat qu'il peut lever n'est
                                      pas un anonymat. --}}
-                                <p class="truncate font-medium text-ink">{{ $donation->publicDonorName() }}</p>
+                                <p class="truncate font-semibold text-ink">{{ $donation->publicDonorName() }}</p>
                                 <p class="text-xs text-grey-400 tabular">
                                     {{ $donation->confirmed_at?->timezone($tz)->translatedFormat('j F Y \a\ H\hi') }}
                                     · {{ $donation->reference }}
@@ -158,7 +134,7 @@
 
                         <div class="flex shrink-0 items-center gap-3">
                             <div class="text-right">
-                                <p class="font-semibold text-ink tabular">{{ $donation->formattedNetAmount() }}</p>
+                                <p class="font-display font-bold text-ink tabular">{{ $donation->formattedNetAmount() }}</p>
                                 @if ($donation->isRefunded())
                                     <p class="text-xs text-grey-400 tabular">
                                         {{ $donation->isFullyRefunded() ? 'Rembourse' : 'Sur '.$donation->formattedSubtotal() }}
@@ -168,7 +144,7 @@
 
                             @if ($canRefund && ! $donation->isFullyRefunded() && $refundingId !== $donation->id)
                                 <button type="button" wire:click="startRefund({{ $donation->id }})"
-                                        class="btn btn-ghost btn-pill text-sm">
+                                        class="btn btn-secondary btn-sm">
                                     Rembourser
                                 </button>
                             @endif
@@ -179,7 +155,7 @@
                         {{-- Rembourser n'efface rien : le don reste confirme et
                              visible, une operation nouvelle s'ajoute a lui
                              (sections 46, 47). --}}
-                        <div class="mt-3 rounded-xl border border-azure-200 bg-azure-50 p-3.5">
+                        <div class="glass-inset mt-3 p-3.5">
                             <p class="text-sm font-semibold text-ink">
                                 Rembourser {{ $donation->publicDonorName() }}
                             </p>
@@ -188,37 +164,35 @@
                                 et le total collecte se recalcule.
                             </p>
 
-                            <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <label for="refundAmount" class="mb-1.5 block text-sm font-medium text-ink">
-                                        Montant <span class="font-normal text-grey-400">(vide = tout le restant)</span>
-                                    </label>
+                            <div class="mt-3 grid gap-x-3 sm:grid-cols-2">
+                                <x-ui.field label="Montant" for="refundAmount"
+                                            hint="Vide = tout le restant."
+                                            :error="$errors->first('refundAmount')">
                                     <input id="refundAmount" type="number" min="1" inputmode="numeric"
                                            wire:model="refundAmount" class="field tabular"
-                                           placeholder="{{ $donation->netAmount() }}">
-                                    @error('refundAmount')
-                                        <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
-                                    @enderror
-                                </div>
+                                           placeholder="{{ $donation->netAmount() }}"
+                                           @error('refundAmount') aria-invalid="true" aria-describedby="refundAmount-error" @enderror>
+                                </x-ui.field>
 
-                                <div>
-                                    <label for="refundReason" class="mb-1.5 block text-sm font-medium text-ink">
-                                        Motif
-                                    </label>
+                                <x-ui.field label="Motif" for="refundReason"
+                                            :error="$errors->first('refundReason')">
                                     <input id="refundReason" type="text" wire:model="refundReason"
-                                           class="field" placeholder="Don en double">
-                                    @error('refundReason')
-                                        <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
-                                    @enderror
-                                </div>
+                                           class="field" placeholder="Don en double"
+                                           @error('refundReason') aria-invalid="true" aria-describedby="refundReason-error" @enderror>
+                                </x-ui.field>
                             </div>
 
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button type="button" wire:click="refund" class="btn btn-primary btn-pill text-sm"
-                                        wire:loading.attr="disabled">
+                            {{-- Un remboursement est irreversible : la confirmation
+                                 est le dernier point ou l'operation peut encore
+                                 etre arretee. --}}
+                            <div class="mt-2 flex flex-col-reverse gap-2 sm:flex-row-reverse sm:justify-start">
+                                <button type="button" wire:click="refund"
+                                        wire:confirm="Confirmer ce remboursement ? L'operation est definitive et sera tracee."
+                                        wire:loading.attr="disabled" wire:target="refund"
+                                        class="btn btn-primary btn-sm">
                                     Confirmer le remboursement
                                 </button>
-                                <button type="button" wire:click="cancelRefund" class="btn btn-ghost btn-pill text-sm">
+                                <button type="button" wire:click="cancelRefund" class="btn btn-secondary btn-sm">
                                     Revenir
                                 </button>
                             </div>
@@ -226,19 +200,15 @@
                     @endif
                 </div>
             @empty
-                <div class="py-10 text-center">
-                    <x-lucide-hand-coins class="mx-auto size-8 text-grey-300" stroke-width="1.5" />
-                    <p class="mt-3 font-semibold text-ink">Aucun don confirme</p>
-                    <p class="mx-auto mt-1 max-w-sm text-sm text-grey-500">
-                        Partagez le lien de votre collecte. Les dons apparaitront ici des
-                        qu'un paiement sera confirme.
-                    </p>
-                </div>
+                <x-ui.empty-state
+                    icon="hand-coins"
+                    title="Aucun don confirme"
+                    description="Partagez le lien de votre collecte. Les dons apparaitront ici des qu'un paiement sera confirme." />
             @endforelse
         </div>
 
         @if ($donations->hasPages())
             <div class="mt-5">{{ $donations->links() }}</div>
         @endif
-    </section>
+    </x-ui.panel>
 </div>

@@ -1,13 +1,39 @@
+@php
+    /*
+     * La navigation de la page, declaree UNE fois.
+     *
+     * Elle etait recopiee dans l'en-tete et dans le pied de page, avec deux
+     * listes qui avaient deja commence a diverger. Elle sert desormais aussi la
+     * feuille mobile, soit trois endroits : la faire vivre a un seul endroit est
+     * la seule facon qu'ils disent la meme chose.
+     */
+    $lpNav = [
+        ['#parcours', 'Comment ca marche'],
+        ['#billetterie', 'Billetterie'],
+        ['#collectes', 'Collectes'],
+        ['#paiement', 'Paiement'],
+    ];
+@endphp
 <!DOCTYPE html>
 <html lang="fr" class="antialiased">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#F5F7FD">
+
+    {{-- Le theme AVANT la premiere peinture. Cette page ecrit son propre <head>
+         au lieu de passer par un gabarit, et le script y avait ete oublie :
+         `data-theme` n'etait jamais pose, donc `@custom-variant dark` ne se
+         declenchait jamais. La page d'accueil restait claire meme pour un
+         visiteur dont le telephone est en mode sombre — et c'est la seule page
+         du produit ou le defaut existait. --}}
+    <x-theme-script />
     <title>Pass241 — Billetterie et collecte de fonds au Gabon</title>
     <meta name="description" content="Creez votre evenement, partagez son lien, encaissez par Airtel Money et Moov Money. Vos participants recoivent leur billet immediatement, vos agents scannent a l'entree meme sans reseau.">
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="icon" href="/favicon.ico" sizes="any">
+    {{-- Voir `components/app-shell.blade.php` pour le detail de cet ordre. --}}
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     <meta property="og:type" content="website">
     <meta property="og:title" content="Pass241 — Billetterie et collecte de fonds au Gabon">
@@ -26,85 +52,90 @@
     rien a refracter et un backdrop-filter permanent coute cher pour rien.
 --}}
 <header data-sticky-header data-stuck="false"
-        class="fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-300
-               data-[stuck=true]:bg-white/70 data-[stuck=true]:shadow-[0_1px_0_rgba(20,84,155,0.08)]
-               data-[stuck=true]:backdrop-blur-xl">
+        {{-- La matiere une fois defile est decrite en CSS, contre les jetons du
+             rail : ecrite ici en `bg-white/70`, elle restait blanche en mode
+             sombre et la barre devenait illisible. --}}
+        class="fixed inset-x-0 top-0 z-50">
     <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
         <a href="{{ route('home') }}"
-           class="flex shrink-0 items-center gap-2 font-display text-xl font-extrabold tracking-tight text-azure-700">
+           class="flex shrink-0 items-center gap-2 font-display text-xl font-extrabold tracking-tight">
             <x-brand-mark class="h-8 w-auto" />
-            Pass241
+            <x-brand-word />
         </a>
 
+        {{-- Navigation en clair a partir de md. Sous cette largeur elle vit
+             dans la feuille, plus bas. --}}
         <nav class="hidden items-center gap-1 md:flex" aria-label="Navigation principale">
-            @foreach ([
-                ['#parcours', 'Comment ca marche'],
-                ['#billetterie', 'Billetterie'],
-                ['#collectes', 'Collectes'],
-                ['#tarifs', 'Tarifs'],
-            ] as [$href, $label])
-                <a href="{{ $href }}"
-                   class="rounded-lg px-3 py-2 text-sm font-semibold text-grey-500 transition-colors hover:bg-azure-100/70 hover:text-azure-700">
-                    {{ $label }}
-                </a>
+            @foreach ($lpNav as [$href, $label])
+                <a href="{{ $href }}" class="lp-nav-link">{{ $label }}</a>
             @endforeach
         </nav>
 
         <div class="flex shrink-0 items-center gap-1.5">
+            {{-- Bascule d'apparence. Elle n'existait pas sur cette page, alors
+                 qu'elle est disponible partout ailleurs dans le produit : un
+                 visiteur qui arrive en mode sombre depuis son telephone n'avait
+                 aucun moyen d'en sortir.
+
+                 Aucun etat n'est tenu en JavaScript — les deux icones se
+                 croisent en CSS selon `data-theme` sur <html>, deja pose avant
+                 la premiere peinture. --}}
+            <button type="button"
+                    data-theme-toggle
+                    class="btn btn-icon"
+                    aria-label="Changer d'apparence">
+                <x-lucide-moon class="size-5 dark:hidden" stroke-width="1.75" aria-hidden="true" />
+                <x-lucide-sun class="hidden size-5 dark:block" stroke-width="1.75" aria-hidden="true" />
+            </button>
+
             @auth
                 <a href="{{ route('dashboard') }}" class="btn btn-primary btn-pill">Mon espace</a>
             @else
-                <a href="{{ route('login') }}" wire:navigate class="btn btn-ghost btn-pill hidden sm:inline-flex">
+                <a href="{{ route('login') }}" class="btn btn-ghost btn-pill hidden sm:inline-flex">
                     Connexion
                 </a>
-                <a href="{{ route('register') }}" wire:navigate class="btn btn-primary btn-pill">
+                <a href="{{ route('register') }}" class="btn btn-primary btn-pill">
                     <span class="sm:hidden">Commencer</span>
                     <span class="hidden sm:inline">Creer un evenement</span>
                 </a>
             @endauth
 
-            {{-- Les trois modules du produit. Le menu est en <details> natif :
-                 utilisable au clavier et sans script. --}}
-            <details class="disclosure relative">
-                <summary aria-label="Autres actions"
-                         class="flex size-11 items-center justify-center rounded-full text-azure-700 transition-colors hover:bg-azure-100/70">
-                    <x-lucide-ellipsis-vertical class="size-5" stroke-width="1.75" />
+            {{-- ============================================================
+                 Menu mobile
+
+                 Sous `md`, les quatre liens de navigation DISPARAISSAIENT
+                 purement et simplement : le `<nav>` etait masque et rien ne le
+                 remplacait. Un visiteur sur telephone — la majorite du trafic
+                 vise — n'avait aucun acces aux sections de la page.
+
+                 En `<details>` natif : ouvrable au clavier, annonce comme un
+                 groupe repliable, et fonctionnel meme si aucun script ne se
+                 charge. Cette page ne charge pas Livewire, donc pas Alpine ;
+                 un menu qui dependrait d'un script serait un menu qui peut ne
+                 pas s'ouvrir.
+            ============================================================= --}}
+            <details class="lp-menu md:hidden">
+                <summary class="btn btn-icon" aria-label="Ouvrir le menu">
+                    <x-lucide-menu class="lp-menu-open size-5" stroke-width="2" aria-hidden="true" />
+                    <x-lucide-x class="lp-menu-close size-5" stroke-width="2" aria-hidden="true" />
                 </summary>
 
-                <div class="disclosure-body glass glass-panel absolute right-0 z-10 mt-2 w-72 overflow-hidden p-2">
-                    <a href="{{ route('register') }}" wire:navigate
-                       class="flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-white/70">
-                        <x-lucide-ticket class="mt-0.5 size-5 shrink-0 text-azure-600" stroke-width="1.5" />
-                        <span>
-                            <span class="block text-sm font-semibold text-ink">Creer une billetterie</span>
-                            <span class="mt-0.5 block text-xs text-grey-500">Evenement, types de billets, controle des entrees</span>
-                        </span>
-                    </a>
+                <div class="lp-menu-sheet glass glass-panel fixed inset-x-3 top-20 z-50 p-3">
+                    <nav class="flex flex-col" aria-label="Navigation principale">
+                        @foreach ($lpNav as [$href, $label])
+                            <a href="{{ $href }}"
+                               class="flex min-h-14 items-center rounded-[var(--radius-md)] px-4 text-base font-semibold text-ink transition-colors hover:bg-surface/70">
+                                {{ $label }}
+                            </a>
+                        @endforeach
+                    </nav>
 
-                    <a href="{{ route('register') }}" wire:navigate
-                       class="flex items-start gap-3 rounded-2xl p-3 transition-colors hover:bg-white/70">
-                        <x-lucide-hand-coins class="mt-0.5 size-5 shrink-0 text-azure-600" stroke-width="1.5" />
-                        <span>
-                            <span class="block text-sm font-semibold text-ink">Lancer une collecte</span>
-                            <span class="mt-0.5 block text-xs text-grey-500">Campagne, objectif, progression publique</span>
-                        </span>
-                    </a>
-
-                    {{-- Le module Votes est planifie en phase 9. Il est annonce
-                         mais rendu inerte : un lien qui ne mene nulle part est
-                         une promesse que le produit ne tient pas encore. --}}
-                    <span class="flex cursor-not-allowed items-start gap-3 rounded-2xl p-3 opacity-60">
-                        <x-lucide-vote class="mt-0.5 size-5 shrink-0 text-grey-400" stroke-width="1.5" />
-                        <span>
-                            <span class="flex items-center gap-2 text-sm font-semibold text-grey-500">
-                                Creer un vote
-                                <span class="rounded-full bg-grey-200 px-2 py-0.5 text-[10px] font-bold tracking-wide text-grey-500 uppercase">
-                                    A venir
-                                </span>
-                            </span>
-                            <span class="mt-0.5 block text-xs text-grey-400">Candidats, votes gratuits ou payants</span>
-                        </span>
-                    </span>
+                    @guest
+                        <a href="{{ route('login') }}"
+                           class="btn btn-secondary btn-pill mt-2 w-full sm:hidden">
+                            Connexion
+                        </a>
+                    @endguest
                 </div>
             </details>
         </div>
@@ -115,107 +146,167 @@
 
     {{-- ---------------------------------------------------------------
          Heros
+
+         Asymetrique : le discours a gauche, l'objet a droite. Il etait centre,
+         sans aucune ancre visuelle — titre, texte, boutons, puis du vide. Le
+         billet n'arrivait qu'a la section suivante, alors que c'est LUI le
+         produit, et le seul argument que personne d'autre ne peut montrer.
+
+         Le billet est donc remonte ici, au premier plan d'une mosaique
+         d'affiches. Son QR Code fonctionne reellement.
     ---------------------------------------------------------------- --}}
-    <section class="mx-auto w-full max-w-6xl px-5 pt-10 pb-4 text-center sm:px-6 sm:pt-16 lg:pt-20">
-        <h1 class="mx-auto max-w-3xl font-display text-[2.5rem] leading-[1.06] font-extrabold text-ink sm:text-6xl lg:text-[4rem]">
-            Publiez aujourd'hui.<br>
-            <span class="text-azure-600">Vendez ce soir.</span>
-        </h1>
-
-        <p class="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-grey-500 sm:text-lg">
-            Creez votre evenement, partagez son lien sur WhatsApp. Vos participants paient
-            par Airtel Money ou Moov Money et recoivent leur billet dans la seconde.
-            Vos agents scannent a l'entree, meme sans reseau.
-        </p>
-
-        <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <a href="{{ route('register') }}" wire:navigate class="btn btn-primary btn-pill btn-lg w-full sm:w-auto">
-                Creer ma billetterie
-                <x-lucide-arrow-right class="size-4" stroke-width="2" />
-            </a>
-            <a href="#parcours" class="btn btn-ghost btn-pill btn-lg w-full sm:w-auto">
-                Voir comment ca marche
-            </a>
+    <section class="relative overflow-hidden">
+        {{-- Nappe ambiante. `aria-hidden` et `pointer-events-none` : c'est du
+             decor, il ne doit ni etre annonce ni intercepter un clic. --}}
+        <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+            <div class="lp-glow lp-glow-a -top-40 -left-32 size-[38rem]"></div>
+            <div class="lp-glow lp-glow-b top-20 -right-40 size-[34rem]"></div>
         </div>
 
-        <p class="mt-7 flex items-center justify-center gap-2 text-sm text-grey-500">
-            <x-lucide-shield-check class="size-4 shrink-0 text-azure-500" stroke-width="1.5" />
-            Inscription libre. La verification n'intervient qu'au moment d'etre paye.
+        <div class="mx-auto grid w-full max-w-6xl gap-12 px-5 pt-10 pb-8 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-10 lg:pt-20 lg:pb-16">
+
+            <div class="text-center lg:text-left">
+                {{-- L'accroche. Reprise de la section Tarifs plus bas : elle y
+                     est deja ecrite noir sur blanc, donc verifiable. --}}
+                <p class="lp-enter lp-enter-1 glass-inset inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold tracking-wide text-azure-700 uppercase">
+                    <x-lucide-badge-check class="size-4 shrink-0" stroke-width="2" aria-hidden="true" />
+                    0 abonnement, 0 frais d'ouverture
+                </p>
+
+                <h1 class="lp-enter lp-enter-2 mt-5 font-display text-[2.5rem] leading-[1.06] font-extrabold text-ink sm:text-6xl lg:text-[3.75rem]">
+                    Publiez aujourd'hui.<br>
+                    <span class="text-azure-600">Vendez ce soir.</span>
+                </h1>
+
+                {{-- Le mot qui tourne : le seul effet focal de la page. Il dit
+                     l'etendue du produit sans allonger le titre de quatre
+                     lignes. Le premier mot reste affiche si le mouvement est
+                     refuse — la phrase garde son sens. --}}
+                <p class="lp-enter lp-enter-2 mt-3 font-display text-xl font-bold text-grey-500 sm:text-2xl">
+                    Pour un
+                    <span class="lp-rotator text-azure-600">
+                        <span class="lp-rotator-sizer">concert de quartier</span>
+                        <span class="lp-rotator-word">concert de quartier</span>
+                        <span class="lp-rotator-word">gala d'association</span>
+                        <span class="lp-rotator-word">tournoi de football</span>
+                        <span class="lp-rotator-word">appel aux dons</span>
+                    </span>
+                </p>
+
+                <p class="lp-enter lp-enter-3 mx-auto mt-6 max-w-xl text-base leading-relaxed text-grey-500 sm:text-lg lg:mx-0">
+                    Creez votre evenement, partagez son lien sur WhatsApp. Vos participants paient
+                    par Airtel Money ou Moov Money et recoivent leur billet dans la seconde.
+                    Vos agents scannent a l'entree, meme sans reseau.
+                </p>
+
+                <div class="lp-enter lp-enter-4 mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                    <a href="{{ route('register') }}" class="btn btn-primary btn-pill btn-lg w-full sm:w-auto">
+                        Creer ma billetterie
+                        <x-lucide-arrow-right class="size-4" stroke-width="2" aria-hidden="true" />
+                    </a>
+                    <a href="#parcours" class="btn btn-secondary btn-pill btn-lg w-full sm:w-auto">
+                        Voir comment ca marche
+                    </a>
+                </div>
+
+                <p class="lp-enter lp-enter-4 mt-6 flex items-center justify-center gap-2 text-sm text-grey-500 lg:justify-start">
+                    <x-lucide-shield-check class="size-4 shrink-0 text-azure-500" stroke-width="2" aria-hidden="true" />
+                    Inscription libre. La verification n'intervient qu'au moment d'etre paye.
+                </p>
+            </div>
+
+            {{-- ----------------------------------------------------------
+                 Mosaique et billet
+
+                 Les affiches sont des compositions ABSTRAITES, generees dans la
+                 famille azurine : ni photographie, ni visage, ni marque.
+                 Publier de fausses photos de concert sur le site d'une vraie
+                 plateforme serait une information fausse.
+
+                 Elles sont `aria-hidden` et sans texte alternatif : elles ne
+                 portent aucune information, seulement une ambiance.
+            ----------------------------------------------------------- --}}
+            {{-- Le billet, seul.
+
+                 Les affiches d'evenements qui l'entouraient ont leur propre
+                 section, juste dessous : elles y disent quelque chose (la
+                 variete des evenements couverts), alors qu'empilees derriere le
+                 billet elles n'etaient qu'une texture, et lui prenaient la
+                 place qui revient au seul objet que personne d'autre ne peut
+                 montrer.
+
+                 Vitrine, et non le billet a taille reelle : a sa taille,
+                 l'objet depasse la hauteur de l'ecran et ecrase la colonne de
+                 texte. `zoom` et non `scale` — le premier reduit la BOITE, le
+                 second seulement le dessin, et la section garderait alors le
+                 vide de la taille d'origine sous le billet. --}}
+            <div class="lp-enter lp-enter-3 flex justify-center lg:justify-end">
+                <div class="lp-ticket-solo">
+                    <x-glass-ticket
+                        :animate="true"
+                        ticket-type="Billet VIP"
+                        event-name="Concert Afro 2026"
+                        date="14 mars 2026"
+                        venue="Libreville"
+                        holder="Awa Ndong"
+                        reference="PS241-4KX9-27B"
+                        :qr-data="route('register')"
+                    />
+                </div>
+            </div>
+        </div>
+
+        {{-- L'invitation a scanner porte sur le QR du billet : elle doit rester
+             a cote de lui, pas ailleurs dans la page. --}}
+        <p class="mx-auto flex w-full max-w-6xl justify-center px-5 pb-10 sm:px-6 lg:justify-end lg:pb-16">
+            <span class="glass-inset inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-azure-700">
+                <x-lucide-scan-line class="size-4 shrink-0" stroke-width="2" aria-hidden="true" />
+                Ce QR Code fonctionne vraiment. Scannez-le.
+            </span>
         </p>
     </section>
 
     {{-- ---------------------------------------------------------------
-         Le billet — moment fort de la page.
+         Les evenements couverts.
 
-         Ce que Pass241 produit, c'est ce billet. Le montrer en vrai, avec
-         un QR reellement scannable, dit en une seconde ce qu'un paragraphe
-         mettrait a expliquer. Le reflet suit le pointeur, comme un badge
-         plastifie qu'on incline pour capter la lumiere.
+         Sa propre section, et non une texture derriere le heros. Elle repond a
+         la seule question qu'un organisateur se pose avant toute autre : « est
+         ce que ca marche pour CE que j'organise ? » Une reponse en images se
+         lit en un coup d'oeil, la meme reponse en liste demande d'etre lue.
+
+         Les compositions sont ABSTRAITES, generees dans la famille azurine :
+         ni photographie, ni visage, ni marque. Publier de fausses photos de
+         concert sur le site d'une vraie plateforme serait une information
+         fausse — la vignette pose une ambiance, c'est le libelle qui porte
+         l'information.
     ---------------------------------------------------------------- --}}
-    <section class="mx-auto w-full max-w-6xl px-5 py-12 sm:px-6 lg:py-20">
-        {{-- Aucun panneau autour du billet : il est la seule surface en verre
-             de cette section. Un panneau en verre l'aurait contenu dans un
-             second niveau de flou, ce qu'interdit la section 70.4 — et qui lui
-             aurait retire la presence que sa position de moment fort exige. --}}
-        <div>
-            {{-- Colonne de texte bornee, et non etiree sur la largeur restante :
-                 le billet vient se poser contre elle plutot qu'a l'autre bout de
-                 la page. Un objet montre a distance de son explication se lit
-                 comme une illustration decorative ; a cote d'elle, il l'appuie. --}}
-            <div class="grid items-center justify-center gap-10 lg:grid-cols-[minmax(0,27rem)_auto] lg:gap-12">
-                <div class="text-center lg:text-left">
-                    <h2 class="font-display text-2xl leading-tight font-extrabold text-ink sm:text-3xl lg:text-4xl">
-                        Le billet arrive avant que la file ne se forme
-                    </h2>
-                    <p class="mx-auto mt-4 max-w-md leading-relaxed text-grey-500 lg:mx-0">
-                        Des que le paiement est confirme, le billet s'affiche sur le telephone du
-                        participant. Il reste accessible depuis son espace, et fonctionne a l'entree
-                        meme si le reseau tombe.
-                    </p>
+    <section id="evenements" class="defer-paint mx-auto w-full max-w-6xl scroll-mt-24 px-5 py-14 sm:px-6 lg:py-20">
+        <div data-reveal class="mx-auto max-w-2xl text-center">
+            <h2 class="font-display text-3xl leading-tight font-extrabold text-ink sm:text-4xl">
+                Un seul outil, tous vos evenements
+            </h2>
+            <p class="mx-auto mt-4 max-w-xl leading-relaxed text-grey-500">
+                Que vous remplissiez une salle de cinquante personnes ou un stade, le parcours
+                est le meme : vous publiez, vous partagez, vous encaissez.
+            </p>
+        </div>
 
-                    <ul class="mx-auto mt-7 grid max-w-md gap-3 text-left sm:grid-cols-2 lg:mx-0">
-                        @foreach ([
-                            'Aucune inscription pour acheter',
-                            'Recuperable sans adresse email',
-                            'Telechargeable en PDF',
-                            'Code signe, jamais copiable',
-                        ] as $point)
-                            <li class="flex items-start gap-2 text-sm text-ink">
-                                <x-lucide-check class="mt-0.5 size-4 shrink-0 text-azure-600" stroke-width="2.25" />
-                                {{ $point }}
-                            </li>
-                        @endforeach
-                    </ul>
-
-                    <p class="glass-inset mt-7 inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-azure-700">
-                        <x-lucide-scan-line class="size-4" stroke-width="1.75" />
-                        Ce QR Code fonctionne vraiment. Scannez-le.
-                    </p>
-                </div>
-
-                <div class="flex justify-center lg:justify-start">
-                    {{-- Vitrine, et non le billet lui-meme : a taille reelle, l'objet
-                         depasse la hauteur de l'ecran et ecrase la colonne de texte a
-                         cote de laquelle il doit se lire.
-
-                         `zoom` et non `scale` : le premier reduit la BOITE, le second
-                         seulement le dessin — la section garderait sinon le vide de la
-                         taille d'origine sous le billet. Le composant n'est pas touche :
-                         la ou le billet EST le produit, il garde sa taille reelle. --}}
-                    <div class="w-full max-w-sm [zoom:0.78] lg:rotate-[1.5deg] lg:[zoom:0.6]">
-                        <x-glass-ticket
-                            :animate="true"
-                            ticket-type="Billet VIP"
-                            event-name="Concert Afro 2026"
-                            date="14 mars 2026"
-                            venue="Libreville"
-                            holder="Awa Ndong"
-                            reference="PS241-4KX9-27B"
-                            :qr-data="route('register')"
-                        />
-                    </div>
-                </div>
-            </div>
+        <div data-reveal data-reveal-step="1" class="lp-mosaic mt-12">
+            @foreach ([
+                ['affiche-concert', 'Concerts et festivals', true],
+                ['affiche-gala', 'Galas et soirees', false],
+                ['affiche-sport', 'Rencontres sportives', false],
+                ['affiche-conference', 'Conferences et ateliers', true],
+            ] as $index => [$file, $label, $tall])
+                <figure class="lp-mosaic-item">
+                    <img src="{{ asset('brand/landing/' . $file . '.webp') }}" alt=""
+                         width="480" height="600" loading="lazy" decoding="async"
+                         class="lp-tile {{ $tall ? 'lp-tile-tall' : '' }}">
+                    <figcaption class="mt-4 text-center font-display text-sm font-bold text-ink sm:text-base">
+                        {{ $label }}
+                    </figcaption>
+                </figure>
+            @endforeach
         </div>
     </section>
 
@@ -236,19 +327,23 @@
                 public, pas d'intermediaire entre vous et vos participants.
             </p>
 
-            <ol class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {{-- La pastille deborde le haut de chaque carte : la rangee se lit
+                 donc d'abord comme une FILE de quatre reperes, avant qu'un seul
+                 mot ne soit lu. `mt-14` reserve la place de ce debordement,
+                 faute de quoi la premiere rangee mordrait sur le titre. --}}
+            <ol class="mt-14 grid gap-x-4 gap-y-14 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ([
                     ['calendar-plus', 'Vous publiez', 'Nom, date, lieu, types de billets et prix. Votre evenement recoit un lien unique.'],
                     ['share-2', 'Vous partagez', 'Le lien part sur WhatsApp, Instagram ou une affiche. Il ouvre un mini-site a votre nom.'],
                     ['smartphone', 'Le participant paie', 'Airtel Money ou Moov Money. Il valide sur son telephone, son billet s\'affiche aussitot.'],
                     ['scan-line', 'Vos agents scannent', 'A l\'entree, sur telephone. Le controle fonctionne hors connexion et se synchronise ensuite.'],
                 ] as $step => $item)
-                    <li data-reveal data-reveal-step="{{ $step }}" class="glass-inset flex flex-col p-6">
-                        <span class="flex size-11 items-center justify-center rounded-2xl bg-azure-100 text-azure-700">
-                            <x-dynamic-component :component="'lucide-' . $item[0]" class="size-5" stroke-width="1.5" />
+                    <li data-reveal data-reveal-step="{{ $step }}" class="lp-feature-card">
+                        <span class="lp-feature-badge">
+                            <x-dynamic-component :component="'lucide-' . $item[0]" class="size-6" stroke-width="1.5" aria-hidden="true" />
                         </span>
-                        <h3 class="mt-5 font-display text-base font-bold text-ink">{{ $item[1] }}</h3>
-                        <p class="mt-2 text-sm leading-relaxed text-grey-500">{{ $item[2] }}</p>
+                        <h3 class="font-display text-base font-bold text-ink">{{ $item[1] }}</h3>
+                        <p class="mt-2.5 text-sm leading-relaxed text-grey-500">{{ $item[2] }}</p>
                     </li>
                 @endforeach
             </ol>
@@ -259,48 +354,68 @@
          Billetterie en detail — accordeon natif.
     ---------------------------------------------------------------- --}}
     <section id="billetterie" class="defer-paint mx-auto w-full max-w-6xl scroll-mt-24 px-5 py-14 sm:px-6 lg:py-20">
-        <div class="grid gap-10 lg:grid-cols-2 lg:items-start lg:gap-16">
-            <div data-reveal>
-                <h2 class="font-display text-3xl leading-tight font-extrabold text-ink sm:text-4xl">
-                    Une experience simple pour vous,<br class="hidden sm:block">
-                    vos equipes et vos participants.
-                </h2>
-                <p class="mt-4 max-w-md leading-relaxed text-grey-500">
-                    Vous n'avez rien a developper. Chaque evenement publie devient un mini-site
-                    complet, avec son affiche, ses billets et son paiement.
-                </p>
-                <a href="{{ route('register') }}" wire:navigate class="btn btn-primary btn-pill mt-7">
-                    Commencer maintenant
-                    <x-lucide-arrow-right class="size-4" stroke-width="2" />
-                </a>
-            </div>
+        <div data-reveal class="mx-auto max-w-2xl text-center">
+            <h2 class="font-display text-3xl leading-tight font-extrabold text-ink sm:text-4xl">
+                Une experience simple pour vous,<br class="hidden sm:block">
+                vos equipes et vos participants.
+            </h2>
+            <p class="mx-auto mt-4 max-w-xl leading-relaxed text-grey-500">
+                Vous n'avez rien a developper. Chaque evenement publie devient un mini-site
+                complet, avec son affiche, ses billets et son paiement.
+            </p>
+        </div>
 
-            <div data-reveal data-reveal-step="1" class="space-y-3">
-                @foreach ([
-                    ['Mini-site evenement', 'Affiche, description, programme, informations pratiques, types de billets et paiement. Une adresse unique du type pass241.app/e/votre-evenement, prete a partager.'],
-                    ['Billets et badges', 'Billets VIP, Premium, Standard ou Early Bird, avec stock et dates de vente. Invitations gratuites et codes promo. Les badges servent a identifier et a controler l\'acces, jamais a payer.'],
-                    ['Controle des entrees', 'Vos agents scannent depuis leur telephone, avec plusieurs points d\'entree. Le mode hors connexion garde tout en memoire locale et se synchronise des le retour du reseau.'],
-                    ['Integration a votre site', 'Un bouton d\'achat ou un module de billetterie a poser sur votre propre site, pour ceux qui en ont un. Le paiement et le billet restent identiques.'],
-                ] as $index => [$title, $body])
-                    <details class="disclosure glass-inset overflow-hidden" @if($index === 0) open @endif>
-                        <summary class="flex items-center justify-between gap-4 p-5 sm:p-6">
-                            <span class="font-display text-base font-bold text-ink sm:text-lg">{{ $title }}</span>
-                            <x-lucide-chevron-down class="disclosure-chevron size-5 shrink-0 text-grey-400" stroke-width="2" />
-                        </summary>
-                        <div class="disclosure-body px-5 pb-5 text-sm leading-relaxed text-grey-500 sm:px-6 sm:pb-6">
-                            {{ $body }}
-                        </div>
-                    </details>
-                @endforeach
-            </div>
+        {{-- ------------------------------------------------------------
+             Un SEUL aplat decoupe par des filets, plutot que six cartes
+             separees.
+
+             La difference se lit : des cartes disent « voici des elements »,
+             un bloc decoupe dit « voici un ENSEMBLE ». Pour des capacites qui
+             vont toutes ensemble, c'est le second sens qui est juste.
+
+             Il remplace l'accordeon qui occupait cette place. L'accordeon
+             obligeait a ouvrir quatre fois pour connaitre l'offre, et trois
+             lignes sur quatre restaient invisibles a l'arrivee — sur une page
+             dont le travail est justement de dire ce que fait le produit.
+        ------------------------------------------------------------- --}}
+        <div data-reveal data-reveal-step="1" class="lp-grid mt-12">
+            @foreach ([
+                ['layout-template', 'Mini-site evenement', 'Affiche, description, programme, informations pratiques, types de billets et paiement. Une adresse unique du type pass241.app/e/votre-evenement, prete a partager.'],
+                ['ticket', 'Billets et badges', 'Billets VIP, Premium, Standard ou Early Bird, avec stock et dates de vente. Invitations gratuites et codes promo. Les badges servent a identifier et a controler l\'acces, jamais a payer.'],
+                ['scan-line', 'Controle des entrees', 'Vos agents scannent depuis leur telephone, avec plusieurs points d\'entree. Le mode hors connexion garde tout en memoire locale et se synchronise des le retour du reseau.'],
+                ['code-xml', 'Integration a votre site', 'Un bouton d\'achat ou un module de billetterie a poser sur votre propre site, pour ceux qui en ont un. Le paiement et le billet restent identiques.'],
+                ['users', 'Vos equipes', 'Vous pouvez confier la gestion operationnelle a une personne de confiance, sans lui ouvrir l\'acces a vos finances.'],
+                ['line-chart', 'Suivi en direct', 'Billets vendus, recettes, entrees scannees : votre tableau de bord se met a jour au fil des ventes et des scans.'],
+            ] as $item)
+                <div class="lp-grid-cell">
+                    <span class="lp-grid-icon">
+                        <x-dynamic-component :component="'lucide-' . $item[0]" class="size-6" stroke-width="1.5" aria-hidden="true" />
+                    </span>
+                    {{-- Sans utilitaire de couleur : `text-white` vit dans la
+                         couche `utilities`, qui l'emporte sur `components`. La
+                         regle de survol de `.lp-grid-cell` ne pouvait donc
+                         jamais reprendre la main — la cellule passait en clair
+                         et le texte restait blanc, donc invisible. La couleur
+                         est tenue en CSS, la ou l'etat survole la change. --}}
+                    <h3 class="mt-5 font-display text-base font-bold sm:text-lg">{{ $item[1] }}</h3>
+                    <p class="mt-2.5 max-w-xs text-sm leading-relaxed">{{ $item[2] }}</p>
+                </div>
+            @endforeach
+        </div>
+
+        <div data-reveal data-reveal-step="2" class="mt-10 flex justify-center">
+            <a href="{{ route('register') }}" class="btn btn-primary btn-pill btn-lg">
+                Commencer maintenant
+                <x-lucide-arrow-right class="size-4" stroke-width="2" aria-hidden="true" />
+            </a>
         </div>
     </section>
 
     {{-- ---------------------------------------------------------------
          Paiement et commission.
     ---------------------------------------------------------------- --}}
-    <section id="tarifs" class="defer-paint mx-auto w-full max-w-6xl scroll-mt-24 px-5 py-14 sm:px-6 lg:py-20">
-        <div class="grid gap-10 lg:grid-cols-2 lg:gap-16">
+    <section id="paiement" class="defer-paint mx-auto w-full max-w-6xl scroll-mt-24 px-5 py-14 sm:px-6 lg:py-20">
+        <div class="grid gap-10 lg:grid-cols-2 lg:items-center lg:gap-16">
             <div data-reveal>
                 <h2 class="font-display text-3xl leading-tight font-extrabold text-ink sm:text-4xl">
                     Paye au telephone,<br>comme tout le monde ici.
@@ -325,24 +440,34 @@
                 </p>
             </div>
 
-            <div data-reveal data-reveal-step="1" class="glass glass-panel divide-y divide-white/60 overflow-hidden">
-                @foreach ([
-                    ['Billetterie', '5 %', 'preleves sur chaque billet vendu'],
-                    ['Collecte de fonds', '2,5 %', 'preleves sur chaque don confirme'],
-                ] as $line)
-                    <div class="flex items-baseline justify-between gap-4 p-6 sm:p-8">
-                        <div>
-                            <p class="font-display text-base font-bold text-ink">{{ $line[0] }}</p>
-                            <p class="mt-1 text-sm text-grey-500">{{ $line[2] }}</p>
-                        </div>
-                        <p class="font-display text-3xl font-extrabold text-azure-600 tabular">{{ $line[1] }}</p>
-                    </div>
-                @endforeach
+            {{-- Banniere de modele economique.
 
-                <p class="p-6 text-sm leading-relaxed text-grey-500 sm:p-8">
-                    Aucun abonnement, aucun frais d'ouverture, aucun engagement. La commission est
-                    calculee automatiquement a chaque transaction.
+                 Elle ne porte AUCUN taux : le detail de la commission ne figure
+                 pas sur cette page. Ce qui est promis ici est verifiable sans
+                 chiffre — pas d'abonnement, pas de frais d'entree, rien a
+                 avancer — et c'est precisement ce qui leve le frein a
+                 l'inscription. --}}
+            <div data-reveal data-reveal-step="1" class="lp-banner px-6 py-10 text-center sm:px-10 sm:py-12">
+                <p class="font-display text-3xl leading-tight font-extrabold text-white sm:text-4xl">
+                    Vous n'avancez rien.
                 </p>
+                <p class="mx-auto mt-4 max-w-sm leading-relaxed text-white/85">
+                    Aucun abonnement, aucun frais d'ouverture, aucun engagement. Notre commission
+                    est prelevee automatiquement sur les transactions reussies, et sur elles
+                    seules.
+                </p>
+
+                <div class="mt-8 grid gap-px text-left sm:grid-cols-2">
+                    @foreach ([
+                        ['wallet', 'Ouvrir votre billetterie ne coute rien'],
+                        ['badge-check', 'Vous n\'etes preleve que si vous vendez'],
+                    ] as $index => [$icon, $label])
+                        <div class="flex items-start gap-3 py-4 sm:px-5 {{ $index === 1 ? 'lp-banner-split' : '' }}">
+                            <x-dynamic-component :component="'lucide-' . $icon" class="mt-0.5 size-5 shrink-0 text-white/70" stroke-width="1.5" aria-hidden="true" />
+                            <span class="text-sm leading-relaxed font-semibold text-white">{{ $label }}</span>
+                        </div>
+                    @endforeach
+                </div>
             </div>
         </div>
     </section>
@@ -406,7 +531,9 @@
                 L'inscription est libre et la vente demarre immediatement. La verification
                 d'identite n'intervient qu'au moment de recevoir vos recettes.
             </p>
-            <a href="{{ route('register') }}" wire:navigate class="btn btn-primary btn-pill btn-lg mt-9">
+            {{-- Sans `wire:navigate` : cette page ne charge pas Livewire, donc
+                 l'attribut n'y est jamais interprete. --}}
+            <a href="{{ route('register') }}" class="btn btn-primary btn-pill btn-lg mt-9">
                 Creer mon compte
                 <x-lucide-arrow-right class="size-4" stroke-width="2" />
             </a>
@@ -414,13 +541,13 @@
     </section>
 </main>
 
-<footer class="border-t border-grey-200/70 bg-white/60">
+<footer class="border-t border-grey-200 bg-surface/60">
     <div class="mx-auto w-full max-w-6xl px-5 py-14 sm:px-6 lg:py-16">
         <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
             <div class="sm:col-span-2 lg:col-span-1">
                 <span class="flex items-center gap-2 font-display text-lg font-extrabold tracking-tight text-azure-700">
                     <x-brand-mark class="h-6 w-auto" />
-                    Pass241
+                    <x-brand-word />
                 </span>
                 <p class="mt-4 max-w-xs text-sm leading-relaxed text-grey-500">
                     Billetterie, controle d'acces et collecte de fonds. Concu au Gabon, pour
@@ -433,7 +560,7 @@
                     ['Comment ca marche', '#parcours'],
                     ['Billetterie', '#billetterie'],
                     ['Collectes de fonds', '#collectes'],
-                    ['Tarifs', '#tarifs'],
+                    ['Paiement', '#paiement'],
                 ]],
                 ['Commencer', [
                     ['Creer un compte', 'route:register'],
@@ -470,7 +597,7 @@
         </div>
 
         <div class="mt-12 border-t border-grey-200/70 pt-6 text-sm text-grey-400">
-            &copy; {{ now()->year }} Pass241
+            &copy; {{ now()->year }} <x-brand-word />
         </div>
     </div>
 </footer>

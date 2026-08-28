@@ -4,67 +4,67 @@
     $kyc = $organization->kyc_status;
 @endphp
 
-<div x-data="{ notice: '' }"
+<div class="space-y-5"
+     x-data="{ notice: '' }"
      @notify.window="notice = $event.detail.message; setTimeout(() => notice = '', 4000)">
 
-    <header class="mb-6">
-        <h1 class="text-2xl font-bold text-ink sm:text-3xl">Parametres</h1>
-        <p class="mt-1 text-sm text-grey-500">Informations de l'organisation et verification d'identite.</p>
-    </header>
+    <x-ui.page-header
+        title="Parametres"
+        description="Informations de l'organisation et verification d'identite."
+        :eyebrow="$organization->name" />
 
-    <div x-show="notice" x-cloak
-         class="mb-5 flex items-center gap-2.5 rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
-        <x-lucide-circle-check class="size-4 shrink-0 text-success" stroke-width="1.5" />
+    <div x-show="notice" x-cloak role="status"
+         class="flex items-center gap-2.5 rounded-[var(--radius-md)] border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
+        <x-lucide-circle-check class="size-4 shrink-0 text-success" stroke-width="2" aria-hidden="true" />
         <span x-text="notice"></span>
     </div>
 
     @unless ($canManage)
-        <div class="mb-5 flex items-start gap-2.5 rounded-xl border border-grey-200 bg-white px-4 py-3 text-sm text-grey-500">
-            <x-lucide-lock class="mt-0.5 size-4 shrink-0" stroke-width="1.5" />
+        <div class="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-grey-200 bg-surface px-4 py-3 text-sm text-grey-500">
+            <x-lucide-lock class="mt-0.5 size-4 shrink-0" stroke-width="2" aria-hidden="true" />
             <span>Consultation seule : votre role ne permet pas de modifier cette organisation.</span>
         </div>
     @endunless
 
     {{-- Surface pleine, pas de verre : ce sont des donnees administratives,
          la lisibilite prime sur l'effet (section 70.4). --}}
-    <section class="surface p-4 sm:p-6">
-        <h2 class="font-display text-lg font-bold text-ink">Informations</h2>
+    <x-ui.panel title="Informations">
+        <form wire:submit="updateProfile">
+            <div class="space-y-1">
+                <x-ui.field label="Nom" for="orgName" required :error="$errors->first('name')">
+                    <input id="orgName" type="text" wire:model="name" class="field" @disabled(! $canManage)
+                           @error('name') aria-invalid="true" aria-describedby="orgName-error" @enderror>
+                </x-ui.field>
 
-        <form wire:submit="updateProfile" class="mt-4 space-y-4">
-            <div>
-                <label for="orgName" class="mb-1.5 block text-sm font-medium text-ink">Nom</label>
-                <input id="orgName" type="text" wire:model="name" class="field" @disabled(! $canManage)>
-                @error('name') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-            </div>
+                <div class="grid gap-x-4 sm:grid-cols-2">
+                    <x-ui.field label="Email de contact" for="contactEmail" :error="$errors->first('contactEmail')">
+                        <input id="contactEmail" type="email" inputmode="email" autocapitalize="none"
+                               wire:model="contactEmail" class="field" @disabled(! $canManage)
+                               @error('contactEmail') aria-invalid="true" aria-describedby="contactEmail-error" @enderror>
+                    </x-ui.field>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label for="contactEmail" class="mb-1.5 block text-sm font-medium text-ink">Email de contact</label>
-                    <input id="contactEmail" type="email" inputmode="email" autocapitalize="none"
-                           wire:model="contactEmail" class="field" @disabled(! $canManage)>
-                    @error('contactEmail') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                </div>
-
-                <div>
-                    <label for="contactPhone" class="mb-1.5 block text-sm font-medium text-ink">Telephone de contact</label>
-                    <input id="contactPhone" type="tel" inputmode="tel" wire:model="contactPhone" class="field"
-                           @disabled(! $canManage)>
-                    @error('contactPhone') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
+                    <x-ui.field label="Telephone de contact" for="contactPhone" :error="$errors->first('contactPhone')">
+                        <input id="contactPhone" type="tel" inputmode="tel" wire:model="contactPhone" class="field"
+                               @disabled(! $canManage)
+                               @error('contactPhone') aria-invalid="true" aria-describedby="contactPhone-error" @enderror>
+                    </x-ui.field>
                 </div>
             </div>
 
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-sm text-grey-500">
-                    Type : <span class="font-medium text-ink">{{ $organization->type->label() }}</span>
+                    Type : <span class="font-semibold text-ink">{{ $organization->type->label() }}</span>
                 </p>
                 @if ($canManage)
-                    <button type="submit" class="btn btn-primary w-full sm:w-auto" wire:loading.attr="disabled">
-                        Enregistrer
+                    <button type="submit" class="btn btn-primary w-full sm:w-auto"
+                            wire:loading.attr="disabled" wire:target="updateProfile">
+                        <span wire:loading.remove wire:target="updateProfile">Enregistrer</span>
+                        <span wire:loading wire:target="updateProfile">Enregistrement…</span>
                     </button>
                 @endif
             </div>
         </form>
-    </section>
+    </x-ui.panel>
 
     {{-- ----------------------------------------------------------------
          Reversement (section 21.2, decision D-025)
@@ -76,28 +76,22 @@
          affiche ensuite — c'est le seul garde-fou contre une faute de frappe,
          et un virement mobile money ne se rappelle pas.
     ----------------------------------------------------------------- --}}
-    <section class="surface mt-5 p-4 sm:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="font-display text-lg font-bold text-ink">Reversement</h2>
-            @if ($organization->hasPayoutDestination())
-                <span class="rounded-full bg-success/10 px-3 py-1 text-xs font-semibold text-success">
-                    Numero enregistre
-                </span>
-            @else
-                <span class="rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
-                    A renseigner
-                </span>
-            @endif
-        </div>
+    <x-ui.panel
+        title="Reversement"
+        description="Vos recettes sont versees sur ce numero apres votre evenement, deduction faite de la commission Pass241.">
 
-        <p class="mt-2 text-sm leading-relaxed text-grey-500">
-            Vos recettes sont versees sur ce numero apres votre evenement,
-            deduction faite de la commission Pass241.
-        </p>
+        <x-slot:actions>
+            @if ($organization->hasPayoutDestination())
+                <x-ui.badge tone="success">Numero enregistre</x-ui.badge>
+            @else
+                <x-ui.badge tone="warning">A renseigner</x-ui.badge>
+            @endif
+        </x-slot:actions>
 
         @if (session('payout-saved'))
-            <p class="mt-4 flex items-start gap-2.5 rounded-xl border border-success/30 bg-success/5 px-3 py-2.5 text-sm text-ink">
-                <x-lucide-circle-check class="mt-0.5 size-4 shrink-0 text-success" stroke-width="1.75" />
+            <p role="status"
+               class="mb-4 flex items-start gap-2.5 rounded-[var(--radius-sm)] border border-success/30 bg-success/5 px-3 py-2.5 text-sm text-ink">
+                <x-lucide-circle-check class="mt-0.5 size-4 shrink-0 text-success" stroke-width="2" aria-hidden="true" />
                 <span>Numero de reversement enregistre.</span>
             </p>
         @endif
@@ -106,8 +100,8 @@
             {{-- Le nom vient de l'operateur, pas de nous : il permet a
                  l'organisateur de reconnaitre son propre compte avant que le
                  premier versement ne parte. --}}
-            <p class="mt-4 flex items-start gap-2.5 rounded-xl bg-azure-50 px-3 py-2.5 text-sm text-ink">
-                <x-lucide-user-check class="mt-0.5 size-4 shrink-0 text-azure-600" stroke-width="1.75" />
+            <p class="mb-4 flex items-start gap-2.5 rounded-[var(--radius-sm)] bg-azure-50 px-3 py-2.5 text-sm text-ink">
+                <x-lucide-user-check class="mt-0.5 size-4 shrink-0 text-azure-600" stroke-width="2" aria-hidden="true" />
                 <span>
                     Vous recevrez vos recettes sur le
                     <span class="font-semibold tabular">{{ $organization->payout_phone }}</span>,
@@ -117,122 +111,115 @@
             </p>
         @endif
 
-        <form wire:submit="savePayoutDestination" class="mt-5">
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label for="payoutOperator" class="mb-1.5 block text-sm font-medium text-ink">Operateur</label>
-                    <select id="payoutOperator" wire:model="payoutOperator" class="field" @disabled(! $canManage)>
+        <form wire:submit="savePayoutDestination">
+            <div class="grid gap-x-4 sm:grid-cols-2">
+                <x-ui.field label="Operateur" for="payoutOperator" required :error="$errors->first('payoutOperator')">
+                    <select id="payoutOperator" wire:model="payoutOperator" class="field" @disabled(! $canManage)
+                            @error('payoutOperator') aria-invalid="true" aria-describedby="payoutOperator-error" @enderror>
                         <option value="">Choisir</option>
                         @foreach ($operators as $operator)
                             <option value="{{ $operator->value }}">{{ $operator->label() }}</option>
                         @endforeach
                     </select>
-                    @error('payoutOperator') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                </div>
+                </x-ui.field>
 
-                <div>
-                    <label for="payoutPhone" class="mb-1.5 block text-sm font-medium text-ink">Numero</label>
+                <x-ui.field label="Numero" for="payoutPhone" required :error="$errors->first('payoutPhone')">
                     <input id="payoutPhone" type="tel" inputmode="numeric" autocomplete="off"
-                           wire:model="payoutPhone" class="field" placeholder="074 00 00 00"
-                           @disabled(! $canManage)>
-                    @error('payoutPhone') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                </div>
+                           wire:model="payoutPhone" class="field tabular" placeholder="074 00 00 00"
+                           @disabled(! $canManage)
+                           @error('payoutPhone') aria-invalid="true" aria-describedby="payoutPhone-error" @enderror>
+                </x-ui.field>
             </div>
 
             @if ($canManage)
-                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-xs leading-relaxed text-grey-400">
                         Tout changement de ce numero est journalise et signale par email.
                     </p>
                     <button type="submit" class="btn btn-primary w-full shrink-0 sm:w-auto"
-                            wire:loading.attr="disabled">
+                            wire:loading.attr="disabled" wire:target="savePayoutDestination">
                         Enregistrer le numero
                     </button>
                 </div>
             @endif
         </form>
-    </section>
+    </x-ui.panel>
 
     @if ($kycDocumentsRequired)
-    <section class="surface mt-5 p-4 sm:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="font-display text-lg font-bold text-ink">Verification d'identite</h2>
-            <span @class([
-                'rounded-full px-3 py-1 text-xs font-semibold',
-                'bg-success/10 text-success' => $kyc === KycStatus::Verified,
-                'bg-warning/10 text-warning' => $kyc === KycStatus::Pending || $kyc === KycStatus::Submitted,
-                'bg-danger/10 text-danger' => $kyc === KycStatus::Rejected,
-            ])>
-                {{ $kyc->label() }}
-            </span>
-        </div>
+        <x-ui.panel
+            title="Verification d'identite"
+            :description="$kyc === KycStatus::Verified
+                ? 'Votre identite est verifiee. Les reversements de vos recettes sont autorises.'
+                : 'Vos ventes et vos dons sont comptabilises normalement des maintenant. La verification ne conditionne que le versement des fonds sur votre compte.'">
 
-        <p class="mt-2 text-sm text-grey-500">
-            @if ($kyc === KycStatus::Verified)
-                Votre identite est verifiee. Les reversements de vos recettes sont autorises.
-            @else
-                Vos ventes et vos dons sont comptabilises normalement des maintenant.
-                La verification ne conditionne que le versement des fonds sur votre compte.
-            @endif
-        </p>
+            <x-slot:actions>
+                <x-ui.badge :tone="match ($kyc) {
+                    KycStatus::Verified => 'success',
+                    KycStatus::Rejected => 'danger',
+                    default => 'warning',
+                }">{{ $kyc->label() }}</x-ui.badge>
+            </x-slot:actions>
 
-        @if ($kyc === KycStatus::Rejected && $organization->kyc_rejection_reason)
-            <p class="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-ink">
-                <span class="font-semibold">Motif du refus :</span> {{ $organization->kyc_rejection_reason }}
-            </p>
-        @endif
-
-        @if ($canSubmitKyc && $canManage)
-            <form wire:submit="submitKyc" class="mt-5 space-y-4">
-                {{-- La contrainte est annoncee avant les champs : la decouvrir
-                     apres l'echec d'un televersement sur une connexion mobile
-                     serait la pire facon de l'apprendre. --}}
-                <p class="flex items-start gap-2 text-xs text-grey-500">
-                    <x-lucide-info class="mt-0.5 size-4 shrink-0" stroke-width="1.5" />
-                    <span>Formats acceptes : JPG, PNG ou PDF. Chaque piece doit peser 2 Mo au maximum.</span>
+            @if ($kyc === KycStatus::Rejected && $organization->kyc_rejection_reason)
+                <p class="mb-4 rounded-[var(--radius-sm)] border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-ink">
+                    <span class="font-semibold">Motif du refus :</span> {{ $organization->kyc_rejection_reason }}
                 </p>
+            @endif
 
-                @foreach ($requiredDocuments as $document)
-                    @php $existing = $uploadedDocuments[$document->value] ?? null; @endphp
-                    <div>
-                        <label for="doc-{{ $document->value }}" class="mb-1 block text-sm font-medium text-ink">
-                            {{ $document->label() }}
-                        </label>
-                        <p class="mb-2 text-xs text-grey-500">{{ $document->hint() }}</p>
+            @if ($canSubmitKyc && $canManage)
+                <form wire:submit="submitKyc" class="space-y-4">
+                    {{-- La contrainte est annoncee AVANT les champs : la
+                         decouvrir apres l'echec d'un televersement sur une
+                         connexion mobile serait la pire facon de l'apprendre. --}}
+                    <p class="flex items-start gap-2 rounded-[var(--radius-sm)] bg-surface-muted px-3 py-2.5 text-xs text-grey-500">
+                        <x-lucide-info class="mt-0.5 size-4 shrink-0" stroke-width="2" aria-hidden="true" />
+                        <span>Formats acceptes : JPG, PNG ou PDF. Chaque piece doit peser 2 Mo au maximum.</span>
+                    </p>
 
-                        @if ($existing)
-                            <p class="mb-2 flex items-center gap-2 text-sm text-grey-500">
-                                <x-lucide-paperclip class="size-4 shrink-0" stroke-width="1.5" />
-                                <span class="truncate">{{ $existing->original_name }}</span>
+                    @foreach ($requiredDocuments as $document)
+                        @php $existing = $uploadedDocuments[$document->value] ?? null; @endphp
+
+                        <x-ui.field
+                            :label="$document->label()"
+                            for="doc-{{ $document->value }}"
+                            :hint="$document->hint()"
+                            :error="$errors->first('documents.' . $document->value)">
+
+                            @if ($existing)
+                                <p class="mb-2 flex items-center gap-2 text-sm text-grey-500">
+                                    <x-lucide-paperclip class="size-4 shrink-0" stroke-width="2" aria-hidden="true" />
+                                    <span class="truncate">{{ $existing->original_name }}</span>
+                                </p>
+                            @endif
+
+                            <input id="doc-{{ $document->value }}"
+                                   type="file"
+                                   accept=".jpg,.jpeg,.png,.pdf"
+                                   wire:model="documents.{{ $document->value }}"
+                                   class="field file:mr-3 file:rounded-[var(--radius-xs)] file:border-0 file:bg-azure-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-azure-700"
+                                   @error('documents.'.$document->value)
+                                       aria-invalid="true" aria-describedby="doc-{{ $document->value }}-error"
+                                   @enderror>
+
+                            <p wire:loading wire:target="documents.{{ $document->value }}" role="status"
+                               class="mt-1.5 flex items-center gap-1.5 text-sm text-grey-500">
+                                <x-lucide-loader-circle class="size-4 animate-spin" stroke-width="2" aria-hidden="true" />
+                                Televersement…
                             </p>
-                        @endif
+                        </x-ui.field>
+                    @endforeach
 
-                        <input id="doc-{{ $document->value }}"
-                               type="file"
-                               accept=".jpg,.jpeg,.png,.pdf"
-                               wire:model="documents.{{ $document->value }}"
-                               class="field file:mr-3 file:rounded-lg file:border-0 file:bg-azure-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-azure-700">
+                    @error('documents')
+                        <p role="alert" class="text-sm font-medium text-danger">{{ $message }}</p>
+                    @enderror
 
-                        <p wire:loading wire:target="documents.{{ $document->value }}"
-                           class="mt-1.5 flex items-center gap-1.5 text-sm text-grey-500">
-                            <x-lucide-loader-circle class="size-4 animate-spin" stroke-width="2" />
-                            Televersement
-                        </p>
-
-                        @error('documents.'.$document->value)
-                            <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
-                        @enderror
-                    </div>
-                @endforeach
-
-                @error('documents') <p class="text-sm text-danger">{{ $message }}</p> @enderror
-
-                <button type="submit" class="btn btn-primary w-full sm:w-auto" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="submitKyc">Transmettre mes pieces</span>
-                    <span wire:loading wire:target="submitKyc">Transmission</span>
-                </button>
-            </form>
-        @endif
-    </section>
+                    <button type="submit" class="btn btn-primary w-full sm:w-auto"
+                            wire:loading.attr="disabled" wire:target="submitKyc">
+                        <span wire:loading.remove wire:target="submitKyc">Transmettre mes pieces</span>
+                        <span wire:loading wire:target="submitKyc">Transmission…</span>
+                    </button>
+                </form>
+            @endif
+        </x-ui.panel>
     @endif
 </div>

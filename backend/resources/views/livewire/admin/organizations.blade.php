@@ -10,45 +10,53 @@
     pas ici : elle coupe les ventes en cours et bloque les reversements, elle
     merite un ecran ou l'on voit ce qu'on ferme avant de le fermer.
 --}}
-<div>
-    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-            <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Organisations</h1>
-            <p class="mt-1 text-sm text-grey-500">
-                {{ $organizations->total() }} organisation{{ $organizations->total() > 1 ? 's' : '' }}
-                sur la plateforme.
-            </p>
-        </div>
+<div class="space-y-5">
 
-        <div class="relative w-full sm:w-72">
-            <x-lucide-search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-grey-400"
-                             stroke-width="1.75" />
-            <input type="search" wire:model.live.debounce.400ms="search" class="field pl-10"
-                   placeholder="Nom, email de contact" aria-label="Rechercher une organisation">
-        </div>
-    </header>
+    <x-ui.page-header
+        title="Organisations"
+        :description="$organizations->total() . ' organisation' . ($organizations->total() > 1 ? 's' : '') . ' sur la plateforme.'"
+        eyebrow="Administration Pass241">
+        <x-slot:actions>
+            <x-ui.search-input
+                id="organizations-search"
+                class="w-full sm:w-72"
+                label="Rechercher une organisation"
+                placeholder="Nom, email de contact"
+                wire:model.live.debounce.400ms="search" />
+        </x-slot:actions>
+    </x-ui.page-header>
 
-    <div class="mb-4 flex flex-wrap gap-1 rounded-xl border border-white/60 bg-white/60 p-1 backdrop-blur">
-        @foreach ([
-            'all' => 'Toutes',
-            'no-payout' => 'Sans numero de reversement',
-            'suspended' => 'Suspendues',
-        ] as $value => $label)
-            <button type="button" wire:click="$set('filter', '{{ $value }}')" @class([
-                'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                'bg-azure-600 text-white' => $filter === $value,
-                'text-grey-500 hover:text-ink' => $filter !== $value,
-            ])>{{ $label }}</button>
-        @endforeach
+    <div class="scroll-x no-scrollbar -mx-1 px-1">
+        <div class="seg" role="tablist" aria-label="Filtrer les organisations">
+            @foreach ([
+                'all' => 'Toutes',
+                'no-payout' => 'Sans numero de reversement',
+                'suspended' => 'Suspendues',
+            ] as $value => $label)
+                <button type="button"
+                        role="tab"
+                        wire:click="$set('filter', '{{ $value }}')"
+                        aria-selected="{{ $filter === $value ? 'true' : 'false' }}"
+                        class="seg-item">{{ $label }}</button>
+            @endforeach
+        </div>
     </div>
 
-    <div class="space-y-3">
+    <div wire:loading.delay wire:target="search, filter, gotoPage, previousPage, nextPage">
+        <x-ui.skeleton variant="list" :rows="5" class="surface p-4 sm:p-5" />
+    </div>
+
+    <div wire:loading.delay.class="opacity-40"
+         wire:target="search, filter, gotoPage, previousPage, nextPage"
+         class="space-y-3 transition-opacity">
+
         @forelse ($organizations as $index => $organization)
             {{-- Chaque carte se revele a son entree dans l'ecran, avec un
                  decalage en cascade : l'ordre de lecture porte ici une
                  information, les organisations etant classees par volume. --}}
             <a href="{{ route('admin.organization', $organization) }}" wire:navigate
-               class="glass-stat glass-specular block p-4 transition-transform hover:-translate-y-0.5 sm:p-5"
+               wire:key="org-{{ $organization->id }}"
+               class="glass-card glass-specular card-lift block p-4 sm:p-5"
                data-reveal data-reveal-step="{{ $index % 5 }}">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0">
@@ -56,20 +64,14 @@
                             <p class="font-display text-lg font-bold text-ink">{{ $organization->name }}</p>
 
                             @if ($organization->isSuspended())
-                                <span class="rounded-full bg-danger/10 px-2.5 py-0.5 text-xs font-semibold text-danger">
-                                    Suspendue
-                                </span>
+                                <x-ui.badge tone="danger">Suspendue</x-ui.badge>
                             @elseif ($organization->kyc_status === KycStatus::Rejected)
-                                <span class="rounded-full bg-danger/10 px-2.5 py-0.5 text-xs font-semibold text-danger">
-                                    Compte refuse
-                                </span>
+                                <x-ui.badge tone="danger">Compte refuse</x-ui.badge>
                             @elseif (! $organization->hasPayoutDestination())
                                 {{-- Le seul etat sur lequel il y a quelque chose
                                      a faire : sans numero, aucun reversement ne
                                      peut partir. --}}
-                                <span class="rounded-full bg-warning/10 px-2.5 py-0.5 text-xs font-semibold text-warning">
-                                    Sans numero de reversement
-                                </span>
+                                <x-ui.badge tone="warning">Sans numero de reversement</x-ui.badge>
                             @endif
                         </div>
 
@@ -88,24 +90,28 @@
                             {{ Money::format((int) $organization->gross) }}
                         </p>
                         <p class="mt-0.5 text-sm text-grey-500 tabular">
-                            {{ number_format((int) $organization->tickets_sold, 0, ',', "\u{202F}") }}
+                            {{ Money::number((int) $organization->tickets_sold) }}
                             billet{{ (int) $organization->tickets_sold > 1 ? 's' : '' }} vendu{{ (int) $organization->tickets_sold > 1 ? 's' : '' }}
                         </p>
                     </div>
                 </div>
             </a>
         @empty
-            <div class="surface p-10 text-center text-sm text-grey-500">
-                Aucune organisation ne correspond.
+            <div class="surface">
+                <x-ui.empty-state
+                    icon="search-x"
+                    tone="filtered"
+                    title="Aucune organisation"
+                    description="Aucune organisation ne correspond." />
             </div>
         @endforelse
     </div>
 
     @if ($organizations->hasPages())
-        <div class="mt-6">{{ $organizations->links() }}</div>
+        <div>{{ $organizations->links() }}</div>
     @endif
 
-    <p class="mt-6 text-xs leading-relaxed text-grey-400">
+    <p class="text-xs leading-relaxed text-grey-400">
         Les volumes portent sur les billets reellement vendus : un billet
         rembourse, annule ou expire n'est pas compte. Ouvrez une organisation pour
         voir son detail, son activite, et suspendre ou reactiver son compte.

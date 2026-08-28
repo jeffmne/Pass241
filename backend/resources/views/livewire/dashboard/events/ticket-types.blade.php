@@ -2,234 +2,231 @@
     use App\Support\Money;
 @endphp
 
-<div x-data="{ notice: '' }"
+<div class="space-y-5"
+     x-data="{ notice: '' }"
      @notify.window="notice = $event.detail.message; setTimeout(() => notice = '', 4000)">
 
-    <div class="mb-6">
-        <a href="{{ route('events.edit', $event) }}" wire:navigate
-           class="inline-flex items-center gap-1.5 text-sm font-medium text-grey-500 transition-colors hover:text-azure-700">
-            <x-lucide-arrow-left class="size-4" stroke-width="1.75" />
-            {{ $event->name }}
-        </a>
-
-        <div class="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-ink sm:text-3xl">Billets</h1>
-                <p class="mt-1 text-sm text-grey-500">
-                    Types de billets, prix et quantites mises en vente.
-                </p>
-            </div>
-
-            @unless ($showForm)
-                <button type="button" wire:click="create" class="btn btn-primary shrink-0">
-                    <x-lucide-plus class="size-4" stroke-width="2" />
+    <x-ui.page-header
+        title="Billets"
+        description="Types de billets, prix et quantites mises en vente."
+        :eyebrow="$event->name"
+        :back="route('events.edit', $event)"
+        :back-label="$event->name">
+        @unless ($showForm)
+            <x-slot:actions>
+                <button type="button" wire:click="create" class="btn btn-primary">
+                    <x-lucide-plus class="size-4 shrink-0" stroke-width="2.25" aria-hidden="true" />
                     Nouveau billet
                 </button>
-            @endunless
-        </div>
-    </div>
+            </x-slot:actions>
+        @endunless
+    </x-ui.page-header>
 
-    <div x-show="notice" x-cloak
-         class="mb-5 flex items-center gap-2.5 rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
-        <x-lucide-circle-check class="size-4 shrink-0 text-success" stroke-width="1.75" />
+    {{-- `role="status"` : annonce sans interrompre la lecture en cours. --}}
+    <div x-show="notice" x-cloak role="status"
+         class="flex items-center gap-2.5 rounded-[var(--radius-md)] border border-success/30 bg-success/5 px-4 py-3 text-sm text-ink">
+        <x-lucide-circle-check class="size-4 shrink-0 text-success" stroke-width="2" aria-hidden="true" />
         <span x-text="notice"></span>
     </div>
 
     @if ($ticketTypes->isNotEmpty())
-        <div class="surface mb-5 grid gap-px overflow-hidden bg-grey-200 sm:grid-cols-3">
-            <div class="bg-white p-4">
-                <p class="text-xs font-semibold tracking-wide text-grey-500 uppercase">En vente</p>
-                <p class="mt-1 font-display text-xl font-bold text-ink tabular">{{ Money::format($totalOnSale, false) }}</p>
-            </div>
-            <div class="bg-white p-4">
-                <p class="text-xs font-semibold tracking-wide text-grey-500 uppercase">Vendus</p>
-                <p class="mt-1 font-display text-xl font-bold text-ink tabular">{{ Money::format($totalSold, false) }}</p>
-            </div>
-            <div class="bg-white p-4">
-                <p class="text-xs font-semibold tracking-wide text-grey-500 uppercase">Restants</p>
-                <p class="mt-1 font-display text-xl font-bold text-azure-600 tabular">
-                    {{ Money::format(max(0, $totalOnSale - $totalSold), false) }}
-                </p>
-            </div>
-        </div>
+        {{-- Trois chiffres en verre : c'est de la synthese, on y regarde une
+             proportion, pas une donnee qu'on releve ligne a ligne. --}}
+        <section class="grid gap-3 sm:grid-cols-3" aria-label="Stock des billets">
+            <x-ui.stat-card icon="layers" label="En vente" :value="Money::format($totalOnSale, false)" />
+            <x-ui.stat-card icon="ticket-check" label="Vendus" tone="success" :value="Money::format($totalSold, false)" />
+            <x-ui.stat-card icon="package" label="Restants" tone="warning"
+                            :value="Money::format(max(0, $totalOnSale - $totalSold), false)" />
+        </section>
     @endif
 
     @if ($showForm)
         {{-- Surface pleine : c'est un formulaire de saisie de montants, la
              lisibilite prime sur l'effet (section 70.4). --}}
-        <form wire:submit="save" class="surface mb-5 p-4 sm:p-6">
-            <h2 class="font-display text-lg font-bold text-ink">
-                {{ $editingId ? 'Modifier le billet' : 'Nouveau billet' }}
-            </h2>
-
-            <div class="mt-5 space-y-4">
-                <div class="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
-                    <div>
-                        <label for="tt-name" class="mb-1.5 block text-sm font-medium text-ink">Nom</label>
+        <x-ui.panel :title="$editingId ? 'Modifier le billet' : 'Nouveau billet'">
+            <form wire:submit="save" class="space-y-1">
+                <div class="grid gap-x-4 sm:grid-cols-[1.4fr_1fr]">
+                    <x-ui.field label="Nom" for="tt-name" required :error="$errors->first('name')">
                         <input id="tt-name" type="text" wire:model="name" class="field"
                                placeholder="Standard, VIP, Early Bird..."
-                               aria-invalid="{{ $errors->has('name') ? 'true' : 'false' }}" required>
-                        @error('name') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                    </div>
+                               @error('name') aria-invalid="true" aria-describedby="tt-name-error" @enderror
+                               required>
+                    </x-ui.field>
 
-                    <div>
-                        <label for="tt-price" class="mb-1.5 block text-sm font-medium text-ink">
-                            Prix <span class="font-normal text-grey-400">(FCFA)</span>
-                        </label>
-                        <input id="tt-price" type="number" min="0" step="1" wire:model="price"
-                               class="field tabular"
-                               aria-invalid="{{ $errors->has('price') ? 'true' : 'false' }}" required>
-                        @error('price') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                        <p class="mt-1.5 text-xs text-grey-400">Laissez 0 pour un billet gratuit.</p>
-                    </div>
+                    <x-ui.field label="Prix" for="tt-price" required
+                                hint="Laissez 0 pour un billet gratuit."
+                                :error="$errors->first('price')">
+                        <div class="relative">
+                            <input id="tt-price" type="number" min="0" step="1" wire:model="price"
+                                   class="field tabular pr-16"
+                                   @error('price') aria-invalid="true" aria-describedby="tt-price-error" @enderror
+                                   required>
+                            {{-- L'unite DANS le champ plutot que dans le
+                                 libelle : au moment de taper un montant, c'est
+                                 la que le regard se trouve. --}}
+                            <span class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm font-semibold text-grey-400">
+                                FCFA
+                            </span>
+                        </div>
+                    </x-ui.field>
                 </div>
 
-                <div>
-                    <label for="tt-description" class="mb-1.5 block text-sm font-medium text-ink">
-                        Description <span class="font-normal text-grey-400">(facultatif)</span>
-                    </label>
+                <x-ui.field label="Description" for="tt-description"
+                            hint="Facultatif. Ce que ce billet donne droit."
+                            :error="$errors->first('description')">
                     <textarea id="tt-description" wire:model="description" rows="2" class="field"
-                              placeholder="Ce que ce billet donne droit."></textarea>
-                    @error('description') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                </div>
+                              placeholder="Ce que ce billet donne droit."
+                              @error('description') aria-invalid="true" aria-describedby="tt-description-error" @enderror></textarea>
+                </x-ui.field>
 
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div>
-                        <label for="tt-quantity" class="mb-1.5 block text-sm font-medium text-ink">Quantite</label>
+                <div class="grid gap-x-4 sm:grid-cols-2">
+                    <x-ui.field label="Quantite" for="tt-quantity" required :error="$errors->first('quantity')">
                         <input id="tt-quantity" type="number" min="1" wire:model="quantity" class="field tabular"
-                               aria-invalid="{{ $errors->has('quantity') ? 'true' : 'false' }}" required>
-                        @error('quantity') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                    </div>
+                               @error('quantity') aria-invalid="true" aria-describedby="tt-quantity-error" @enderror
+                               required>
+                    </x-ui.field>
 
-                    <div>
-                        <label for="tt-max" class="mb-1.5 block text-sm font-medium text-ink">
-                            Maximum par commande
-                        </label>
+                    <x-ui.field label="Maximum par commande" for="tt-max" required :error="$errors->first('maxPerOrder')">
                         <input id="tt-max" type="number" min="1" wire:model="maxPerOrder" class="field tabular"
-                               aria-invalid="{{ $errors->has('maxPerOrder') ? 'true' : 'false' }}" required>
-                        @error('maxPerOrder') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                    </div>
+                               @error('maxPerOrder') aria-invalid="true" aria-describedby="tt-max-error" @enderror
+                               required>
+                    </x-ui.field>
                 </div>
 
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div>
-                        <label for="tt-start" class="mb-1.5 block text-sm font-medium text-ink">
-                            Debut de vente <span class="font-normal text-grey-400">(facultatif)</span>
-                        </label>
-                        <input id="tt-start" type="datetime-local" wire:model="salesStartAt" class="field">
-                        @error('salesStartAt') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                    </div>
+                <div class="grid gap-x-4 sm:grid-cols-2">
+                    <x-ui.field label="Debut de vente" for="tt-start" hint="Facultatif."
+                                :error="$errors->first('salesStartAt')">
+                        <input id="tt-start" type="datetime-local" wire:model="salesStartAt" class="field"
+                               @error('salesStartAt') aria-invalid="true" aria-describedby="tt-start-error" @enderror>
+                    </x-ui.field>
 
-                    <div>
-                        <label for="tt-end" class="mb-1.5 block text-sm font-medium text-ink">
-                            Fin de vente <span class="font-normal text-grey-400">(facultatif)</span>
-                        </label>
-                        <input id="tt-end" type="datetime-local" wire:model="salesEndAt" class="field">
-                        @error('salesEndAt') <p class="mt-1.5 text-sm text-danger">{{ $message }}</p> @enderror
-                    </div>
+                    <x-ui.field label="Fin de vente" for="tt-end" hint="Facultatif."
+                                :error="$errors->first('salesEndAt')">
+                        <input id="tt-end" type="datetime-local" wire:model="salesEndAt" class="field"
+                               @error('salesEndAt') aria-invalid="true" aria-describedby="tt-end-error" @enderror>
+                    </x-ui.field>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <label class="flex min-h-11 items-center gap-2.5 text-sm text-ink">
-                        <input type="checkbox" wire:model="isActive" class="size-4 rounded border-grey-200">
+                {{-- Les deux interrupteurs sont dans un cadre a part : ce ne
+                     sont pas des valeurs a saisir mais des decisions de mise en
+                     vente, et les melanger aux champs ferait passer a cote. --}}
+                <fieldset class="glass-inset mt-2 grid gap-1 p-3 sm:grid-cols-2">
+                    <legend class="sr-only">Mise en vente</legend>
+
+                    <label class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[var(--radius-xs)] px-1 text-sm text-ink">
+                        <input type="checkbox" wire:model="isActive"
+                               class="size-4 rounded border-grey-200 text-azure-600">
                         En vente
                     </label>
-                    <label class="flex min-h-11 items-center gap-2.5 text-sm text-ink">
-                        <input type="checkbox" wire:model="isVisible" class="size-4 rounded border-grey-200">
+                    <label class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[var(--radius-xs)] px-1 text-sm text-ink">
+                        <input type="checkbox" wire:model="isVisible"
+                               class="size-4 rounded border-grey-200 text-azure-600">
                         Visible sur la page publique
                     </label>
-                </div>
-            </div>
+                </fieldset>
 
-            <div class="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
-                <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="save">Enregistrer</span>
-                    <span wire:loading wire:target="save">Enregistrement</span>
-                </button>
-                <button type="button" wire:click="cancelForm" class="btn btn-ghost">Annuler</button>
-            </div>
-        </form>
+                {{-- Ordre inverse sur telephone : l'action principale au-dessus,
+                     donc la plus proche du pouce. `flex-row-reverse` a partir de
+                     `sm` remet l'ordre visuel conventionnel. --}}
+                <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row-reverse sm:justify-start">
+                    <button type="submit" class="btn btn-primary" wire:loading.attr="disabled" wire:target="save">
+                        <span wire:loading.remove wire:target="save">Enregistrer</span>
+                        <span wire:loading wire:target="save">Enregistrement…</span>
+                    </button>
+                    <button type="button" wire:click="cancelForm" class="btn btn-secondary">Annuler</button>
+                </div>
+            </form>
+        </x-ui.panel>
     @endif
 
-    @forelse ($ticketTypes as $ticketType)
-        @php
-            $sold = $ticketType->soldCount();
-            /*
-             * Ce qu'un acheteur peut encore prendre MAINTENANT : les billets
-             * immobilises par une commande en cours de paiement en sont deja
-             * retires (section 17.1). L'organisateur voit donc le meme chiffre
-             * que le public, ce qui evite la question « pourquoi la page
-             * annonce-t-elle moins de places que mon tableau de bord ? ».
-             */
-            $remaining = $ticketType->availableStock();
-            $reason = $ticketType->unavailabilityReason();
-        @endphp
+    <div class="space-y-3">
+        @forelse ($ticketTypes as $ticketType)
+            @php
+                $sold = $ticketType->soldCount();
+                /*
+                 * Ce qu'un acheteur peut encore prendre MAINTENANT : les billets
+                 * immobilises par une commande en cours de paiement en sont deja
+                 * retires (section 17.1). L'organisateur voit donc le meme chiffre
+                 * que le public, ce qui evite la question « pourquoi la page
+                 * annonce-t-elle moins de places que mon tableau de bord ? ».
+                 */
+                $remaining = $ticketType->availableStock();
+                $reason = $ticketType->unavailabilityReason();
+                $share = $ticketType->quantity > 0 ? min(100, $sold / $ticketType->quantity * 100) : 0;
+            @endphp
 
-        <article class="surface mb-3 p-4 sm:p-5">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <h2 class="font-display text-base font-bold text-ink">{{ $ticketType->name }}</h2>
+            <article wire:key="tt-{{ $ticketType->id }}" class="surface p-4 sm:p-5">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="font-display text-base font-bold text-ink">{{ $ticketType->name }}</h2>
 
-                        @if ($reason)
-                            <span class="rounded-full bg-grey-200/70 px-2.5 py-1 text-xs font-semibold text-grey-500">
-                                {{ $reason }}
-                            </span>
-                        @else
-                            <span class="rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
-                                En vente
-                            </span>
+                            @if ($reason)
+                                <x-ui.badge tone="neutral">{{ $reason }}</x-ui.badge>
+                            @else
+                                <x-ui.badge tone="success">En vente</x-ui.badge>
+                            @endif
+
+                            @unless ($ticketType->is_visible)
+                                <x-ui.badge tone="neutral" bare>
+                                    <x-lucide-eye-off class="size-3 shrink-0" stroke-width="2.25" aria-hidden="true" />
+                                    Masque
+                                </x-ui.badge>
+                            @endunless
+                        </div>
+
+                        @if ($ticketType->description)
+                            <p class="mt-1.5 text-sm text-grey-500">{{ $ticketType->description }}</p>
                         @endif
 
-                        @unless ($ticketType->is_visible)
-                            <span class="flex items-center gap-1 rounded-full bg-grey-200/70 px-2.5 py-1 text-xs font-semibold text-grey-500">
-                                <x-lucide-eye-off class="size-3" stroke-width="2" />
-                                Masque
-                            </span>
-                        @endunless
+                        <p class="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-grey-500">
+                            <span class="font-display font-bold text-ink tabular">{{ $ticketType->formattedPrice() }}</span>
+                            <span class="tabular">{{ $sold }} / {{ $ticketType->quantity }} vendus</span>
+                            <span class="tabular">{{ $remaining }} restants</span>
+                        </p>
+
+                        {{-- La barre dit d'un coup d'oeil ce que les trois
+                             chiffres au-dessus demandent de comparer. --}}
+                        <div class="progress-track mt-2.5 max-w-md">
+                            <div class="progress-fill" style="--progress: {{ number_format($share, 2, '.', '') }}%"></div>
+                        </div>
                     </div>
 
-                    @if ($ticketType->description)
-                        <p class="mt-1.5 text-sm text-grey-500">{{ $ticketType->description }}</p>
-                    @endif
-
-                    <p class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-grey-500">
-                        <span class="font-display font-bold text-ink tabular">{{ $ticketType->formattedPrice() }}</span>
-                        <span class="tabular">{{ $sold }} / {{ $ticketType->quantity }} vendus</span>
-                        <span class="tabular">{{ $remaining }} restants</span>
-                    </p>
-                </div>
-
-                <div class="flex shrink-0 items-center gap-1.5">
-                    <button type="button" wire:click="edit({{ $ticketType->id }})" class="btn btn-ghost">
-                        Modifier
-                    </button>
-
-                    @if ($sold === 0)
-                        <button type="button" wire:click="delete({{ $ticketType->id }})"
-                                wire:confirm="Supprimer definitivement ce type de billet ?"
-                                class="btn btn-ghost text-danger hover:bg-danger/10"
-                                aria-label="Supprimer {{ $ticketType->name }}">
-                            <x-lucide-trash-2 class="size-4" stroke-width="1.75" />
+                    <div class="flex shrink-0 items-center gap-2">
+                        <button type="button" wire:click="edit({{ $ticketType->id }})" class="btn btn-secondary">
+                            Modifier
                         </button>
-                    @endif
+
+                        @if ($sold === 0)
+                            {{-- Supprimable uniquement tant que rien n'a ete
+                                 vendu : au-dela, le type porte des billets deja
+                                 en circulation. --}}
+                            <button type="button" wire:click="delete({{ $ticketType->id }})"
+                                    wire:confirm="Supprimer definitivement ce type de billet ?"
+                                    class="btn btn-icon text-danger hover:bg-danger/10"
+                                    aria-label="Supprimer {{ $ticketType->name }}">
+                                <x-lucide-trash-2 class="size-4" stroke-width="2" aria-hidden="true" />
+                            </button>
+                        @endif
+                    </div>
                 </div>
-            </div>
-        </article>
-    @empty
-        @unless ($showForm)
-            <div class="surface p-8 text-center sm:p-12">
-                <x-lucide-ticket class="mx-auto size-8 text-azure-300" stroke-width="1.5" />
-                <h2 class="mt-3 font-display text-lg font-bold text-ink">Aucun billet pour le moment</h2>
-                <p class="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-grey-500">
-                    Creez au moins un type de billet pour que vos participants puissent reserver.
-                    Un billet gratuit se cree en laissant le prix a zero.
-                </p>
-                <button type="button" wire:click="create" class="btn btn-primary mt-6">
-                    <x-lucide-plus class="size-4" stroke-width="2" />
-                    Creer un billet
-                </button>
-            </div>
-        @endunless
-    @endforelse
+            </article>
+        @empty
+            @unless ($showForm)
+                <div class="surface">
+                    <x-ui.empty-state
+                        icon="ticket"
+                        title="Aucun billet pour le moment"
+                        description="Creez au moins un type de billet pour que vos participants puissent reserver. Un billet gratuit se cree en laissant le prix a zero.">
+                        <x-slot:action>
+                            <button type="button" wire:click="create" class="btn btn-primary">
+                                <x-lucide-plus class="size-4 shrink-0" stroke-width="2.25" aria-hidden="true" />
+                                Creer un billet
+                            </button>
+                        </x-slot:action>
+                    </x-ui.empty-state>
+                </div>
+            @endunless
+        @endforelse
+    </div>
 </div>

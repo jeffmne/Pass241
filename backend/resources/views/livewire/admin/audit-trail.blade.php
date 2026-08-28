@@ -1,3 +1,9 @@
+@php
+    use App\Support\Money;
+
+    $tz = config('app.display_timezone');
+@endphp
+
 {{--
     Journal d'audit de la plateforme (sections 58, 67).
 
@@ -9,46 +15,56 @@
     que le lire, et n'exposera jamais de suppression : un journal qu'on peut
     nettoyer ne prouve rien.
 --}}
-<div>
-    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-            <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Journal</h1>
-            <p class="mt-1 text-sm text-grey-500">
-                {{ number_format($logs->total(), 0, ',', "\u{202F}") }} entree{{ $logs->total() > 1 ? 's' : '' }}.
-                En ajout seul, jamais modifiable.
-            </p>
-        </div>
+<div class="space-y-5">
 
-        <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <select wire:model.live="action" class="field sm:w-56" aria-label="Filtrer par action">
-                <option value="">Toutes les actions</option>
-                @foreach ($actions as $available)
-                    <option value="{{ $available->value }}">{{ $available->label() }}</option>
-                @endforeach
-            </select>
+    <x-ui.page-header
+        title="Journal"
+        :description="Money::number($logs->total()) . ' entree' . ($logs->total() > 1 ? 's' : '') . '. En ajout seul, jamais modifiable.'"
+        eyebrow="Administration Pass241">
 
-            <div class="relative sm:w-64">
-                <x-lucide-search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-grey-400"
-                                 stroke-width="1.75" />
-                <input type="search" wire:model.live.debounce.400ms="search" class="field pl-10"
-                       placeholder="Organisation, email" aria-label="Rechercher dans le journal">
+        <x-slot:actions>
+            <div class="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <div class="sm:w-56">
+                    <label for="audit-action" class="sr-only">Filtrer par action</label>
+                    <select id="audit-action" wire:model.live="action" class="field">
+                        <option value="">Toutes les actions</option>
+                        @foreach ($actions as $available)
+                            <option value="{{ $available->value }}">{{ $available->label() }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <x-ui.search-input
+                    id="audit-search"
+                    class="sm:w-64"
+                    label="Rechercher dans le journal"
+                    placeholder="Organisation, email"
+                    wire:model.live.debounce.400ms="search" />
             </div>
-        </div>
-    </header>
+        </x-slot:actions>
+    </x-ui.page-header>
 
-    <div class="space-y-2">
+    <div wire:loading.delay wire:target="search, action, gotoPage, previousPage, nextPage">
+        <x-ui.skeleton variant="list" :rows="6" class="surface p-4" />
+    </div>
+
+    <div wire:loading.delay.class="opacity-40"
+         wire:target="search, action, gotoPage, previousPage, nextPage"
+         class="space-y-2 transition-opacity">
+
         @forelse ($logs as $index => $log)
-            <div @class([
-                    'glass-stat p-4',
+            <div wire:key="log-{{ $log->id }}"
+                 @class([
+                    'glass-card p-4',
                     // Les actions financieres portent un liseré azur : ce sont
                     // celles qu'on cherche quand on remonte un litige.
                     'border-l-[3px] border-l-azure-500' => $log->action->isFinancial(),
                  ])
                  data-reveal data-reveal-step="{{ $index % 5 }}">
                 <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p class="font-medium text-ink">{{ $log->action->label() }}</p>
+                    <p class="font-semibold text-ink">{{ $log->action->label() }}</p>
                     <p class="text-xs text-grey-400 tabular">
-                        {{ $log->created_at->timezone(config('app.display_timezone'))->translatedFormat('j F Y \a\ H\hi\m\i\n\s') }}
+                        {{ $log->created_at->timezone($tz)->translatedFormat('j F Y \a\ H\hi\m\i\n\s') }}
                     </p>
                 </div>
 
@@ -74,7 +90,7 @@
                          sont deja masques a l'ecriture (decision D-025) :
                          filtrer ici donnerait la fausse impression que la
                          donnee brute est propre. --}}
-                    <dl class="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-white/60 pt-2 text-xs">
+                    <dl class="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-[var(--stat-border)] pt-2 text-xs">
                         @foreach ($log->metadata as $key => $value)
                             {{-- Une cle sans valeur n'apprend rien et allonge
                                  une ligne qu'on parcourt vite. --}}
@@ -90,13 +106,17 @@
                 @endif
             </div>
         @empty
-            <div class="surface p-10 text-center text-sm text-grey-500">
-                Aucune entree ne correspond.
+            <div class="surface">
+                <x-ui.empty-state
+                    icon="search-x"
+                    tone="filtered"
+                    title="Aucune entree"
+                    description="Aucune entree ne correspond a ce filtre." />
             </div>
         @endforelse
     </div>
 
     @if ($logs->hasPages())
-        <div class="mt-6">{{ $logs->links() }}</div>
+        <div>{{ $logs->links() }}</div>
     @endif
 </div>

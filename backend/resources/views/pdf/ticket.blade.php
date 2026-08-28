@@ -314,7 +314,7 @@
     <div class="head">
         <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
-                <td width="42%" class="brand-name">Pass241</td>
+                <td width="42%"><x-pdf.brand variant="light" :height="8" :size="13" /></td>
                 <td class="brand-rule">&nbsp;</td>
                 <td class="brand-tagline">Vivez vos evenements autrement</td>
             </tr>
@@ -472,7 +472,7 @@
         <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
                 <td width="38%" style="vertical-align: top;">
-                    <p class="foot-brand">Pass241</p>
+                    <x-pdf.brand :height="7" :size="11" />
                 </td>
                 <td class="foot-right" style="vertical-align: top;">
                     <p class="foot-label">Retrouvez vos billets sur</p>

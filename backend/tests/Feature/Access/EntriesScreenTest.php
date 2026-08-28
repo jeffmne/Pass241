@@ -170,9 +170,14 @@ it('explique l ecran vide avant le premier scan', function () {
 
     // Les compteurs a zero ne disent pas ce qu'on attend : l'ecran precise que
     // les entrees arriveront, y compris celles faites hors connexion.
-    // Sans `escape: false`, l'apostrophe du libelle serait cherchee sous sa
-    // forme encodee, absente du gabarit.
-    ($this->screen)()->assertSee('Aucun controle pour l\'instant', escape: false);
+    //
+    // Echappement PAR DEFAUT, et c'est le comportement attendu : le libelle
+    // passe desormais par le composant `x-ui.empty-state`, qui l'affiche via
+    // `{{ }}`. L'apostrophe sort donc encodee, comme toute donnee rendue par
+    // Blade. Auparavant le texte etait ecrit en dur dans le gabarit et
+    // echappait a l'encodage — ce que ce test constatait plus qu'il ne le
+    // verifiait.
+    ($this->screen)()->assertSee('Aucun controle pour l\'instant');
 });
 
 /*

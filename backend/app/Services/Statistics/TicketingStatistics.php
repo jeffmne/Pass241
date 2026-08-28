@@ -7,6 +7,8 @@ use App\Enums\OrderOrigin;
 use App\Enums\TicketStatus;
 use App\Models\Organization;
 use App\Services\Commission\CommissionCalculator;
+use App\Support\Money;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -101,11 +103,112 @@ class TicketingStatistics
             ->values();
     }
 
+    /**
+     * Ventes des N derniers jours, un point par jour.
+     *
+     * Sert l'histogramme du tableau de bord. Trois partis pris :
+     *
+     * 1. LA SERIE EST CONTINUE. Les jours sans vente sont ramenes a zero en
+     *    PHP plutot que d'etre absents. Un graphique qui saute les jours creux
+     *    ment sur le rythme : trois ventes le lundi et trois le vendredi se
+     *    liraient comme deux jours consecutifs.
+     *
+     * 2. LA DATE EST CELLE DU PAIEMENT, pas celle de la creation de la
+     *    commande. Une commande creee a 23h55 et payee a 00h10 appartient au
+     *    lendemain — c'est ce jour-la que l'argent est entre.
+     *
+     * 3. LE DECOUPAGE SE FAIT DANS LE FUSEAU D'AFFICHAGE. Les horodatages sont
+     *    stockes en UTC ; regrouper sans conversion decalerait chaque journee
+     *    d'une heure a Libreville, et rangerait toutes les ventes faites entre
+     *    minuit et 1h dans la veille.
+     *
+     * @return list<array{label: string, value: int, display: string, date: string}>
+     */
+    public function dailySales(Organization $organization, int $days = 7): array
+    {
+        $rows = Cache::remember(
+            $this->cacheKey($organization).':daily:'.$days,
+            self::CACHE_SECONDS,
+            fn () => $this->computeDailySales($organization, $days),
+        );
+
+        $timezone = config('app.display_timezone');
+        $series = [];
+
+        for ($offset = $days - 1; $offset >= 0; $offset--) {
+            $day = CarbonImmutable::now($timezone)->subDays($offset);
+            $key = $day->format('Y-m-d');
+            $count = $rows[$key] ?? 0;
+
+            $series[] = [
+                'date' => $key,
+                // Initiale majuscule : `translatedFormat` rend « lun. » en
+                // francais, et une rangee de minuscules sous un graphique se
+                // lit mal.
+                'label' => ucfirst(rtrim($day->translatedFormat('D'), '.')),
+                'value' => $count,
+                'display' => $day->translatedFormat('j F').' : '
+                    .$count.' '.($count === 1 ? 'billet vendu' : 'billets vendus'),
+            ];
+        }
+
+        return $series;
+    }
+
+    /**
+     * Recettes des N derniers mois, un point par mois.
+     *
+     * Meme continuite que la serie quotidienne, et pour la meme raison : un
+     * mois sans recette fait partie de l'histoire que raconte la courbe.
+     *
+     * @return list<array{label: string, value: int, display: string, month: string}>
+     */
+    public function monthlyRevenue(Organization $organization, int $months = 6): array
+    {
+        $rows = Cache::remember(
+            $this->cacheKey($organization).':monthly:'.$months,
+            self::CACHE_SECONDS,
+            fn () => $this->computeMonthlyRevenue($organization, $months),
+        );
+
+        $timezone = config('app.display_timezone');
+        $series = [];
+
+        for ($offset = $months - 1; $offset >= 0; $offset--) {
+            $month = CarbonImmutable::now($timezone)->startOfMonth()->subMonths($offset);
+            $key = $month->format('Y-m');
+            $amount = $rows[$key] ?? 0;
+
+            $series[] = [
+                'month' => $key,
+                'label' => ucfirst(rtrim($month->translatedFormat('M'), '.')),
+                'value' => $amount,
+                'display' => ucfirst($month->translatedFormat('F Y')).' : '.Money::format($amount),
+            ];
+        }
+
+        return $series;
+    }
+
     /** Vide le cache d'une organisation. */
     public function forget(Organization $organization): void
     {
         Cache::forget($this->cacheKey($organization));
         Cache::forget($this->cacheKey($organization).':types');
+
+        /*
+         * Les series temporelles sont mises en cache par longueur de fenetre.
+         * Les longueurs employees par les ecrans sont enumerees ici plutot que
+         * devinees : une cle oubliee laisserait un graphique perime a l'ecran
+         * apres une vente, ce qui est precisement le moment ou on le regarde.
+         */
+        foreach ([7, 30] as $days) {
+            Cache::forget($this->cacheKey($organization).':daily:'.$days);
+        }
+
+        foreach ([6, 12] as $months) {
+            Cache::forget($this->cacheKey($organization).':monthly:'.$months);
+        }
     }
 
     /**
@@ -171,6 +274,98 @@ class TicketingStatistics
             // echec. Les deux apparaissent au premier scan.
             'hasEntries' => $entries > 0,
         ];
+    }
+
+    /**
+     * Billets vendus par jour, indexes sur `Y-m-d` dans le fuseau d'affichage.
+     *
+     * `AT TIME ZONE 'UTC' AT TIME ZONE ?` n'est pas une redondance : la
+     * premiere clause dit a Postgres comment INTERPRETER l'horodatage stocke
+     * (nos colonnes sont sans fuseau, et Laravel y ecrit de l'UTC), la seconde
+     * le CONVERTIT vers le fuseau d'affichage. Sans la premiere, Postgres
+     * appliquerait le fuseau de la session, qui depend de la configuration du
+     * serveur — le graphique changerait alors selon la machine.
+     *
+     * @return array<string, int>
+     */
+    private function computeDailySales(Organization $organization, int $days): array
+    {
+        $timezone = config('app.display_timezone');
+
+        // Depuis le debut du plus ancien jour affiche : borner en SQL evite de
+        // parcourir tout l'historique de l'organisation a chaque affichage.
+        $since = CarbonImmutable::now($timezone)->subDays($days - 1)->startOfDay()->utc();
+
+        return DB::table('tickets')
+            ->join('orders', 'orders.id', '=', 'tickets.order_id')
+            ->where('tickets.organization_id', $organization->getKey())
+            ->whereIn('tickets.status', $this->soldStatuses())
+            // Les invitations ne sont pas des ventes (section 25) : les
+            // inclure ferait apparaitre un pic le jour ou l'organisateur a
+            // invite cinquante personnes, sans qu'un franc soit entre.
+            ->where('orders.origin', OrderOrigin::Purchase->value)
+            ->whereNotNull('orders.paid_at')
+            ->where('orders.paid_at', '>=', $since)
+            /*
+             * On regroupe sur l'ALIAS DE SORTIE, pas sur une copie de
+             * l'expression.
+             *
+             * Repeter l'expression dans le `GROUP BY` semble equivalent, mais
+             * ne l'est pas : chaque `?` devient un parametre DISTINCT
+             * (`$1` dans le select, `$2` dans le group by), et Postgres refuse
+             * alors de considerer les deux expressions comme identiques —
+             * « column orders.paid_at must appear in the GROUP BY clause ».
+             *
+             * L'alias supprime la duplication et le doute d'un seul coup.
+             */
+            ->groupByRaw('bucket')
+            ->selectRaw(
+                "(orders.paid_at AT TIME ZONE 'UTC' AT TIME ZONE ?)::date AS bucket, COUNT(*) AS total",
+                [$timezone]
+            )
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                CarbonImmutable::parse($row->bucket)->format('Y-m-d') => (int) $row->total,
+            ])
+            ->all();
+    }
+
+    /**
+     * Recettes par mois, indexees sur `Y-m` dans le fuseau d'affichage.
+     *
+     * La recette est le prix REELLEMENT PAYE, releve sur la ligne de commande —
+     * jamais le tarif courant du type, qui a pu changer depuis l'achat. C'est
+     * la meme regle que pour les chiffres consolides, et elle doit le rester :
+     * une courbe qui ne totalise pas la carte du dessus fait douter des deux.
+     *
+     * @return array<string, int>
+     */
+    private function computeMonthlyRevenue(Organization $organization, int $months): array
+    {
+        $timezone = config('app.display_timezone');
+
+        $since = CarbonImmutable::now($timezone)->startOfMonth()->subMonths($months - 1)->utc();
+
+        return DB::table('tickets')
+            ->join('order_items', 'order_items.id', '=', 'tickets.order_item_id')
+            ->join('orders', 'orders.id', '=', 'tickets.order_id')
+            ->where('tickets.organization_id', $organization->getKey())
+            ->whereIn('tickets.status', $this->soldStatuses())
+            ->where('orders.origin', OrderOrigin::Purchase->value)
+            ->whereNotNull('orders.paid_at')
+            ->where('orders.paid_at', '>=', $since)
+            // Meme raison qu'au-dessus : on regroupe sur l'alias de sortie.
+            ->groupByRaw('bucket')
+            ->selectRaw(
+                "date_trunc('month', orders.paid_at AT TIME ZONE 'UTC' AT TIME ZONE ?) AS bucket,
+                 COALESCE(SUM(order_items.unit_price), 0) AS revenue",
+                [$timezone]
+            )
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                CarbonImmutable::parse($row->bucket)->format('Y-m') => (int) $row->revenue,
+            ])
+            ->all();
     }
 
     /**

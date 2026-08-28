@@ -2,6 +2,7 @@
     use App\Enums\PayoutState;
     use App\Support\Money;
 
+    $tz = config('app.display_timezone');
     $card = fn (PayoutState $state) => $totals[$state->value] ?? ['count' => 0, 'amount' => 0];
 @endphp
 
@@ -15,59 +16,54 @@
     fonds a la demande.
 
     Le tableau reste une surface pleine, sans verre : la regle 70.4 ecarte le
-    verre des tableaux denses, ou la lisibilite prime sur la matiere.
+    verre des tableaux denses, ou la lisibilite prime sur la matiere. Il bascule
+    en cartes sous `md` par le CSS, a partir du meme balisage — cet ecran
+    ecrivait auparavant chaque ligne deux fois, et les deux versions avaient
+    deja diverge.
 --}}
-<div>
-    <div class="flex flex-wrap items-end justify-between gap-4">
-        <div>
-            <h1 class="font-display text-2xl font-extrabold text-ink">Reversements</h1>
-            <p class="mt-1 text-sm text-grey-500">
-                Toutes organisations confondues. Consultation seule.
-            </p>
-        </div>
+<div class="space-y-5">
 
-        <div class="relative w-full sm:w-72">
-            <x-lucide-search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-grey-400"
-                             stroke-width="1.75" />
-            <input type="search" wire:model.live.debounce.400ms="search"
-                   class="field pl-9"
-                   placeholder="Reference, organisation"
-                   aria-label="Rechercher un reversement">
-        </div>
-    </div>
+    <x-ui.page-header
+        title="Reversements"
+        description="Toutes organisations confondues. Consultation seule."
+        eyebrow="Administration Pass241">
+        <x-slot:actions>
+            <x-ui.search-input
+                id="settlements-search"
+                class="w-full sm:w-72"
+                label="Rechercher un reversement"
+                placeholder="Reference, organisation"
+                wire:model.live.debounce.400ms="search" />
+        </x-slot:actions>
+    </x-ui.page-header>
 
     {{-- Totaux par etat. Agreges en SQL : cette console doit rester utilisable
          avec des dizaines de milliers de lignes. --}}
-    <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Totaux par etat">
         @foreach ([
-            [PayoutState::Succeeded, 'Verses', 'circle-check', 'text-success'],
-            [PayoutState::Scheduled, 'Programmes', 'calendar-clock', 'text-azure-600'],
-            [PayoutState::Pending, 'En cours', 'loader-circle', 'text-warning'],
-            [PayoutState::Failed, 'Echoues', 'circle-alert', 'text-danger'],
-        ] as [$state, $label, $icon, $colour])
+            [PayoutState::Succeeded, 'Verses', 'circle-check', 'success'],
+            [PayoutState::Scheduled, 'Programmes', 'calendar-clock', 'primary'],
+            [PayoutState::Pending, 'En cours', 'loader-circle', 'warning'],
+            [PayoutState::Failed, 'Echoues', 'circle-alert', 'danger'],
+        ] as [$state, $label, $icon, $tone])
             @php ($stat = $card($state))
-            <div class="glass-stat glass-specular p-4"
-                 data-reveal data-reveal-step="{{ $loop->index }}">
-                <div class="flex items-center gap-2 text-grey-500">
-                    <x-dynamic-component :component="'lucide-'.$icon" class="size-4" stroke-width="1.5" />
-                    <span class="text-xs font-semibold tracking-wide uppercase">{{ $label }}</span>
-                </div>
-                <p class="mt-2 font-display text-xl font-extrabold {{ $colour }} tabular">
-                    {{ Money::format($stat['amount']) }}
-                </p>
-                <p class="mt-0.5 text-sm text-grey-500 tabular">
-                    {{ $stat['count'] }} reversement{{ $stat['count'] > 1 ? 's' : '' }}
-                </p>
-            </div>
+            <x-ui.stat-card
+                :icon="$icon"
+                :label="$label"
+                :tone="$tone"
+                data-reveal data-reveal-step="{{ $loop->index }}"
+                :value="Money::format($stat['amount'])"
+                :hint="$stat['count'] . ' reversement' . ($stat['count'] > 1 ? 's' : '')" />
         @endforeach
-    </div>
+    </section>
 
     @if ($attentionCount > 0)
         {{-- Un virement echoue ou dont on ignore le sort demande une
              intervention humaine : c'est la seule chose que cette console doit
              faire remonter d'elle-meme. --}}
-        <p class="mt-4 flex items-start gap-2.5 rounded-2xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink">
-            <x-lucide-circle-alert class="mt-0.5 size-4 shrink-0 text-danger" stroke-width="1.75" />
+        <p role="alert"
+           class="flex items-start gap-2.5 rounded-[var(--radius-lg)] border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-ink">
+            <x-lucide-circle-alert class="mt-0.5 size-4 shrink-0 text-danger" stroke-width="2" aria-hidden="true" />
             <span>
                 {{ $attentionCount }} reversement{{ $attentionCount > 1 ? 's' : '' }}
                 {{ $attentionCount > 1 ? 'demandent' : 'demande' }} une verification :
@@ -78,120 +74,94 @@
         </p>
     @endif
 
-    <div class="mt-5 flex flex-wrap gap-1 rounded-xl border border-white/60 bg-white/60 p-1 backdrop-blur">
-        @foreach ([
-            'all' => 'Tous',
-            'attention' => 'A verifier',
-            'pending' => 'En cours',
-            'settled' => 'Verses',
-        ] as $value => $label)
-            <button type="button" wire:click="$set('filter', '{{ $value }}')" @class([
-                'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                'bg-azure-600 text-white' => $filter === $value,
-                'text-grey-500 hover:text-ink' => $filter !== $value,
-            ])>{{ $label }}</button>
-        @endforeach
+    <div class="scroll-x no-scrollbar -mx-1 px-1">
+        <div class="seg" role="tablist" aria-label="Filtrer les reversements">
+            @foreach ([
+                'all' => 'Tous',
+                'attention' => 'A verifier',
+                'pending' => 'En cours',
+                'settled' => 'Verses',
+            ] as $value => $label)
+                <button type="button"
+                        role="tab"
+                        wire:click="$set('filter', '{{ $value }}')"
+                        aria-selected="{{ $filter === $value ? 'true' : 'false' }}"
+                        class="seg-item">{{ $label }}</button>
+            @endforeach
+        </div>
     </div>
 
-    {{-- Tableau sur grand ecran --}}
-    <div class="surface mt-4 hidden overflow-x-auto p-0 lg:block">
-        <table class="w-full min-w-[54rem] text-sm">
-            <thead>
-                <tr class="border-b border-grey-200 text-left text-xs tracking-wide text-grey-500 uppercase">
-                    <th class="px-4 py-3 font-semibold">Reference</th>
-                    <th class="px-4 py-3 font-semibold">Organisation</th>
-                    <th class="px-4 py-3 font-semibold">Evenement</th>
-                    <th class="px-4 py-3 text-right font-semibold">Brut</th>
-                    <th class="px-4 py-3 text-right font-semibold">Commission</th>
-                    <th class="px-4 py-3 text-right font-semibold">Net verse</th>
-                    <th class="px-4 py-3 font-semibold">Etat</th>
-                    <th class="px-4 py-3 font-semibold">Date</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($settlements as $settlement)
-                    <tr class="border-b border-grey-200/60 last:border-0">
-                        <td class="px-4 py-3">
-                            <span class="font-medium text-ink tabular">{{ $settlement->reference }}</span>
+    <div wire:loading.delay wire:target="search, filter, gotoPage, previousPage, nextPage">
+        <x-ui.skeleton variant="table" :rows="6" />
+    </div>
+
+    <x-ui.panel flush
+                wire:loading.delay.class="opacity-40"
+                wire:target="search, filter, gotoPage, previousPage, nextPage"
+                class="transition-opacity">
+
+        @if ($settlements->isEmpty())
+            <x-ui.empty-state
+                icon="search-x"
+                tone="filtered"
+                title="Aucun reversement"
+                description="Aucun reversement ne correspond." />
+        @else
+            <x-ui.table caption="Reversements de la plateforme">
+                <x-slot:head>
+                    <th scope="col">Reference</th>
+                    <th scope="col">Organisation</th>
+                    <th scope="col">Evenement</th>
+                    <th scope="col" class="col-amount">Brut</th>
+                    <th scope="col" class="col-amount">Commission</th>
+                    <th scope="col" class="col-amount">Net verse</th>
+                    <th scope="col">Etat</th>
+                    <th scope="col">Date</th>
+                </x-slot:head>
+
+                @foreach ($settlements as $settlement)
+                    <tr wire:key="settlement-{{ $settlement->id }}">
+                        <td class="cell-primary">
+                            <span class="tabular">{{ $settlement->reference }}</span>
                             @if ($settlement->provider_reference)
-                                <span class="mt-0.5 block text-xs text-grey-400 tabular">
+                                <span class="mt-0.5 block text-xs font-normal text-grey-400 tabular">
                                     {{ $settlement->provider_reference }}
                                 </span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-grey-500">{{ $settlement->organization?->name }}</td>
-                        <td class="px-4 py-3 text-grey-500">{{ $settlement->settlableName() }}</td>
-                        <td class="px-4 py-3 text-right text-grey-500 tabular">{{ $settlement->formattedGross() }}</td>
-                        <td class="px-4 py-3 text-right text-grey-500 tabular">{{ $settlement->formattedCommission() }}</td>
-                        <td class="px-4 py-3 text-right font-semibold text-ink tabular">{{ $settlement->formattedNet() }}</td>
-                        <td class="px-4 py-3">
+
+                        <td data-label="Organisation" class="text-grey-500">{{ $settlement->organization?->name }}</td>
+                        <td data-label="Evenement" class="text-grey-500">{{ $settlement->settlableName() }}</td>
+
+                        <td data-label="Brut" class="col-amount font-normal text-grey-500">
+                            {{ $settlement->formattedGross() }}
+                        </td>
+                        <td data-label="Commission" class="col-amount font-normal text-grey-500">
+                            {{ $settlement->formattedCommission() }}
+                        </td>
+                        <td data-label="Net verse" class="col-amount">{{ $settlement->formattedNet() }}</td>
+
+                        <td data-label="Etat">
                             <x-settlement-state :status="$settlement->status" />
                         </td>
-                        <td class="px-4 py-3 text-grey-500 tabular">
-                            {{ $settlement->expectedOn()
-                                ?->timezone(config('app.display_timezone'))
-                                ?->translatedFormat('j M Y') }}
+                        <td data-label="Date" class="text-grey-500 tabular">
+                            {{ $settlement->expectedOn()?->timezone($tz)?->translatedFormat('j M Y') }}
                         </td>
                     </tr>
-                @empty
-                    <tr>
-                        <td colspan="8" class="px-4 py-12 text-center text-grey-500">
-                            Aucun reversement ne correspond.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+                @endforeach
+            </x-ui.table>
+        @endif
 
-    {{-- Cartes sur telephone : un tableau de huit colonnes y devient
-         illisible, et la console doit rester consultable en mobilite. --}}
-    <div class="mt-4 space-y-3 lg:hidden">
-        @forelse ($settlements as $settlement)
-            <div class="glass-stat glass-specular p-4"
-                 data-reveal data-reveal-step="{{ $loop->index % 5 }}">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <p class="font-display font-bold text-ink tabular">{{ $settlement->reference }}</p>
-                        <p class="mt-0.5 truncate text-sm text-grey-500">
-                            {{ $settlement->organization?->name }}
-                        </p>
-                        <p class="truncate text-sm text-grey-400">{{ $settlement->settlableName() }}</p>
-                    </div>
-                    <x-settlement-state :status="$settlement->status" />
-                </div>
-
-                <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t border-white/60 pt-3 text-sm">
-                    <div class="flex gap-1.5">
-                        <dt class="text-grey-500">Brut</dt>
-                        <dd class="text-ink tabular">{{ $settlement->formattedGross() }}</dd>
-                    </div>
-                    <div class="flex gap-1.5">
-                        <dt class="text-grey-500">Commission</dt>
-                        <dd class="text-ink tabular">{{ $settlement->formattedCommission() }}</dd>
-                    </div>
-                    <div class="flex gap-1.5">
-                        <dt class="text-grey-500">Net</dt>
-                        <dd class="font-semibold text-ink tabular">{{ $settlement->formattedNet() }}</dd>
-                    </div>
-                </dl>
-            </div>
-        @empty
-            <div class="surface p-6 text-center text-sm text-grey-500">
-                Aucun reversement ne correspond.
-            </div>
-        @endforelse
-    </div>
+        <x-slot:footer>
+            Les montants sont figes a la creation du reversement et proteges en base
+            contre toute modification. Aucun reversement ne peut etre declenche,
+            rejoue ou annule depuis cet ecran : il est instruit par
+            <span class="tabular">pass241:settle-events</span> et verifie par
+            <span class="tabular">pass241:reconcile-settlements</span>.
+        </x-slot:footer>
+    </x-ui.panel>
 
     @if ($settlements->hasPages())
-        <div class="mt-6">{{ $settlements->links() }}</div>
+        <div>{{ $settlements->links() }}</div>
     @endif
-
-    <p class="mt-6 text-xs leading-relaxed text-grey-400">
-        Les montants sont figes a la creation du reversement et proteges en base
-        contre toute modification. Aucun reversement ne peut etre declenche,
-        rejoue ou annule depuis cet ecran : il est instruit par
-        <span class="tabular">pass241:settle-events</span> et verifie par
-        <span class="tabular">pass241:reconcile-settlements</span>.
-    </p>
 </div>

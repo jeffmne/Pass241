@@ -9,12 +9,30 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <x-theme-script />
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#F5F7FD">
+    <meta name="theme-color" content="#f7f9fb">
     <title>{{ $title }}</title>
     <meta name="robots" content="noindex">
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="icon" href="/favicon.ico" sizes="any">
+    {{-- Icones de la marque.
+
+         L'ordre compte : les navigateurs prennent la PREMIERE declaration
+         qu'ils comprennent. Le PNG 32px d'abord, net sur un onglet ; le .ico
+         ensuite, qui porte les tailles 16/32/48 pour les favoris de bureau et
+         les navigateurs anciens.
+
+         L'ancien `favicon.svg` a ete retire : il portait l'ancien symbole
+         monochrome. Et l'ancien `favicon.ico` pesait ZERO octet — il etait
+         declare depuis le debut mais completement vide, ce qui laissait
+         l'onglet sans icone. --}}
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    {{-- Polices auto-hebergees : sans cet appel, les `@font-face` ne sont
+         declares nulle part et le navigateur retombe sur la police systeme.
+         Voir le commentaire detaille dans `components/app-shell.blade.php`. --}}
+    {{ Vite::fonts() }}
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="azure-wash min-h-dvh">
@@ -36,7 +54,7 @@
                'mx-auto lg:mx-0' => $width === 'wide',
            ])>
             <x-brand-mark class="h-8 w-auto" />
-            Pass241
+            <x-brand-word />
         </a>
 
         {{ $slot }}

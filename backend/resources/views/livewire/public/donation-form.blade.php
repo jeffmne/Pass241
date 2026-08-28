@@ -1,6 +1,5 @@
 @php
-    $nbsp = "\u{202F}";
-    $money = fn (int $amount) => number_format($amount, 0, ',', $nbsp).' F';
+    $money = fn (int $amount) => \App\Support\Money::formatShort($amount);
 @endphp
 
 {{--

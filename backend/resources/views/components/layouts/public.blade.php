@@ -18,7 +18,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#F5F7FD">
+
+    {{-- Le theme est pose avant la premiere peinture, y compris sur les pages
+         publiques : quelqu'un qui ouvre un lien de billet en pleine nuit ne
+         doit pas recevoir un ecran blanc au visage. --}}
+    <x-theme-script />
+    <meta name="theme-color" content="#f7f9fb">
 
     <title>{{ $title }}</title>
     @if ($description)
@@ -31,8 +36,20 @@
         <meta name="robots" content="noindex, nofollow">
     @endunless
 
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-    <link rel="icon" href="/favicon.ico" sizes="any">
+    {{-- Icones de la marque.
+
+         L'ordre compte : les navigateurs prennent la PREMIERE declaration
+         qu'ils comprennent. Le PNG 32px d'abord, net sur un onglet ; le .ico
+         ensuite, qui porte les tailles 16/32/48 pour les favoris de bureau et
+         les navigateurs anciens.
+
+         L'ancien `favicon.svg` a ete retire : il portait l'ancien symbole
+         monochrome. Et l'ancien `favicon.ico` pesait ZERO octet — il etait
+         declare depuis le debut mais completement vide, ce qui laissait
+         l'onglet sans icone. --}}
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
     {{--
         Apercu de partage (section 14). WhatsApp est le canal principal sur ce
@@ -69,6 +86,11 @@
         <script type="application/ld+json">{!! $structuredData !!}</script>
     @endif
 
+    {{-- Polices auto-hebergees : sans cet appel, les `@font-face` ne sont
+         declares nulle part et le navigateur retombe sur la police systeme.
+         Voir le commentaire detaille dans `components/app-shell.blade.php`. --}}
+    {{ Vite::fonts() }}
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="azure-wash flex min-h-dvh flex-col overflow-x-hidden">
@@ -84,8 +106,6 @@
     <header data-sticky-header data-stuck="false"
             @class([
                 'group fixed inset-x-0 top-0 z-40 transition-[background-color,box-shadow,backdrop-filter] duration-300',
-                'data-[stuck=true]:bg-white/70 data-[stuck=true]:shadow-[0_1px_0_rgba(20,84,155,0.08)]',
-                'data-[stuck=true]:backdrop-blur-xl',
                 'data-[stuck=false]:bg-gradient-to-b data-[stuck=false]:from-ink/50 data-[stuck=false]:to-transparent' => $heroDark,
             ])>
         <div class="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-3.5 sm:px-6">
@@ -95,8 +115,26 @@
                    'text-white group-data-[stuck=true]:text-azure-700' => $heroDark,
                    'text-azure-700' => ! $heroDark,
                ])>
-                <x-brand-mark class="h-7 w-auto" />
-                Pass241
+                {{-- Au-dessus d'un heros sombre, le symbole passe en `mono` et
+                     suit la couleur du texte, qui est alors blanc : sa
+                     lisibilite ne peut pas dependre de la photo choisie par
+                     l'organisateur. Sur les pages sans heros, il reprend ses
+                     couleurs. --}}
+                <x-brand-mark :variant="$heroDark ? 'mono' : 'color'" class="h-7 w-auto" />
+
+                @if ($heroDark)
+                    {{-- Deux exemplaires, et un seul visible a la fois. Le
+                         « 241 » ne peut pas avoir la meme teinte au-dessus
+                         d'une affiche sombre et sur l'en-tete blanc une fois la
+                         page defilee : le bleu clair disparaitrait sur blanc,
+                         le bleu foncé sur la photo. Une classe conditionnelle
+                         ne suffit pas — c'est la VARIANTE du composant qui
+                         change, pas seulement sa couleur. --}}
+                    <x-brand-word variant="light" class="group-data-[stuck=true]:hidden" />
+                    <x-brand-word class="hidden group-data-[stuck=true]:inline" />
+                @else
+                    <x-brand-word />
+                @endif
             </a>
             <span @class([
                 'text-xs transition-colors',
@@ -115,10 +153,10 @@
         {{ $slot }}
     </main>
 
-    <footer class="border-t border-grey-200/70 bg-white/60">
+    <footer class="border-t border-grey-200 bg-surface/60">
         <div class="mx-auto flex w-full max-w-5xl flex-col gap-2 px-5 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <a href="{{ route('home') }}" class="font-display text-base font-extrabold tracking-tight text-azure-700">
-                Pass241
+                <x-brand-word />
             </a>
             <p class="text-sm text-grey-500">
                 Vous organisez un evenement ?

@@ -2,14 +2,13 @@
     use App\Enums\CampaignStatus;
 
     $tz = config('app.display_timezone');
-    $nbsp = "\u{202F}";
 
     $state = $campaign->displayStatus();
     $cover = $campaign->coverUrl();
     $open = $campaign->acceptsDonations();
 
     $ends = $campaign->ends_at?->timezone($tz);
-    $money = fn (int $amount) => number_format($amount, 0, ',', $nbsp).' F';
+    $money = fn (int $amount) => \App\Support\Money::formatShort($amount);
 @endphp
 
 {{--
@@ -140,10 +139,10 @@
 
                 <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span class="font-semibold text-azure-700 tabular">
-                        {{ number_format($progress['displayPercentage'], 0, ',', $nbsp) }} % de l'objectif
+                        {{ \App\Support\Money::number($progress['displayPercentage']) }} % de l'objectif
                     </span>
                     <span class="text-grey-500 tabular">
-                        {{ number_format($progress['donations'], 0, ',', $nbsp) }}
+                        {{ \App\Support\Money::number($progress['donations']) }}
                         don{{ $progress['donations'] > 1 ? 's' : '' }}
                     </span>
                 </div>
@@ -273,7 +272,7 @@
                          lignes : le nombre et le mot doivent rester colles a
                          l'affichage comme a la recherche. --}}
                     <p class="text-sm text-grey-500 tabular">
-                        {{ number_format($progress['donations'], 0, ',', $nbsp)
+                        {{ \App\Support\Money::number($progress['donations'])
                             .' don'.($progress['donations'] > 1 ? 's' : '').' au total' }}
                     </p>
                 @endif

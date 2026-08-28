@@ -1,6 +1,5 @@
 @php
-    $nbsp = "\u{202F}";
-    $money = fn (int $amount) => number_format($amount, 0, ',', $nbsp).' F';
+    $money = fn (int $amount) => \App\Support\Money::formatShort($amount);
 @endphp
 
 {{--
@@ -88,7 +87,7 @@
                     <p class="mt-2 text-sm text-grey-500 tabular">
                         <span class="font-semibold text-ink">{{ $money($progress['collected']) }}</span>
                         collectes sur {{ $money($progress['goal']) }}
-                        · {{ number_format($progress['donations'], 0, ',', $nbsp) }}
+                        · {{ \App\Support\Money::number($progress['donations']) }}
                         don{{ $progress['donations'] > 1 ? 's' : '' }}
                     </p>
                 </div>

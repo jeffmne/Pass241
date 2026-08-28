@@ -113,8 +113,7 @@
 <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
         <td style="vertical-align: top;">
-            <p class="brand">Pass241</p>
-            <p class="brand-note">Collecte de fonds</p>
+            <x-pdf.brand note="Collecte de fonds" />
         </td>
         <td style="vertical-align: top;">
             <p class="doc-title">Recu de don</p>

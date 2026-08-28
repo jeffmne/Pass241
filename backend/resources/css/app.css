@@ -1,47 +1,52 @@
 @import 'tailwindcss';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+/*
+ * La pagination de Laravel et celle de Livewire ne sont plus balayees ici :
+ * elles sont toutes deux remplacees par `resources/views/vendor/livewire/
+ * tailwind.blade.php`, deja couvert par la detection automatique de Tailwind.
+ * Les gabarits d'origine sont ecrits contre `bg-white` et `text-gray-500`, des
+ * couleurs figees qui ne suivaient aucun theme.
+ */
 @source '../../storage/framework/views/*.php';
 @source '../../app/Livewire';
+
+/*
+ * La variante `dark:` est rebranchee sur NOTRE attribut de theme.
+ *
+ * Par defaut, Tailwind fait reposer `dark:` sur `prefers-color-scheme` — la
+ * preference du systeme d'exploitation. Ce n'est pas ce que le produit
+ * applique : un utilisateur peut choisir explicitement le mode clair alors que
+ * son telephone est en mode nuit, et c'est son choix qui doit gagner
+ * (`data-theme` sur <html>, pose avant la premiere peinture).
+ *
+ * Sans cette ligne, `dark:hidden` suivrait le systeme pendant que le reste de
+ * la page suivrait le choix de l'utilisateur : les deux se contrediraient dans
+ * exactement le cas ou la bascule sert a quelque chose.
+ */
+@custom-variant dark ([data-theme='dark'] &);
 
 /*
  * Design system Pass241 — section 70, detail dans docs/10-design-system.md.
  * Aucun emoji nulle part (regle 80.6) : les familles de secours pour emoji
  * sont volontairement absentes des piles de polices.
  */
+
+/* ===========================================================================
+ * 1. Ce qui ne depend pas du theme
+ * ======================================================================== */
+
 @theme {
-    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
-
-    /* Bleu azurin — seule couleur de marque a usage large (section 70.1) */
-    --color-azure-50: #f2f8fe;
-    --color-azure-100: #e4f1fd;
-    --color-azure-300: #7db6ef;
-    --color-azure-500: #2f8fe6;
-    --color-azure-600: #1d6fc4;
-    --color-azure-700: #14549b;
-
-    /* Fond de page en blanc casse, jamais blanc pur : c'est ce qui donne au
-       verre liquide de quoi se detacher (section 70.1) */
-    --color-offwhite: #f3f5f8;
-
-    /* Toile des pages publiques : meme famille que --offwhite, legerement
-       tiree vers le bleu pour que la nappe ambiante ait de la matiere. Les
-       ecrans de travail restent sur --offwhite, plus neutre et plus reposant
-       sur une journee entiere. */
-    --color-canvas: #f5f7fd;
-    --color-canvas-tint: #dfe6fb;
-
-    --color-grey-200: #e1e5eb;
-    --color-grey-400: #9aa3b2;
-    --color-grey-500: #6b7280;
-    --color-ink: #10131a;
-
-    /* Couleurs semantiques : jamais remplacees par de l'azur, meme sur un
-       ecran tres bleute — un statut de paiement doit se lire d'un coup d'oeil */
-    --color-success: #1fae68;
-    --color-warning: #f2a93b;
-    --color-danger: #e5484d;
+    /*
+     * Une seule famille dans tout le produit (section 70.2).
+     *
+     * `--font-display` reste declare et pointe sur la meme pile : les vues
+     * ecrivent deja `font-display` sur les titres et les montants, et la
+     * distinction reste utile — elle marque une INTENTION de hierarchie, meme
+     * quand les deux piles coincident. Le jour ou un titre devrait changer de
+     * dessin, il n'y aurait qu'une ligne a toucher au lieu de cent vues.
+     */
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
 
     /*
      * Courbes et durees. Une seule famille de courbes dans tout le produit :
@@ -55,25 +60,490 @@
     --duration-state: 240ms; /* changement d'etat courant */
     --duration-view: 420ms; /* changement de vue ou de calque */
     --duration-focal: 700ms; /* l'entree du billet, une seule fois */
+
+    /*
+     * Une sortie est plus rapide qu'une entree. Ce qui arrive merite d'etre
+     * regarde ; ce qui part ne doit pas retenir la main de l'utilisateur.
+     */
+    --duration-exit: 160ms;
+
+    /* Pas de cascade. Cinq echelons au maximum : au-dela, le dernier element
+       arrive si tard qu'on croit la page bloquee. */
+    --stagger-step: 90ms;
+
+    /*
+     * Echelle de rayons. Cinq valeurs, pas une de plus : c'est ce qui fait
+     * qu'un ecran inconnu se lit comme appartenant au meme produit.
+     *
+     * La regle d'emploi est la HIERARCHIE, pas la taille : plus une surface
+     * porte de choses, plus son rayon est grand. Un rayon de 24px sur une
+     * pastille de statut la rend ovale ; un rayon de 8px sur un panneau de
+     * 600px de large durcit la silhouette et casse l'illusion de matiere.
+     */
+    --radius-xs: 8px; /* pastille, puce, petite pilule */
+    --radius-sm: 12px; /* champ, bouton, entree de navigation */
+    --radius-md: 16px; /* surface pleine, ligne de tableau detachee */
+    --radius-lg: 20px; /* carte de chiffre, carte posee dans un panneau */
+    --radius-xl: 24px; /* panneau de verre courant */
+    --radius-2xl: 32px; /* grand panneau, modale, cadre de capture */
 }
 
-/*
- * ---------------------------------------------------------------------------
- * Qualite adaptative
- * ---------------------------------------------------------------------------
+/* ===========================================================================
+ * 2. Jetons de couleur — mode clair
+ * ===========================================================================
  *
- * Le marche prioritaire est le telephone Android d'entree de gamme sur
- * connexion mobile (sections 70.4, 72). `backdrop-filter` est l'effet le plus
- * couteux du web : sur un appareil faible, il transforme un defilement en
- * diaporama.
+ * Les valeurs brutes vivent ici, pas dans `@theme`. Une valeur posee dans
+ * `@theme` est figee a la compilation : elle ne peut pas changer avec le
+ * theme. C'est `@theme inline` (section 4) qui rattache ensuite les classes
+ * utilitaires a ces variables, de sorte que `text-ink` ou `border-grey-200`
+ * suivent le theme SANS QU'UNE SEULE VUE SOIT MODIFIEE.
  *
- * resources/js/app.js pose `data-quality="reduced"` sur <html> quand
- * l'appareil annonce peu de coeurs, peu de memoire, ou une connexion
- * economisee. Le verre garde alors sa teinte et sa bordure lumineuse, mais
- * perd son flou : la composition reste intacte, le cout disparait.
- *
- * L'attribut est pose avant le premier rendu, donc sans scintillement.
+ * Le selecteur `[data-theme='light']` figure a cote de `:root` pour une
+ * raison precise : il rend possible un ILOT CLAIR a l'interieur d'une page
+ * sombre. Le billet s'en sert — un QR Code inverse n'est pas lu par la moitie
+ * des lecteurs d'entree de gamme du marche vise.
  */
+
+:root,
+[data-theme='light'] {
+    color-scheme: light;
+
+    /* Bleu azurin — seule couleur de marque a usage large (section 70.1).
+       La rampe est monotone en clair : plus le nombre est grand, plus c'est
+       fonce. Voir le mode sombre pour la seule exception justifiee.
+
+       `--azure-500` VAUT EXACTEMENT #007FFF : c'est la couleur de marque, et
+       elle est employee telle quelle partout ou elle est un GRAPHIQUE — trait
+       de courbe, remplissage de barre, arete active du rail, anneau de focus,
+       pastille. Ces usages demandent 3:1, qu'elle tient largement.
+
+       Elle n'est JAMAIS un fond porteur de texte blanc : blanc sur #007FFF
+       plafonne a 3,8:1, sous le seuil de 4,5:1 exige d'un libelle de bouton.
+       Les aplats qui portent du texte descendent donc d'un cran, sur les
+       jetons `--btn-primary-*` ci-dessous. La marque reste reconnaissable, le
+       libelle reste lisible : les deux contraintes sont tenues sans arbitrer
+       l'une contre l'autre. */
+    --azure-50: #f0f7ff;
+    --azure-100: #dbedff;
+    --azure-300: #66b2ff;
+    --azure-500: #007fff;
+    --azure-600: #0066cc;
+    --azure-700: #004f9e;
+
+    /*
+     * Les deux couleurs du mot-symbole « Pass241 », RELEVEES SUR LE LOGO —
+     * echantillonnees dans `docs/design/logo.png`, pas approchees a l'oeil.
+     *
+     * Elles vivent a part de la rampe azurine parce qu'elles ne servent qu'a
+     * une chose : ecrire le nom de la marque. `--brand-ink` est un bleu marine
+     * tres sombre, pas un noir ; `--brand-blue` est le bleu du logo, a deux
+     * unites du #007FFF de la charte.
+     *
+     * `--brand-blue` porte 4,0:1 sur blanc, sous le seuil de 4,5:1 du texte
+     * courant. C'est admis ici et seulement ici : le critere WCAG 1.4.3 exempte
+     * explicitement le texte qui fait partie d'un logo ou d'un nom de marque.
+     * Aucun autre texte du produit n'emploie cette teinte.
+     */
+    --brand-ink: #011136;
+    --brand-blue: #0077fc;
+
+    /* Fond de page en blanc casse, jamais blanc pur : c'est ce qui donne au
+       verre liquide de quoi se detacher (section 70.1) */
+    --offwhite: #f7f9fb;
+
+    /* Toile des pages publiques : meme famille que --offwhite, legerement
+       tiree vers le bleu pour que la nappe ambiante ait de la matiere. */
+    --canvas: #f5f8fd;
+    --canvas-tint: #dfe9fb;
+
+    /*
+     * Les deux taches de lumiere de `.azure-wash`. Elles etaient REFERENCEES
+     * sans jamais avoir ete definies : les deux `radial-gradient` tombaient,
+     * la nappe se reduisait a un degre lineaire, et le verre pose dessus
+     * n'avait presque plus rien a refracter.
+     *
+     * Tres faibles volontairement. Une nappe qui se voit devient un decor ;
+     * celle-ci ne doit que donner de la matiere a ce qui est pose dessus.
+     */
+    --wash-a: rgba(0, 127, 255, 0.11);
+    --wash-b: rgba(0, 127, 255, 0.07);
+
+    /*
+     * Encre du voile pose sur une affiche d'evenement. TOUJOURS sombre, dans
+     * les deux themes : elle sert a assombrir une photo pour y poser du texte
+     * blanc. En mode sombre, `--ink` est clair — s'en servir eclaircirait
+     * l'image au lieu de la couvrir.
+     */
+    --hero-scrim: #0a0f18;
+
+    --grey-200: #e3e7ec;
+    /* Texte discret. #737b82 tient 4,6:1 sur la toile : sous cette valeur, une
+       mention secondaire devient une mention illisible. */
+    --grey-400: #737b82;
+    --grey-500: #41474d;
+    --ink: #191c1e;
+
+    /* Couleurs semantiques : jamais remplacees par de l'azur, meme sur un
+       ecran tres bleute — un statut de paiement doit se lire d'un coup d'oeil.
+       Ces trois valeurs sont lisibles EN TEXTE sur la toile claire, ce qui est
+       leur usage principal : « Payee », « En attente », « Echouee ». */
+    --success: #006c4b;
+    --warning: #8e5100;
+    --danger: #ba1a1a;
+
+    /* ------------------------------------------------------------------
+     * Matiere du verre
+     * ------------------------------------------------------------------
+     *
+     * Le verre n'est pas decrit deux fois, une par theme : il est decrit UNE
+     * fois (section 5) contre ces jetons. Changer de theme change la matiere,
+     * jamais la composition.
+     */
+    --glass-tint-a: rgba(255, 255, 255, 0.7);
+    --glass-tint-b: rgba(255, 255, 255, 0.42);
+    --glass-border: rgba(255, 255, 255, 0.6);
+    /* Ombre teintee d'azur et non de noir : une ombre neutre sous une surface
+       translucide se lit comme de la salissure. */
+    --glass-shadow: 0 8px 32px rgba(0, 127, 255, 0.08);
+    --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    /* Repli sans flou : appareil modeste, navigateur ancien, capture d'image */
+    --glass-solid: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.8));
+    /* La nappe de lumiere qui suit le pointeur */
+    --glass-specular: rgba(255, 255, 255, 0.75);
+    --glass-specular-fade: rgba(255, 255, 255, 0.18);
+
+    /* Rail lateral : plus opaque que le verre courant, il porte de la
+       navigation lue en diagonale — le contraste prime sur la transparence */
+    --rail-tint-a: rgba(255, 255, 255, 0.88);
+    --rail-tint-b: rgba(255, 255, 255, 0.74);
+    --rail-border: rgba(255, 255, 255, 0.75);
+    --rail-shadow: 1px 0 24px rgba(20, 84, 155, 0.06);
+    --rail-solid: rgba(255, 255, 255, 0.96);
+    /* Etat actif d'une entree de navigation, posee sur le rail */
+    --rail-active: rgba(255, 255, 255, 0.7);
+    --rail-hover: rgba(255, 255, 255, 0.5);
+
+    /* Carte de chiffre */
+    --stat-tint-a: rgba(255, 255, 255, 0.82);
+    --stat-tint-b: rgba(255, 255, 255, 0.58);
+    --stat-border: rgba(255, 255, 255, 0.7);
+    --stat-shadow: 0 8px 28px rgba(20, 84, 155, 0.1);
+    --stat-inner: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --stat-shadow-hover: 0 14px 38px rgba(20, 84, 155, 0.14);
+    --stat-inner-hover: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --stat-solid: rgba(255, 255, 255, 0.94);
+    /* Le liseré de lumiere sur l'arete haute */
+    --stat-edge: rgba(255, 255, 255, 0.95);
+
+    /* Carte posee DANS un panneau de verre : surface pleine, jamais du verre
+       (section 70.4 — pas de verre imbrique dans du verre) */
+    --inset-bg: rgba(255, 255, 255, 0.86);
+    --inset-border: rgba(255, 255, 255, 0.9);
+    --inset-shadow: 0 2px 12px rgba(20, 84, 155, 0.06);
+
+    /* Surface pleine : formulaires de montants, tableaux, donnees financieres */
+    --surface: #ffffff;
+    --field-bg: #ffffff;
+
+    /*
+     * Surface secondaire : en-tete de tableau, ligne survolee, puce d'icone.
+     * Un cran seulement sous `--surface` — au-dela, l'en-tete se lit comme un
+     * bandeau et vole la vedette aux donnees.
+     */
+    --surface-muted: #f2f5f8;
+
+    /* Bouton secondaire. Il vit AUSSI sur des surfaces pleines, ou une bordure
+       blanche translucide serait invisible : sa bordure est donc teintee
+       d'azur, pas de blanc. */
+    --btn-secondary-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.72));
+    --btn-secondary-hover: linear-gradient(135deg, #ffffff, rgba(255, 255, 255, 0.9));
+    --btn-secondary-border: rgba(0, 79, 158, 0.16);
+    --btn-secondary-ink: #004f9e;
+    --btn-secondary-shadow: 0 4px 12px rgba(0, 127, 255, 0.06);
+    --btn-secondary-shadow-hover: 0 8px 20px rgba(0, 127, 255, 0.12);
+
+    /* Calques : menu deroulant, modale, voile */
+    --shadow-pop: 0 12px 40px rgba(0, 127, 255, 0.1), 0 2px 8px rgba(0, 79, 158, 0.06);
+    --shadow-modal: 0 32px 80px -12px rgba(10, 15, 24, 0.28);
+    --overlay: rgba(10, 20, 35, 0.42);
+
+    /* Squelette de chargement */
+    --skeleton-base: #e6ebf1;
+    --skeleton-sheen: rgba(255, 255, 255, 0.85);
+
+    /* ------------------------------------------------------------------
+     * Aplat azur de la page d'accueil
+     * ------------------------------------------------------------------
+     *
+     * Jetons DEDIES, et non la rampe azurine, pour la meme raison que le
+     * bouton primaire : cet aplat porte du texte blanc, il doit donc rester
+     * fonce dans les deux themes, alors que la rampe s'inverse.
+     *
+     * La plage #004f9e -> #0066cc n'est pas choisie a l'oeil : le blanc y tient
+     * 8,1:1 sur la borne haute et 5,1:1 sur la borne basse. Un degre plus clair
+     * — le #007fff de la marque, par exemple — tomberait a 3,4:1, sous le seuil
+     * de 4,5:1 du texte courant. La marque reste reconnaissable ; les
+     * paragraphes restent lisibles.
+     */
+    --lp-grid-from: #004f9e;
+    --lp-grid-to: #0066cc;
+    --lp-grid-rule: rgba(255, 255, 255, 0.18);
+    --lp-grid-icon-line: rgba(255, 255, 255, 0.4);
+    --lp-grid-glow: 0 24px 60px -24px rgba(0, 79, 158, 0.55);
+    /* L'etat souleve d'une cellule : elle passe en clair et rend la main a
+       l'encre. */
+    --lp-grid-lift: #ffffff;
+    --lp-grid-lift-accent: #004f9e;
+    --lp-grid-lift-ink: #41474d;
+    /* L'anneau diffus autour d'une pastille d'etape. */
+    --lp-badge-halo: rgba(0, 127, 255, 0.1);
+
+    /* Bouton primaire. Jetons dedies plutot que la rampe azurine : en mode
+       sombre le bouton doit rester un aplat bleu franc, alors que la rampe,
+       elle, s'inverse pour rester lisible en texte (voir section 3). */
+    --btn-primary-from: #0059b3;
+    --btn-primary-via: #0066cc;
+    --btn-primary-to: #0074e6;
+    --btn-primary-ink: #ffffff;
+    --btn-primary-shadow: 0 1px 2px rgba(0, 79, 158, 0.24);
+    --btn-primary-shadow-hover: 0 10px 24px -6px rgba(0, 127, 255, 0.45);
+    /* Desature plutot qu'eclairci : un bouton desactive doit se lire comme
+       hors service, pas comme un bouton bleu d'une autre nuance. Son encre a
+       son propre jeton — garder l'encre du bouton actif donnerait, en mode
+       sombre, du quasi-noir sur de l'ardoise. */
+    --btn-primary-disabled: #dfe4ea;
+    --btn-primary-disabled-ink: #868e97;
+
+    /* Souche du billet */
+    --stub-from: rgba(242, 248, 254, 0.55);
+    --stub-to: rgba(228, 241, 253, 0.75);
+    --perforation: rgba(20, 84, 155, 0.34);
+    --notch-shadow: inset 0 1px 2px rgba(20, 84, 155, 0.14);
+
+    --scrollbar: var(--grey-200);
+}
+
+/* ===========================================================================
+ * 3. Jetons de couleur — mode sombre
+ * ===========================================================================
+ *
+ * CE N'EST PAS UNE INVERSION. Un theme sombre obtenu en retournant les
+ * valeurs claires donne un gris sale et des bleus fluorescents.
+ *
+ * Le fond n'est pas noir : c'est une encre bleutee tres profonde, de la meme
+ * famille que l'azur de la marque. Sur un aplat noir pur, le verre n'a plus
+ * rien a refracter et redevient un rectangle gris.
+ *
+ * Quatre niveaux de profondeur, perceptibles sans etre theatraux :
+ *
+ *   --canvas          fond de page
+ *   verre du rail     navigation
+ *   --surface         carte pleine, tableau, formulaire
+ *   verre + ombre     carte de chiffre, modale
+ *
+ * LA RAMPE AZURINE S'INVERSE, et c'est voulu. En clair, `azure-700` est le
+ * bleu le plus fonce : c'est la couleur du TEXTE de marque. En sombre, un
+ * texte doit etre clair — `azure-700` devient donc le bleu le plus clair. Le
+ * ROLE de chaque echelon est preserve (700 = texte de marque appuye, 100 =
+ * fond de marque discret), seule sa luminosite suit le theme. Sans cela,
+ * chaque `text-azure-700` deja ecrit dans les vues deviendrait illisible.
+ */
+
+[data-theme='dark'] {
+    color-scheme: dark;
+
+    /*
+     * Le marine du mot-symbole s'eclaircit : #011136 sur une encre bleutee
+     * profonde serait purement et simplement invisible. Il garde sa famille —
+     * un bleu tres desature — pour que « Pass » ne devienne pas un blanc neutre
+     * qui casserait le couple avec le « 241 ».
+     *
+     * `--brand-blue` monte du meme cran que le reste de la rampe.
+     */
+    --brand-ink: #d4dced;
+    --brand-blue: #4d9fff;
+
+    --azure-50: #0c1c2e;
+    --azure-100: #12293f;
+    --azure-300: #3d8ede;
+    /* La marque garde sa teinte mais monte legerement en luminosite : #007fff
+       pur sur une encre profonde tient 4,4:1, suffisant pour un aplat mais
+       juste pour un trait fin de courbe. */
+    --azure-500: #2b95ff;
+    --azure-600: #66b2ff;
+    --azure-700: #a8d3ff;
+
+    --offwhite: #0b0f18;
+    --canvas: #0a0e17;
+    --canvas-tint: #101a2e;
+
+    --wash-a: rgba(0, 127, 255, 0.13);
+    --wash-b: rgba(43, 149, 255, 0.08);
+
+    /* Identique au mode clair, et c'est le sujet : ce voile couvre une photo,
+       il n'a pas a suivre le theme de l'interface. */
+    --hero-scrim: #0a0f18;
+
+    --grey-200: #26303f;
+    --grey-400: #8593a6;
+    --grey-500: #a9b6c8;
+    --ink: #eaeff7;
+
+    /* Les semantiques montent en luminosite pour tenir le contraste sur fond
+       sombre, sans changer de teinte : un rouge doit rester rouge. Les valeurs
+       claires (#006c4b, #8e5100, #ba1a1a) seraient illisibles ici. */
+    --success: #34d187;
+    --warning: #f7bd5c;
+    --danger: #ff6b70;
+
+    /*
+     * Verre sombre : une lueur bleutee tres faible, pas un voile blanc. Un
+     * blanc a 6 % sur fond sombre grise l'image ; une teinte bleu-acier garde
+     * la couleur du fond visible au travers.
+     */
+    --glass-tint-a: rgba(146, 180, 224, 0.13);
+    --glass-tint-b: rgba(110, 145, 190, 0.05);
+    --glass-border: rgba(162, 196, 235, 0.16);
+    --glass-shadow: 0 10px 36px rgba(0, 0, 0, 0.5);
+    --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    --glass-solid: linear-gradient(135deg, #182234, #131b2a);
+    --glass-specular: rgba(180, 214, 255, 0.22);
+    --glass-specular-fade: rgba(180, 214, 255, 0.06);
+
+    --rail-tint-a: rgba(24, 34, 52, 0.86);
+    --rail-tint-b: rgba(17, 24, 38, 0.78);
+    --rail-border: rgba(162, 196, 235, 0.12);
+    --rail-shadow: 1px 0 24px rgba(0, 0, 0, 0.4);
+    --rail-solid: #141c2b;
+    --rail-active: rgba(146, 180, 224, 0.16);
+    --rail-hover: rgba(146, 180, 224, 0.09);
+
+    --stat-tint-a: rgba(150, 184, 228, 0.14);
+    --stat-tint-b: rgba(110, 145, 190, 0.05);
+    --stat-border: rgba(162, 196, 235, 0.15);
+    --stat-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --stat-inner: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    --stat-shadow-hover: 0 18px 44px rgba(0, 0, 0, 0.55);
+    --stat-inner-hover: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    --stat-solid: #182234;
+    --stat-edge: rgba(190, 220, 255, 0.5);
+
+    --inset-bg: rgba(150, 184, 228, 0.07);
+    --inset-border: rgba(162, 196, 235, 0.1);
+    --inset-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+
+    --surface: #141b27;
+    --field-bg: #111825;
+
+    /* En mode sombre la surface secondaire est PLUS CLAIRE que la surface :
+       la profondeur se lit par la lumiere recue, pas par l'assombrissement. */
+    --surface-muted: #1b2433;
+
+    --btn-secondary-bg: linear-gradient(135deg, rgba(150, 184, 228, 0.16), rgba(110, 145, 190, 0.07));
+    --btn-secondary-hover: linear-gradient(135deg, rgba(150, 184, 228, 0.26), rgba(110, 145, 190, 0.14));
+    --btn-secondary-border: rgba(162, 196, 235, 0.22);
+    --btn-secondary-ink: #a8d3ff;
+    --btn-secondary-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --btn-secondary-shadow-hover: 0 8px 20px rgba(0, 0, 0, 0.45);
+
+    --shadow-pop: 0 14px 44px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+    --shadow-modal: 0 32px 80px -12px rgba(0, 0, 0, 0.75);
+    --overlay: rgba(4, 8, 15, 0.66);
+
+    --skeleton-base: #1e2836;
+    --skeleton-sheen: rgba(146, 180, 224, 0.1);
+
+    /*
+     * L'aplat azur descend d'un cran en mode sombre. Repris tel quel du mode
+     * clair, il deviendrait la zone la PLUS lumineuse d'un ecran nocturne, et
+     * une page sombre dont le milieu eblouit est une page sombre ratee.
+     *
+     * Le blanc y tient plus de 10:1 : la marge gagnee en assombrissant n'est
+     * jamais perdue en lisibilite.
+     */
+    --lp-grid-from: #0a2d55;
+    --lp-grid-to: #103f70;
+    --lp-grid-rule: rgba(255, 255, 255, 0.1);
+    --lp-grid-icon-line: rgba(255, 255, 255, 0.28);
+    --lp-grid-glow: 0 24px 60px -24px rgba(0, 0, 0, 0.7);
+    /* L'inversion ne va PAS jusqu'au blanc ici : un aplat blanc au milieu
+       d'une page sombre eclaire la piece a chaque passage du pointeur. La
+       cellule s'eleve d'un voile clair, ce qui dit la meme chose sans la
+       brulure. */
+    --lp-grid-lift: rgba(255, 255, 255, 0.1);
+    --lp-grid-lift-accent: #a8d3ff;
+    --lp-grid-lift-ink: #dce8f7;
+    --lp-badge-halo: rgba(43, 149, 255, 0.12);
+
+    /* Le bouton reste un aplat bleu franc : c'est l'element le plus important
+       de l'ecran, il n'a pas a se fondre dans le decor. Legerement plus clair
+       qu'en mode clair, faute de quoi il s'enfonce dans le fond. */
+    --btn-primary-from: #0f7ae8;
+    --btn-primary-via: #2b95ff;
+    --btn-primary-to: #4dabff;
+    --btn-primary-ink: #04101f;
+    --btn-primary-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --btn-primary-shadow-hover: 0 12px 28px -8px rgba(43, 149, 255, 0.5);
+    /* Cette valeur etait `#2b4straight` — une chaine invalide, que le
+       navigateur laissait tomber. Le bouton desactive retombait alors sur la
+       couleur heritee : en mode sombre, il restait indiscernable d'un bouton
+       actif. */
+    --btn-primary-disabled: #232e3d;
+    --btn-primary-disabled-ink: #6b7889;
+
+    --stub-from: rgba(30, 44, 66, 0.55);
+    --stub-to: rgba(22, 34, 52, 0.75);
+    --perforation: rgba(162, 196, 235, 0.35);
+    --notch-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+
+    --scrollbar: #2c384a;
+}
+
+/* ===========================================================================
+ * 4. Rattachement aux classes utilitaires
+ * ===========================================================================
+ *
+ * `@theme inline` produit `text-ink`, `bg-surface`, `border-grey-200`… en
+ * REFERENCANT la variable plutot qu'en recopiant sa valeur. C'est ce mot-cle
+ * qui fait que tout le produit bascule de theme sans qu'aucune vue ne change.
+ */
+
+@theme inline {
+    --color-brand-ink: var(--brand-ink);
+    --color-brand-blue: var(--brand-blue);
+
+    --color-azure-50: var(--azure-50);
+    --color-azure-100: var(--azure-100);
+    --color-azure-300: var(--azure-300);
+    --color-azure-500: var(--azure-500);
+    --color-azure-600: var(--azure-600);
+    --color-azure-700: var(--azure-700);
+
+    --color-offwhite: var(--offwhite);
+    --color-canvas: var(--canvas);
+    --color-canvas-tint: var(--canvas-tint);
+
+    --color-grey-200: var(--grey-200);
+    --color-grey-400: var(--grey-400);
+    --color-grey-500: var(--grey-500);
+    --color-ink: var(--ink);
+
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-danger: var(--danger);
+
+    /*
+     * Surface : le remplacant de `bg-white` dans tout le produit. `bg-white`
+     * reste disponible et reste blanc — pour les rares endroits ou le blanc
+     * est voulu quel que soit le theme, au premier rang desquels le QR Code.
+     */
+    --color-surface: var(--surface);
+    --color-surface-muted: var(--surface-muted);
+}
+
+/* ===========================================================================
+ * 5. Base
+ * ======================================================================== */
 
 @layer base {
     html {
@@ -82,8 +552,8 @@
     }
 
     body {
-        background-color: var(--color-offwhite);
-        color: var(--color-ink);
+        background-color: var(--offwhite);
+        color: var(--ink);
         font-family: var(--font-sans);
         -webkit-font-smoothing: antialiased;
         text-rendering: optimizeLegibility;
@@ -95,19 +565,19 @@
      * focus. Laissees par defaut, elles appartiennent a aucun systeme visuel.
      */
     ::selection {
-        background-color: color-mix(in srgb, var(--color-azure-500) 22%, transparent);
-        color: var(--color-azure-700);
+        background-color: color-mix(in srgb, var(--azure-500) 22%, transparent);
+        color: var(--azure-700);
     }
 
     :root {
-        accent-color: var(--color-azure-500);
-        caret-color: var(--color-azure-600);
-        scrollbar-color: var(--color-grey-200) transparent;
+        accent-color: var(--azure-500);
+        caret-color: var(--azure-600);
+        scrollbar-color: var(--scrollbar) transparent;
         scrollbar-width: thin;
     }
 
     :focus-visible {
-        outline: 2px solid var(--color-azure-500);
+        outline: 2px solid var(--azure-500);
         outline-offset: 2px;
         border-radius: 4px;
     }
@@ -133,6 +603,47 @@
     }
 }
 
+/* ===========================================================================
+ * 6. Bascule de theme
+ * ===========================================================================
+ *
+ * La transition n'est PAS permanente. Une regle globale
+ * `transition: background-color …` ferait trainer chaque survol de ligne de
+ * tableau et chaque changement d'etat de champ : l'interface entiere
+ * paraitrait molle.
+ *
+ * Elle n'est armee que pendant la bascule elle-meme : app.js pose
+ * `data-theme-switching` sur <html>, le retire une fois le fondu termine. Le
+ * reste du temps, le changement de theme n'a aucun cout.
+ */
+
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+    transition:
+        background-color var(--duration-state) var(--ease-out-quart),
+        border-color var(--duration-state) var(--ease-out-quart),
+        color var(--duration-state) var(--ease-out-quart),
+        box-shadow var(--duration-state) var(--ease-out-quart) !important;
+}
+
+/* ===========================================================================
+ * 7. Qualite adaptative
+ * ===========================================================================
+ *
+ * Le marche prioritaire est le telephone Android d'entree de gamme sur
+ * connexion mobile (sections 70.4, 72). `backdrop-filter` est l'effet le plus
+ * couteux du web : sur un appareil faible, il transforme un defilement en
+ * diaporama.
+ *
+ * resources/js/app.js pose `data-quality="reduced"` sur <html> quand
+ * l'appareil annonce peu de coeurs, peu de memoire, ou une connexion
+ * economisee. Le verre garde alors sa teinte et sa bordure lumineuse, mais
+ * perd son flou : la composition reste intacte, le cout disparait.
+ *
+ * L'attribut est pose avant le premier rendu, donc sans scintillement.
+ */
+
 @layer components {
     /*
      * Verre liquide (section 70.3). A poser uniquement sur un fond qui a de la
@@ -141,28 +652,26 @@
      */
     .glass {
         position: relative;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.32));
-        backdrop-filter: blur(20px) saturate(180%);
+        background: linear-gradient(135deg, var(--glass-tint-a), var(--glass-tint-b));
         -webkit-backdrop-filter: blur(20px) saturate(180%);
-        border: 1px solid rgba(255, 255, 255, 0.6);
-        border-radius: 24px;
-        box-shadow:
-            0 8px 32px rgba(20, 84, 155, 0.12),
-            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(20px) saturate(180%);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--glass-shadow), var(--glass-inner);
     }
 
     /* Appareil modeste ou connexion economisee : le flou tombe, la teinte
        monte pour compenser la perte de contraste avec le fond. */
     :root[data-quality='reduced'] .glass {
-        backdrop-filter: none;
         -webkit-backdrop-filter: none;
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.8));
+        backdrop-filter: none;
+        background: var(--glass-solid);
     }
 
     /* Navigateur sans backdrop-filter : meme repli. */
     @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
         .glass {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.8));
+            background: var(--glass-solid);
         }
     }
 
@@ -190,8 +699,8 @@
             transition: opacity var(--duration-state) var(--ease-out-quart);
             background: radial-gradient(
                 18rem 18rem at var(--spec-x, 50%) var(--spec-y, 0%),
-                rgba(255, 255, 255, 0.75),
-                rgba(255, 255, 255, 0.18) 38%,
+                var(--glass-specular),
+                var(--glass-specular-fade) 38%,
                 transparent 68%
             );
         }
@@ -209,9 +718,9 @@
 
     /* Surface pleine : formulaires de montants, tableaux, donnees financieres */
     .surface {
-        background-color: #ffffff;
-        border: 1px solid var(--color-grey-200);
-        border-radius: 16px;
+        background-color: var(--surface);
+        border: 1px solid var(--grey-200);
+        border-radius: var(--radius-md);
     }
 
     /*
@@ -220,13 +729,16 @@
      * Le verre a besoin de quelque chose a refracter : sur un aplat uni,
      * l'effet est invisible et coute du rendu pour rien. Une diagonale
      * bleu-lavande donne le fond, deux taches azur y apportent le relief.
+     *
+     * En mode sombre, les taches sont plus larges et plus faibles : sur une
+     * encre profonde, une lueur trop marquee se lit comme un halo d'ecran sale.
      */
     .azure-wash {
-        background-color: var(--color-canvas);
+        background-color: var(--canvas);
         background-image:
-            radial-gradient(58rem 38rem at 12% -8%, rgba(47, 143, 230, 0.16), transparent 58%),
-            radial-gradient(46rem 34rem at 108% 6%, rgba(125, 182, 239, 0.2), transparent 55%),
-            linear-gradient(135deg, var(--color-canvas) 0%, var(--color-canvas-tint) 52%, var(--color-canvas) 100%);
+            radial-gradient(58rem 38rem at 12% -8%, var(--wash-a), transparent 58%),
+            radial-gradient(46rem 34rem at 108% 6%, var(--wash-b), transparent 55%),
+            linear-gradient(135deg, var(--canvas) 0%, var(--canvas-tint) 52%, var(--canvas) 100%);
         background-attachment: scroll;
     }
 
@@ -236,7 +748,7 @@
      * matiere.
      */
     .glass-panel {
-        border-radius: 32px;
+        border-radius: var(--radius-2xl);
     }
 
     /*
@@ -248,47 +760,47 @@
      * doublent le cout de rendu sur telephone.
      */
     .glass-inset {
-        background-color: rgba(255, 255, 255, 0.86);
-        border: 1px solid rgba(255, 255, 255, 0.9);
-        border-radius: 20px;
-        box-shadow: 0 2px 12px rgba(20, 84, 155, 0.06);
+        background-color: var(--inset-bg);
+        border: 1px solid var(--inset-border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--inset-shadow);
     }
 
     .field {
         width: 100%;
-        border-radius: 12px;
-        border: 1px solid var(--color-grey-200);
-        background-color: #ffffff;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--grey-200);
+        background-color: var(--field-bg);
         padding: 0.75rem 0.875rem;
         /* 16px : en dessous, iOS zoome automatiquement au focus. L'application
            est mobile-first, ce detail se voit tout de suite sur le terrain. */
         font-size: 1rem;
-        color: var(--color-ink);
+        color: var(--ink);
         transition:
             border-color var(--duration-feedback) var(--ease-out-quart),
             box-shadow var(--duration-feedback) var(--ease-out-quart);
     }
 
     .field::placeholder {
-        color: var(--color-grey-400);
+        color: var(--grey-400);
     }
 
     .field:hover:not(:focus) {
-        border-color: var(--color-azure-300);
+        border-color: var(--azure-300);
     }
 
     .field:focus {
         outline: none;
-        border-color: var(--color-azure-500);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-azure-500) 18%, transparent);
+        border-color: var(--azure-500);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--azure-500) 18%, transparent);
     }
 
     .field[aria-invalid='true'] {
-        border-color: var(--color-danger);
+        border-color: var(--danger);
     }
 
     .field[aria-invalid='true']:focus {
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 18%, transparent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent);
     }
 
     .btn {
@@ -299,7 +811,7 @@
         /* 44px de haut : cible tactile confortable, mobile-first (section 70) */
         min-height: 2.75rem;
         padding: 0.6875rem 1.25rem;
-        border-radius: 12px;
+        border-radius: var(--radius-sm);
         font-weight: 600;
         font-size: 0.9375rem;
         transition:
@@ -316,13 +828,18 @@
         /* Degrade dans une seule famille de bleu : la lumiere semble venir de
            la droite, comme sur les surfaces en verre de la page. Deux teintes
            eloignees donneraient un bouton bariole. */
-        background-image: linear-gradient(100deg, var(--color-azure-600) 0%, var(--color-azure-500) 55%, #3aa0f0 100%);
-        color: #ffffff;
-        box-shadow: 0 1px 2px rgba(20, 84, 155, 0.24);
+        background-image: linear-gradient(
+            100deg,
+            var(--btn-primary-from) 0%,
+            var(--btn-primary-via) 55%,
+            var(--btn-primary-to) 100%
+        );
+        color: var(--btn-primary-ink);
+        box-shadow: var(--btn-primary-shadow);
     }
 
     .btn-primary:hover {
-        box-shadow: 0 10px 24px -6px rgba(29, 111, 196, 0.5);
+        box-shadow: var(--btn-primary-shadow-hover);
         transform: translateY(-1px);
     }
 
@@ -332,7 +849,8 @@
 
     .btn-primary:disabled {
         background-image: none;
-        background-color: var(--color-azure-300);
+        background-color: var(--btn-primary-disabled);
+        color: var(--btn-primary-disabled-ink);
         box-shadow: none;
         transform: none;
         cursor: not-allowed;
@@ -351,12 +869,732 @@
     }
 
     .btn-ghost {
-        color: var(--color-azure-700);
+        color: var(--azure-700);
         background-color: transparent;
     }
 
     .btn-ghost:hover {
-        background-color: var(--color-azure-100);
+        background-color: var(--azure-100);
+    }
+
+    /*
+     * Bouton secondaire — le « verre » de la maquette de reference.
+     *
+     * Il est la deuxieme action d'un ecran, jamais la premiere : « Annuler »,
+     * « Exporter », « Voir la page publique ». Un seul bouton primaire par
+     * ecran, sinon aucun ne l'est.
+     */
+    .btn-secondary {
+        background-image: var(--btn-secondary-bg);
+        border: 1px solid var(--btn-secondary-border);
+        color: var(--btn-secondary-ink);
+        box-shadow: var(--btn-secondary-shadow);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+    }
+
+    .btn-secondary:hover {
+        background-image: var(--btn-secondary-hover);
+        box-shadow: var(--btn-secondary-shadow-hover);
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary:active {
+        transform: translateY(0) scale(0.99);
+    }
+
+    :root[data-quality='reduced'] .btn-secondary {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    /*
+     * Actions destructives et confirmatives.
+     *
+     * Teintes plutot que pleines : un aplat rouge de la taille d'un bouton
+     * primaire attire l'oeil AVANT l'action principale de l'ecran, ce qui est
+     * exactement l'inverse de ce qu'on veut d'un bouton « Supprimer ». La
+     * bordure et l'encre suffisent a l'identifier ; le rouge plein est reserve
+     * a la confirmation dans la modale, ou il n'y a plus d'autre choix a faire.
+     */
+    .btn-danger {
+        background-color: color-mix(in srgb, var(--danger) 10%, transparent);
+        border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
+        color: var(--danger);
+    }
+
+    .btn-danger:hover {
+        background-color: color-mix(in srgb, var(--danger) 18%, transparent);
+    }
+
+    .btn-danger-solid {
+        background-color: var(--danger);
+        color: #ffffff;
+        border: 1px solid var(--danger);
+    }
+
+    .btn-danger-solid:hover {
+        background-color: color-mix(in srgb, var(--danger) 88%, #000000);
+    }
+
+    .btn-success {
+        background-color: color-mix(in srgb, var(--success) 10%, transparent);
+        border: 1px solid color-mix(in srgb, var(--success) 32%, transparent);
+        color: var(--success);
+    }
+
+    .btn-success:hover {
+        background-color: color-mix(in srgb, var(--success) 18%, transparent);
+    }
+
+    .btn-sm {
+        min-height: 2.25rem;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.8125rem;
+        border-radius: var(--radius-xs);
+    }
+
+    /*
+     * Bouton d'icone. Il garde 44px de cible tactile meme quand l'icone n'en
+     * occupe que 20 : la cible ne se voit pas, elle se touche (regle
+     * « Touch & Interaction », priorite 2).
+     */
+    .btn-icon {
+        min-height: 2.75rem;
+        min-width: 2.75rem;
+        padding: 0;
+        border-radius: var(--radius-sm);
+        color: var(--grey-500);
+    }
+
+    .btn-icon:hover {
+        background-color: var(--surface-muted);
+        color: var(--azure-700);
+    }
+
+    .btn-icon-sm {
+        min-height: 2.25rem;
+        min-width: 2.25rem;
+    }
+
+    /*
+     * Etat de chargement.
+     *
+     * Le libelle RESTE en place et garde sa largeur : le remplacer par un
+     * « Chargement… » fait sauter la largeur du bouton, et avec elle toute la
+     * barre d'actions. On le rend transparent, on pose un disque tournant
+     * par-dessus. La largeur ne bouge pas d'un pixel.
+     */
+    .btn[aria-busy='true'],
+    .btn[wire\:loading] {
+        position: relative;
+        color: transparent !important;
+        pointer-events: none;
+    }
+
+    .btn[aria-busy='true']::after {
+        content: '';
+        position: absolute;
+        width: 1.125rem;
+        height: 1.125rem;
+        border-radius: 9999px;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        color: var(--btn-primary-ink);
+        animation: btn-spin 620ms linear infinite;
+    }
+
+    .btn-secondary[aria-busy='true']::after,
+    .btn-ghost[aria-busy='true']::after {
+        color: var(--azure-700);
+    }
+
+    @keyframes btn-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+     * Carte en verre
+     * ----------------------------------------------------------------------
+     *
+     * L'echelon intermediaire entre `.surface` (pleine, pour les donnees
+     * denses) et `.glass` (panneau, pour les grands calques). C'est la carte
+     * de la maquette de reference : plus opaque que le panneau, donc lisible
+     * meme avec du texte courant dessus.
+     */
+    .glass-card {
+        position: relative;
+        background: linear-gradient(160deg, var(--stat-tint-a), var(--stat-tint-b));
+        -webkit-backdrop-filter: blur(10px) saturate(170%);
+        backdrop-filter: blur(10px) saturate(170%);
+        border: 1px solid var(--stat-border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--stat-shadow);
+    }
+
+    :root[data-quality='reduced'] .glass-card {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: var(--stat-solid);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .glass-card {
+            background: var(--stat-solid);
+        }
+    }
+
+    /*
+     * Relief au survol, pour les cartes QUI MENENT QUELQUE PART uniquement.
+     * Une carte qui se souleve sans etre cliquable promet une action qui
+     * n'existe pas.
+     */
+    @media (hover: hover) and (pointer: fine) {
+        .card-lift {
+            transition:
+                transform var(--duration-state) var(--ease-out-quart),
+                box-shadow var(--duration-state) var(--ease-out-quart);
+        }
+
+        .card-lift:hover {
+            transform: translate3d(0, -2px, 0);
+            box-shadow: var(--stat-shadow-hover), var(--stat-inner-hover);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .card-lift:hover {
+            transform: none;
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+     * Pastilles de statut
+     * ----------------------------------------------------------------------
+     *
+     * Un seul jeu pour tout le produit : commande, reversement, evenement,
+     * collecte, invitation. Deux pastilles « Payee » de teintes differentes
+     * sur deux ecrans font douter de ce qu'on lit.
+     *
+     * Chacune porte un POINT en plus de sa couleur. La couleur seule ne suffit
+     * pas : un daltonien deuteranope ne distingue pas le vert de l'orange, et
+     * un export imprime en noir et blanc les confond toutes.
+     */
+    .badge {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 0.375rem;
+        border-radius: 9999px;
+        padding: 0.25rem 0.625rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.25;
+        white-space: nowrap;
+    }
+
+    .badge::before {
+        content: '';
+        width: 0.375rem;
+        height: 0.375rem;
+        border-radius: 9999px;
+        background-color: currentColor;
+        flex-shrink: 0;
+    }
+
+    .badge-bare::before {
+        display: none;
+    }
+
+    .badge-success {
+        background-color: color-mix(in srgb, var(--success) 12%, transparent);
+        color: var(--success);
+    }
+
+    .badge-warning {
+        background-color: color-mix(in srgb, var(--warning) 14%, transparent);
+        color: var(--warning);
+    }
+
+    .badge-danger {
+        background-color: color-mix(in srgb, var(--danger) 12%, transparent);
+        color: var(--danger);
+    }
+
+    .badge-info {
+        background-color: var(--azure-100);
+        color: var(--azure-700);
+    }
+
+    .badge-neutral {
+        background-color: color-mix(in srgb, var(--grey-400) 18%, transparent);
+        color: var(--grey-500);
+    }
+
+    /* -------------------------------------------------------------------------
+     * Tableaux
+     * ----------------------------------------------------------------------
+     *
+     * Surface PLEINE, jamais du verre (section 70.4). Un tableau est ce qu'on
+     * relit ligne a ligne ; le flou lui retire precisement le contraste dont
+     * cette lecture depend.
+     *
+     * L'aeration vient des marges internes, pas des filets : un filet par
+     * colonne transforme une liste en grille de tableur.
+     */
+    .data-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .data-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background-color: var(--surface-muted);
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--grey-500);
+        white-space: nowrap;
+        border-bottom: 1px solid var(--grey-200);
+    }
+
+    .data-table tbody td {
+        padding: 0.875rem 1rem;
+        font-size: 0.875rem;
+        color: var(--ink);
+        border-bottom: 1px solid color-mix(in srgb, var(--grey-200) 60%, transparent);
+        vertical-align: middle;
+    }
+
+    .data-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .data-table tbody tr {
+        transition: background-color var(--duration-feedback) var(--ease-out-quart);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .data-table tbody tr:hover {
+            background-color: var(--surface-muted);
+        }
+    }
+
+    /* Colonne de montants : alignee a droite, chiffres tabulaires. Deux
+       montants ne se comparent qu'alignes sur leur unite. */
+    .data-table .col-amount {
+        text-align: right;
+        font-weight: 600;
+    }
+
+    .data-table .col-actions {
+        text-align: right;
+        white-space: nowrap;
+        width: 1%;
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Tableau empile sur telephone
+     * ---------------------------------------------------------------------
+     *
+     * En dessous de `md`, chaque LIGNE devient une carte et chaque CELLULE une
+     * paire libelle/valeur. Ce n'est pas un tableau comprime : c'est une autre
+     * composition, obtenue sans dupliquer le balisage.
+     *
+     * L'alternative repandue — une liste de cartes en plus du tableau, masquee
+     * a tour de role — oblige a ecrire deux fois chaque ligne, donc a les faire
+     * diverger tot ou tard. Un simple `overflow-x` n'est pas mieux : un tableau
+     * de sept colonnes sur 375px force a defiler lateralement pour lire une
+     * seule ligne, et on perd de vue a qui elle appartient.
+     *
+     * La STRUCTURE du tableau est preservee : `<thead>` n'est pas retire, il
+     * est deplace hors du champ visuel. Un lecteur d'ecran continue d'annoncer
+     * « colonne Montant » avant chaque valeur, et le tableau reste un tableau.
+     *
+     * Chaque `<td>` porte son libelle dans `data-label`. La cellule marquee
+     * `cell-primary` devient le titre de la carte : c'est elle qui dit de QUI
+     * ou de QUOI parle la ligne, et elle n'a pas besoin d'etre etiquetee.
+     */
+    @media (max-width: 47.999rem) {
+        .data-table-stack thead {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            margin: -1px;
+            padding: 0;
+            border: 0;
+            overflow: hidden;
+            clip-path: inset(50%);
+            white-space: nowrap;
+        }
+
+        .data-table-stack tbody tr {
+            display: block;
+            padding: 0.875rem 1rem;
+            border-bottom: 1px solid color-mix(in srgb, var(--grey-200) 70%, transparent);
+        }
+
+        .data-table-stack tbody tr:last-child {
+            border-bottom: 0;
+        }
+
+        .data-table-stack tbody td {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.1875rem 0;
+            border-bottom: 0;
+            text-align: right;
+        }
+
+        .data-table-stack tbody td[data-label]::before {
+            content: attr(data-label);
+            flex-shrink: 0;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--grey-500);
+        }
+
+        /* Le titre de la carte : pleine largeur, en tete, sans libelle. */
+        .data-table-stack tbody td.cell-primary {
+            display: block;
+            padding-bottom: 0.5rem;
+            text-align: left;
+            font-size: 0.9375rem;
+            font-weight: 700;
+        }
+
+        .data-table-stack tbody td.cell-primary::before {
+            content: none;
+        }
+
+        /* Les actions passent en pied de carte, alignees a gauche et espacees :
+           au doigt, deux cibles collees a droite se manquent. */
+        .data-table-stack tbody td.col-actions {
+            width: auto;
+            justify-content: flex-start;
+            padding-top: 0.625rem;
+            white-space: normal;
+        }
+
+        .data-table-stack tbody td.col-amount {
+            text-align: right;
+        }
+
+        /* Une cellule vide sur telephone n'a pas a occuper une ligne pour
+           afficher son seul libelle. */
+        .data-table-stack tbody td:empty {
+            display: none;
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+     * Squelette de chargement
+     * ----------------------------------------------------------------------
+     *
+     * Un squelette plutot qu'un disque tournant : il occupe la place exacte du
+     * contenu attendu, donc rien ne saute quand celui-ci arrive. C'est la
+     * moitie du travail sur le decalage cumulatif de mise en page.
+     */
+    .skeleton {
+        position: relative;
+        overflow: hidden;
+        background-color: var(--skeleton-base);
+        border-radius: var(--radius-xs);
+    }
+
+    .skeleton::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, var(--skeleton-sheen), transparent);
+        animation: skeleton-sweep 1.4s var(--ease-out-quart) infinite;
+    }
+
+    @keyframes skeleton-sweep {
+        to {
+            transform: translateX(100%);
+        }
+    }
+
+    /* Un mouvement reduit demande une surface stable, pas un balayage. */
+    @media (prefers-reduced-motion: reduce) {
+        .skeleton::after {
+            animation: none;
+            opacity: 0;
+        }
+    }
+
+    /* -------------------------------------------------------------------------
+     * Calques : menu deroulant, modale, tiroir
+     * ---------------------------------------------------------------------- */
+
+    .overlay-scrim {
+        position: fixed;
+        inset: 0;
+        background-color: var(--overlay);
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+    }
+
+    :root[data-quality='reduced'] .overlay-scrim {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    /*
+     * Modale et tiroir : surface PLEINE, malgre l'esthetique de verre du reste.
+     *
+     * Une modale flotte au-dessus du contenu de la page — c'est justement ce
+     * contenu qu'on voudrait ne plus lire. Un panneau translucide laisserait le
+     * tableau du dessous transparaitre sous le formulaire de confirmation. Le
+     * verre reste sur le voile, ou il est a sa place.
+     */
+    .layer-panel {
+        background-color: var(--surface);
+        border: 1px solid var(--grey-200);
+        border-radius: var(--radius-2xl);
+        box-shadow: var(--shadow-modal);
+    }
+
+    .layer-menu {
+        background-color: var(--surface);
+        border: 1px solid var(--grey-200);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-pop);
+    }
+
+    @keyframes layer-in {
+        from {
+            opacity: 0;
+            transform: translate3d(0, 8px, 0) scale(0.98);
+        }
+        to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) scale(1);
+        }
+    }
+
+    .layer-in {
+        animation: layer-in var(--duration-state) var(--ease-out-expo) both;
+    }
+
+    @keyframes scrim-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .scrim-in {
+        animation: scrim-in var(--duration-state) var(--ease-out-quart) both;
+    }
+
+    /* -------------------------------------------------------------------------
+     * Graphiques
+     * ----------------------------------------------------------------------
+     *
+     * Aucune bibliotheque. Quatre a douze points ne justifient pas des dizaines
+     * de kilo-octets sur une connexion mobile gabonaise (section 72), et un SVG
+     * ecrit par le serveur est lisible par un lecteur d'ecran des lors qu'on lui
+     * donne un tableau de repli.
+     *
+     * La grille est volontairement a peine visible : elle sert a estimer une
+     * hauteur, pas a etre regardee.
+     */
+    .chart-grid {
+        background-image: repeating-linear-gradient(
+            to top,
+            color-mix(in srgb, var(--grey-200) 70%, transparent) 0 1px,
+            transparent 1px 25%
+        );
+    }
+
+    .chart-bar {
+        border-radius: var(--radius-xs) var(--radius-xs) 2px 2px;
+        background-image: linear-gradient(
+            to top,
+            color-mix(in srgb, var(--azure-500) 62%, transparent),
+            var(--azure-500)
+        );
+        transition:
+            height var(--duration-view) var(--ease-out-expo),
+            background-color var(--duration-feedback) var(--ease-out-quart);
+    }
+
+    /* La barre du jour en cours : pleine, les autres legerement en retrait.
+       C'est la seule hierarchie du graphique, et elle evite une legende. */
+    .chart-bar-muted {
+        background-image: linear-gradient(
+            to top,
+            color-mix(in srgb, var(--azure-500) 26%, transparent),
+            color-mix(in srgb, var(--azure-500) 55%, transparent)
+        );
+    }
+
+    .chart-line {
+        fill: none;
+        stroke: var(--azure-500);
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vector-effect: non-scaling-stroke;
+    }
+
+    /*
+     * La surface sous la courbe n'a pas de classe : son degrade est declare
+     * DANS chaque SVG, avec un identifiant unique. Deux graphiques sur la meme
+     * page partageraient sinon la meme definition, et le second effacerait le
+     * premier — un defaut qui ne se voit qu'a partir du deuxieme graphique.
+     */
+
+    /* -------------------------------------------------------------------------
+     * Etat vide
+     * ----------------------------------------------------------------------
+     *
+     * Jamais une page blanche : un ecran vide doit dire ce qui manque et offrir
+     * le geste qui le remplit. C'est le seul endroit ou une grande icone est
+     * justifiee — elle occupe l'espace que le contenu occupera.
+     */
+    .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+    }
+
+    .empty-state-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3.5rem;
+        height: 3.5rem;
+        margin-bottom: 0.5rem;
+        border-radius: 9999px;
+        background-color: var(--azure-100);
+        color: var(--azure-600);
+    }
+
+    /* -------------------------------------------------------------------------
+     * Barre de filtres et recherche
+     * ---------------------------------------------------------------------- */
+
+    .field-search {
+        padding-left: 2.5rem;
+    }
+
+    /*
+     * Groupe de bascule (« Tous / Publies / Brouillons »).
+     *
+     * Des onglets plutot qu'un menu deroulant tant qu'il y a cinq choix ou
+     * moins : l'utilisateur voit d'un coup ce qui existe, et change de filtre
+     * en un geste au lieu de trois.
+     */
+    .seg {
+        display: inline-flex;
+        gap: 0.125rem;
+        padding: 0.1875rem;
+        border-radius: var(--radius-sm);
+        background-color: var(--surface-muted);
+        border: 1px solid var(--grey-200);
+    }
+
+    .seg-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        min-height: 2.125rem;
+        padding: 0 0.75rem;
+        border-radius: calc(var(--radius-sm) - 3px);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--grey-500);
+        white-space: nowrap;
+        transition:
+            background-color var(--duration-feedback) var(--ease-out-quart),
+            color var(--duration-feedback) var(--ease-out-quart);
+    }
+
+    .seg-item:hover {
+        color: var(--azure-700);
+    }
+
+    /*
+     * Trois attributs pour un seul aspect, parce que le meme dessin sert trois
+     * roles differents : `aria-selected` pour une serie d'onglets,
+     * `aria-checked` pour un choix exclusif, `aria-pressed` pour une bascule.
+     * Le composant se plie au role attendu par le lecteur d'ecran au lieu de
+     * forcer le balisage a se plier au composant.
+     */
+    .seg-item[aria-selected='true'],
+    .seg-item[aria-checked='true'],
+    .seg-item[aria-pressed='true'] {
+        background-color: var(--surface);
+        color: var(--azure-700);
+        box-shadow: 0 1px 3px rgba(0, 79, 158, 0.1);
+    }
+
+    [data-theme='dark'] .seg-item[aria-selected='true'],
+    [data-theme='dark'] .seg-item[aria-checked='true'],
+    [data-theme='dark'] .seg-item[aria-pressed='true'] {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    /*
+     * Barre de progression. Une seule ecriture pour la billetterie et les
+     * collectes : le remplissage d'un evenement et l'avancee d'une collecte se
+     * lisent de la meme facon, il n'y a aucune raison de les dessiner
+     * differemment.
+     */
+    .progress-track {
+        height: 0.375rem;
+        border-radius: 9999px;
+        background-color: color-mix(in srgb, var(--grey-400) 24%, transparent);
+        overflow: hidden;
+    }
+
+    /*
+     * La largeur vit dans `--progress`, ECRITE PAR LE SERVEUR — jamais calculee
+     * par le navigateur (sections 49, 50). Le repli a 0% ne sert qu'au cas ou
+     * la variable manque ; il ne doit jamais etre atteint.
+     */
+    .progress-fill {
+        width: var(--progress, 0%);
+        height: 100%;
+        border-radius: 9999px;
+        background-color: var(--azure-500);
+    }
+
+    /* Teintes semantiques de la barre, pour la billetterie : un evenement a 8 %
+       trois jours avant l'ouverture des portes n'est pas une bonne nouvelle. */
+    .progress-fill-warning {
+        background-color: var(--warning);
+    }
+
+    .progress-fill-danger {
+        background-color: var(--danger);
+    }
+
+    .progress-fill-success {
+        background-color: var(--success);
     }
 
     /*
@@ -400,10 +1638,8 @@
      * Meme garantie que la revelation ci-dessus, et pour la meme raison — une
      * page a demi chargee doit rester exacte.
      */
-    .progress-fill {
-        width: var(--progress, 0%);
-    }
-
+    /* La forme de la barre est decrite une seule fois, plus bas avec les autres
+       primitives. Ici, uniquement sa mise en mouvement. */
     :root[data-reveal='on'] [data-reveal] .progress-fill {
         width: 0;
     }
@@ -431,12 +1667,6 @@
         animation: ticket-arrive var(--duration-focal) var(--ease-out-expo) both;
     }
 
-    /*
-     * Encoches de dechirure du billet. Deux demi-cercles evides sur les cotes,
-     * a l'endroit ou une souche se detache. C'est le vocabulaire du billet
-     * papier, pas une decoration : c'est ce qui fait lire l'objet comme un
-     * billet avant meme d'en lire le texte.
-     */
     /*
      * Accordeon en <details>/<summary> natif plutot qu'en JavaScript : ouvert
      * au clavier, annonce correctement par un lecteur d'ecran, fonctionnel
@@ -511,6 +1741,10 @@
      * - vertical, pour fondre le bas de l'image dans la page ;
      * - horizontal, pour assombrir le cote ou vit le texte sans noircir tout
      *   le visuel.
+     *
+     * Le voile est ecrit contre `--hero-scrim`, une encre TOUJOURS sombre :
+     * en mode sombre, `--ink` est clair et assombrir avec lui eclaircirait
+     * l'image au lieu de la couvrir.
      */
     .event-hero-scrim {
         position: absolute;
@@ -518,26 +1752,32 @@
         background:
             linear-gradient(
                 to top,
-                var(--color-canvas) 0%,
-                color-mix(in srgb, var(--color-canvas) 92%, transparent) 8%,
-                color-mix(in srgb, var(--color-ink) 25%, transparent) 42%,
-                color-mix(in srgb, var(--color-ink) 45%, transparent) 100%
+                var(--canvas) 0%,
+                color-mix(in srgb, var(--canvas) 92%, transparent) 8%,
+                color-mix(in srgb, var(--hero-scrim) 25%, transparent) 42%,
+                color-mix(in srgb, var(--hero-scrim) 45%, transparent) 100%
             ),
             linear-gradient(
                 to right,
-                color-mix(in srgb, var(--color-ink) 72%, transparent) 0%,
-                color-mix(in srgb, var(--color-ink) 45%, transparent) 45%,
-                color-mix(in srgb, var(--color-ink) 12%, transparent) 100%
+                color-mix(in srgb, var(--hero-scrim) 72%, transparent) 0%,
+                color-mix(in srgb, var(--hero-scrim) 45%, transparent) 45%,
+                color-mix(in srgb, var(--hero-scrim) 12%, transparent) 100%
             );
     }
 
+    /*
+     * Encoches de dechirure du billet. Deux demi-cercles evides sur les cotes,
+     * a l'endroit ou une souche se detache. C'est le vocabulaire du billet
+     * papier, pas une decoration : c'est ce qui fait lire l'objet comme un
+     * billet avant meme d'en lire le texte.
+     */
     .ticket-notch {
         position: absolute;
         width: 1.5rem;
         height: 1.5rem;
         border-radius: 9999px;
-        background-color: var(--color-offwhite);
-        box-shadow: inset 0 1px 2px rgba(20, 84, 155, 0.14);
+        background-color: var(--offwhite);
+        box-shadow: var(--notch-shadow);
     }
 
     /*
@@ -550,11 +1790,7 @@
      */
     .ticket-perforation {
         height: 3px;
-        background-image: radial-gradient(
-            circle,
-            rgba(20, 84, 155, 0.34) 1.4px,
-            transparent 1.5px
-        );
+        background-image: radial-gradient(circle, var(--perforation) 1.4px, transparent 1.5px);
         background-size: 9px 3px;
         background-repeat: repeat-x;
         background-position: center;
@@ -566,11 +1802,869 @@
      * elle accueille le QR Code (regle 70.4).
      */
     .ticket-stub {
+        background-image: linear-gradient(180deg, var(--stub-from), var(--stub-to));
+    }
+
+    /* -------------------------------------------------------------------------
+     * Console d'administration et espace organisateur
+     * ---------------------------------------------------------------------- */
+
+    /*
+     * Rail lateral en verre.
+     *
+     * Une colonne entiere en verre n'est lisible que sous trois conditions :
+     * elle est fixe, elle ne defile pas, et elle se detache d'une nappe
+     * ambiante (section 70.4). Le rail les remplit toutes les trois — les
+     * tableaux, eux, restent des surfaces pleines.
+     *
+     * Teinte plus soutenue que `.glass` : cette colonne porte de la navigation
+     * lue en diagonale, pas du contenu qu'on relit. Le contraste prime sur la
+     * transparence.
+     */
+    .glass-rail {
+        background: linear-gradient(180deg, var(--rail-tint-a), var(--rail-tint-b));
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        backdrop-filter: blur(24px) saturate(180%);
+        border-right: 1px solid var(--rail-border);
+        box-shadow: var(--rail-shadow);
+    }
+
+    /* Appareil modeste : le flou tombe, la teinte monte pour compenser. */
+    :root[data-quality='reduced'] .glass-rail {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: var(--rail-solid);
+    }
+
+    /* Navigateur sans backdrop-filter : meme repli. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .glass-rail {
+            background: var(--rail-solid);
+        }
+    }
+
+    /*
+     * En-tete et barre inferieure : meme matiere que le rail, mais la bordure
+     * n'est pas du meme cote. Un `border-right` sur une barre horizontale
+     * dessine un trait vertical parasite au bord de l'ecran.
+     */
+    .glass-bar {
+        border-right: 0;
+        border-bottom: 1px solid var(--rail-border);
+        box-shadow: 0 1px 24px rgba(20, 84, 155, 0.06);
+    }
+
+    [data-theme='dark'] .glass-bar {
+        box-shadow: 0 1px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    .glass-bar-bottom {
+        border-right: 0;
+        border-bottom: 0;
+        border-top: 1px solid var(--rail-border);
+        box-shadow: 0 -1px 24px rgba(20, 84, 155, 0.06);
+    }
+
+    [data-theme='dark'] .glass-bar-bottom {
+        box-shadow: 0 -1px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    /*
+     * L'en-tete ne prend sa matiere qu'une fois la page defilee : en haut de
+     * page il n'aurait rien a refracter, et un `backdrop-filter` permanent
+     * coute cher pour rien. `data-stuck` est pose par app.js depuis une
+     * sentinelle, sans le moindre calcul pendant le defilement.
+     */
+    [data-sticky-header] {
+        transition:
+            background-color var(--duration-state) var(--ease-out-quart),
+            box-shadow var(--duration-state) var(--ease-out-quart),
+            border-color var(--duration-state) var(--ease-out-quart);
+    }
+
+    /*
+     * La matiere de l'en-tete flottant, une fois la page defilee.
+     *
+     * Elle est decrite ICI et non en classes utilitaires, parce qu'elle doit
+     * suivre le theme. Les pages publiques l'ecrivaient en
+     * `data-[stuck=true]:bg-white/70` : un blanc FIGE, qui reste blanc en mode
+     * sombre. La barre devenait alors une bande gris clair portant du texte
+     * clair — illisible, et d'autant plus deroutante qu'elle n'apparaissait
+     * qu'apres avoir defile.
+     *
+     * Les jetons du rail sont reutilises tels quels : l'en-tete d'une page
+     * publique et la colonne laterale du tableau de bord sont la meme matiere,
+     * et doivent le rester.
+     */
+    [data-sticky-header][data-stuck='true'] {
+        background: linear-gradient(180deg, var(--rail-tint-a), var(--rail-tint-b));
+        -webkit-backdrop-filter: blur(24px) saturate(180%);
+        backdrop-filter: blur(24px) saturate(180%);
+        border-bottom: 1px solid var(--rail-border);
+        box-shadow: 0 1px 24px rgba(20, 84, 155, 0.06);
+    }
+
+    [data-theme='dark'] [data-sticky-header][data-stuck='true'] {
+        box-shadow: 0 1px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    :root[data-quality='reduced'] [data-sticky-header][data-stuck='true'] {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: var(--rail-solid);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        [data-sticky-header][data-stuck='true'] {
+            background: var(--rail-solid);
+        }
+    }
+
+    /*
+     * Entree de navigation du rail.
+     *
+     * Regroupee ici plutot que repetee dans chaque gabarit : la barre laterale
+     * de l'organisateur et celle du Super Admin doivent se comporter a
+     * l'identique, sinon un administrateur reapprend l'interface a chaque
+     * aller-retour entre les deux espaces.
+     */
+    .rail-link {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        border-radius: var(--radius-sm);
+        padding: 0.625rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--grey-500);
+        transition:
+            background-color var(--duration-feedback) var(--ease-out-quart),
+            color var(--duration-feedback) var(--ease-out-quart);
+    }
+
+    .rail-link:hover {
+        background-color: var(--rail-hover);
+        color: var(--azure-700);
+    }
+
+    /*
+     * L'entree active est un APLAT BLEU PLEIN, pas une teinte.
+     *
+     * Sur une colonne en verre, un simple fond legerement colore se confond
+     * avec le reflet de la surface : on ne sait plus ou l'on est, ce qui est
+     * exactement ce que la navigation doit dire. L'aplat, lui, ne laisse aucun
+     * doute a un metre de l'ecran.
+     *
+     * Il emprunte les jetons du bouton primaire plutot que `--azure-500`, et
+     * c'est la seule raison pour laquelle ces jetons existent separement : le
+     * bleu de marque #007fff ne porte que 3,8:1 de contraste avec du blanc,
+     * insuffisant pour un libelle de 14px. La rampe du bouton descend d'un cran
+     * et depasse 4,5:1 — l'aplat reste bleu Pass241 a l'oeil, et lisible a la
+     * mesure.
+     */
+    .rail-link[aria-current='page'] {
         background-image: linear-gradient(
-            180deg,
-            rgba(242, 248, 254, 0.55),
-            rgba(228, 241, 253, 0.75)
+            100deg,
+            var(--btn-primary-from) 0%,
+            var(--btn-primary-via) 60%,
+            var(--btn-primary-to) 100%
         );
+        color: var(--btn-primary-ink);
+        font-weight: 600;
+        box-shadow: var(--btn-primary-shadow);
+    }
+
+    .rail-link[aria-current='page']:hover {
+        background-color: transparent;
+        color: var(--btn-primary-ink);
+    }
+
+    /*
+     * Carte de chiffre en verre, avec un liseré de lumiere sur l'arete haute.
+     *
+     * Ce liseré est ce qui distingue une vitre d'un rectangle blanc translucide :
+     * une surface de verre reçoit la lumiere par sa tranche. Un seul pixel suffit,
+     * et il ne coute rien a rendre.
+     */
+    .glass-stat {
+        position: relative;
+        background: linear-gradient(160deg, var(--stat-tint-a), var(--stat-tint-b));
+        -webkit-backdrop-filter: blur(20px) saturate(175%);
+        backdrop-filter: blur(20px) saturate(175%);
+        border: 1px solid var(--stat-border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--stat-shadow), var(--stat-inner);
+    }
+
+    .glass-stat::before {
+        content: '';
+        position: absolute;
+        inset: 0 12% auto 12%;
+        height: 1px;
+        border-radius: 9999px;
+        background: linear-gradient(90deg, transparent, var(--stat-edge), transparent);
+    }
+
+    :root[data-quality='reduced'] .glass-stat {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: var(--stat-solid);
+    }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .glass-stat {
+            background: var(--stat-solid);
+        }
+    }
+
+    /*
+     * Relief au survol des cartes de chiffres.
+     *
+     * Une carte en verre monte de deux pixels et son ombre s'elargit : c'est ce
+     * que ferait une vitre qu'on souleve. Deux pixels et pas plus — au-dela, la
+     * grille se met a bouger et l'oeil suit le mouvement au lieu de lire le
+     * chiffre.
+     *
+     * Reserve aux appareils dotes d'un vrai pointeur. Au doigt, un etat de survol
+     * reste colle apres le tap et se lit comme un defaut.
+     */
+    @media (hover: hover) and (pointer: fine) {
+        .glass-stat {
+            transition:
+                transform var(--duration-state) var(--ease-out-quart),
+                box-shadow var(--duration-state) var(--ease-out-quart);
+        }
+
+        .glass-stat:hover {
+            transform: translate3d(0, -2px, 0);
+            box-shadow: var(--stat-shadow-hover), var(--stat-inner-hover);
+        }
+    }
+
+    /* Un mouvement reduit demande de ne rien deplacer du tout. */
+    @media (prefers-reduced-motion: reduce) {
+        .glass-stat:hover {
+            transform: none;
+        }
+    }
+}
+
+/* ===========================================================================
+ * 8. Page d'accueil publique
+ * ===========================================================================
+ *
+ * TOUT CE BLOC EST PREFIXE `lp-` ET N'EST UTILISE QUE PAR `welcome.blade.php`.
+ *
+ * Le prefixe n'est pas de la coquetterie : la page d'accueil est le seul ecran
+ * du produit qui a le droit d'etre spectaculaire, et elle demande donc des
+ * effets — halos qui derivent, mosaique inclinee, mot qui tourne — qui
+ * n'auraient aucun sens sur un tableau de bord consulte huit heures par jour.
+ * Les isoler garantit qu'aucune de ces libertes ne peut fuir vers le reste de
+ * l'application.
+ *
+ * Ils sont ecrits contre les MEMES jetons que le reste : la page d'accueil a un
+ * ton different, pas une autre identite.
+ * ======================================================================== */
+
+@layer components {
+    /*
+     * ---------------------------------------------------------------------
+     * Nappe ambiante du heros
+     * ---------------------------------------------------------------------
+     *
+     * Deux halos tres larges qui derivent lentement. La derive dure 26 et 34
+     * secondes : des durees volontairement premieres entre elles, pour que les
+     * deux taches ne repassent jamais par la meme configuration et que l'oeil
+     * ne percoive aucune boucle.
+     *
+     * L'amplitude est faible (4 % de la largeur). Un mouvement de fond que l'on
+     * REMARQUE est un mouvement rate : il doit seulement empecher l'image d'etre
+     * tout a fait fixe.
+     */
+    .lp-glow {
+        position: absolute;
+        border-radius: 9999px;
+        filter: blur(90px);
+        pointer-events: none;
+        will-change: transform;
+    }
+
+    .lp-glow-a {
+        background: color-mix(in srgb, var(--azure-500) 34%, transparent);
+        animation: lp-drift-a 26s ease-in-out infinite alternate;
+    }
+
+    .lp-glow-b {
+        background: color-mix(in srgb, var(--azure-300) 30%, transparent);
+        animation: lp-drift-b 34s ease-in-out infinite alternate;
+    }
+
+    @keyframes lp-drift-a {
+        to {
+            transform: translate3d(4%, -3%, 0) scale(1.08);
+        }
+    }
+
+    @keyframes lp-drift-b {
+        to {
+            transform: translate3d(-4%, 4%, 0) scale(0.94);
+        }
+    }
+
+    /* Le halo est l'effet le plus couteux de la page : un flou de 90px sur une
+       grande surface. Il tombe en premier sur un appareil modeste. */
+    :root[data-quality='reduced'] .lp-glow {
+        display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .lp-glow-a,
+        .lp-glow-b {
+            animation: none;
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Mot qui tourne
+     * ---------------------------------------------------------------------
+     *
+     * Le seul effet FOCAL de la page — celui qu'on a le droit de remarquer.
+     *
+     * Entierement en CSS, sans une ligne de JavaScript ni de bibliotheque. Les
+     * mots sont empiles en position absolue et se croisent en opacite ; la
+     * hauteur de ligne est tenue par un exemplaire invisible du mot le plus
+     * long, faute de quoi le titre sauterait a chaque changement.
+     *
+     * Quatre mots a 3 secondes : 12 secondes de cycle. Plus court, cela
+     * clignote et empeche de lire la phrase ; plus long, le second mot n'est
+     * jamais vu.
+     */
+    .lp-rotator {
+        position: relative;
+        display: inline-block;
+        vertical-align: top;
+        text-align: left;
+    }
+
+    /* L'exemplaire qui reserve la place. Invisible, mais bien present dans le
+       flux : c'est lui qui donne sa largeur et sa hauteur au bloc. */
+    .lp-rotator-sizer {
+        visibility: hidden;
+    }
+
+    .lp-rotator-word {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        white-space: nowrap;
+        animation: lp-rotate 12s linear infinite;
+    }
+
+    .lp-rotator-word:nth-child(2) { animation-delay: 0s; }
+    .lp-rotator-word:nth-child(3) { animation-delay: 3s; }
+    .lp-rotator-word:nth-child(4) { animation-delay: 6s; }
+    .lp-rotator-word:nth-child(5) { animation-delay: 9s; }
+
+    /* Visible un quart du cycle, avec un fondu court aux deux extremites : le
+       mot arrive et repart EN MONTANT, jamais en glissant lateralement — un
+       mouvement horizontal se lirait comme un defilement, pas comme un
+       remplacement. */
+    @keyframes lp-rotate {
+        0% { opacity: 0; transform: translate3d(0, 0.3em, 0); }
+        3% { opacity: 1; transform: translate3d(0, 0, 0); }
+        22% { opacity: 1; transform: translate3d(0, 0, 0); }
+        25% { opacity: 0; transform: translate3d(0, -0.3em, 0); }
+        100% { opacity: 0; transform: translate3d(0, -0.3em, 0); }
+    }
+
+    /*
+     * Mouvement reduit : le mot ne tourne plus, le premier reste affiche. Le
+     * titre garde tout son sens — c'est la condition pour qu'un effet ait le
+     * droit d'exister sur une page d'accueil.
+     */
+    @media (prefers-reduced-motion: reduce) {
+        .lp-rotator-word {
+            animation: none;
+        }
+
+        .lp-rotator-word:nth-child(2) {
+            opacity: 1;
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Mosaique d'affiches
+     * ---------------------------------------------------------------------
+     *
+     * Des affiches legerement inclinees, posees en profondeur derriere le
+     * billet. Les rotations sont FIXES et non aleatoires : une composition se
+     * regle, elle ne se tire pas au sort.
+     *
+     * Les inclinaisons ne s'appliquent qu'a partir de `lg`. Sur telephone, une
+     * carte inclinee mange de la largeur utile et se fait couper par le bord.
+     */
+    /*
+     * ---------------------------------------------------------------------
+     * Mosaique d'evenements
+     * ---------------------------------------------------------------------
+     *
+     * Des tuiles DECALEES verticalement les unes par rapport aux autres. Des
+     * tuiles alignees se lisent comme un tableau ; decalees, elles se lisent
+     * comme des affiches posees a la main — et c'est le second sens qui est
+     * juste pour une rangee d'evenements.
+     *
+     * En colonne unique sous `sm` : sur un telephone, un decalage vertical ne
+     * produit plus une mosaique, seulement des trous.
+     */
+    .lp-mosaic {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 2rem 1rem;
+        align-items: start;
+    }
+
+    @media (min-width: 40rem) {
+        .lp-mosaic {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 64rem) {
+        .lp-mosaic {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        /*
+         * Le decalage, tuile par tuile. Les valeurs ne sont pas tirees au
+         * sort : une composition se REGLE. Elles restent inegales entre elles
+         * pour que la ligne du bas ne se lise pas comme un escalier regulier.
+         */
+        .lp-mosaic-item:nth-child(2) {
+            transform: translate3d(0, 2.5rem, 0);
+        }
+
+        .lp-mosaic-item:nth-child(3) {
+            transform: translate3d(0, 1rem, 0);
+        }
+
+        .lp-mosaic-item:nth-child(4) {
+            transform: translate3d(0, 3.5rem, 0);
+        }
+    }
+
+    .lp-tile {
+        width: 100%;
+        aspect-ratio: 4 / 5;
+        object-fit: cover;
+        border-radius: var(--radius-md);
+        box-shadow: 0 14px 34px -14px rgba(0, 79, 158, 0.4);
+    }
+
+    /* Deux hauteurs de tuile, pas une seule : c'est l'irregularite qui fait la
+       mosaique. Toutes a la meme hauteur, les trois colonnes redeviendraient un
+       tableau. */
+    .lp-tile-tall {
+        aspect-ratio: 3 / 5;
+    }
+
+    [data-theme='dark'] .lp-tile {
+        box-shadow: 0 14px 34px -14px rgba(0, 0, 0, 0.75);
+    }
+
+    /*
+     * Le billet du heros.
+     *
+     * Sensiblement plus petit qu'a l'origine : a l'ancienne echelle il
+     * depassait la hauteur de l'ecran, et le visiteur arrivait sur un objet
+     * coupe. Reduit, il tient en entier dans le premier ecran — un billet
+     * qu'on voit en entier vaut mieux qu'un billet imposant qu'on ne voit
+     * qu'a moitie.
+     */
+    .lp-ticket-solo {
+        width: 100%;
+        max-width: 22rem;
+        zoom: 0.66;
+    }
+
+    @media (min-width: 64rem) {
+        .lp-ticket-solo {
+            zoom: 0.7;
+            /* Ramene vers la GAUCHE, au plus pres de la colonne de texte.
+               Pousse au bord droit, il laissait une bande vide au milieu du
+               heros et les deux moities cessaient de se lire ensemble. */
+            margin-right: 5rem;
+            transform: rotate(1.5deg);
+        }
+    }
+
+    @media (min-width: 80rem) {
+        .lp-ticket-solo {
+            margin-right: 10rem;
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Entree du heros
+     * ---------------------------------------------------------------------
+     *
+     * Une cascade, une seule fois, au chargement. Les durees restent celles du
+     * produit (`--duration-view`, 420ms) : la reference que nous avons etudiee
+     * anime sur 1200 a 3200ms, et le resultat est qu'en defilant normalement on
+     * arrive sur du texte encore a moitie transparent. Ce n'est pas du
+     * raffinement, c'est de la lenteur.
+     *
+     * Le contenu est VISIBLE par defaut : l'animation n'existe que sous
+     * `[data-reveal='on']`, pose par app.js. Un script en echec laisse donc une
+     * page lisible.
+     */
+    :root[data-reveal='on'] .lp-enter {
+        opacity: 0;
+        transform: translate3d(0, 16px, 0);
+        animation: lp-enter var(--duration-view) var(--ease-out-expo) forwards;
+    }
+
+    :root[data-reveal='on'] .lp-enter-1 { animation-delay: 60ms; }
+    :root[data-reveal='on'] .lp-enter-2 { animation-delay: 140ms; }
+    :root[data-reveal='on'] .lp-enter-3 { animation-delay: 220ms; }
+    :root[data-reveal='on'] .lp-enter-4 { animation-delay: 300ms; }
+
+    @keyframes lp-enter {
+        to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        :root[data-reveal='on'] .lp-enter {
+            opacity: 1;
+            transform: none;
+            animation: none;
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Navigation
+     * ---------------------------------------------------------------------
+     *
+     * Un trait qui se deploie depuis le centre au survol. `scaleX` et non
+     * `width` : rien n'est recalcule par le navigateur.
+     */
+    .lp-nav-link {
+        position: relative;
+        border-radius: var(--radius-xs);
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--grey-500);
+        transition: color var(--duration-feedback) var(--ease-out-quart);
+    }
+
+    .lp-nav-link:hover {
+        color: var(--azure-700);
+    }
+
+    .lp-nav-link::after {
+        content: '';
+        position: absolute;
+        bottom: 0.25rem;
+        left: 0.75rem;
+        right: 0.75rem;
+        height: 2px;
+        border-radius: 9999px;
+        background-color: var(--azure-500);
+        transform: scaleX(0);
+        transition: transform var(--duration-state) var(--ease-out-expo);
+    }
+
+    .lp-nav-link:hover::after {
+        transform: scaleX(1);
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Menu mobile
+     * ---------------------------------------------------------------------
+     *
+     * En `<details>` natif, comme le reste du produit : ouvrable au clavier,
+     * annonce correctement par un lecteur d'ecran, fonctionnel sans une ligne
+     * de JavaScript. La page d'accueil ne charge pas Livewire, donc pas
+     * d'Alpine — un menu qui dependrait d'un script serait un menu qui peut ne
+     * pas s'ouvrir.
+     */
+    .lp-menu > summary {
+        list-style: none;
+        cursor: pointer;
+    }
+
+    .lp-menu > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .lp-menu[open] .lp-menu-open,
+    .lp-menu:not([open]) .lp-menu-close {
+        display: none;
+    }
+
+    .lp-menu-sheet {
+        animation: lp-sheet var(--duration-state) var(--ease-out-expo) both;
+    }
+
+    @keyframes lp-sheet {
+        from {
+            opacity: 0;
+            transform: translate3d(0, -8px, 0);
+        }
+    }
+
+    /* Le fond de page ne defile plus quand la feuille est ouverte : sinon on
+       fait glisser la page DERRIERE le menu, ce qui donne l'impression que le
+       menu a lache. */
+    body:has(.lp-menu[open]) {
+        overflow: hidden;
+    }
+
+    @media (min-width: 48rem) {
+        /* Au-dessus de `md` la navigation est visible en clair : la feuille ne
+           doit jamais pouvoir rester ouverte apres un redimensionnement. */
+        body:has(.lp-menu[open]) {
+            overflow: auto;
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Carte d'etape
+     * ---------------------------------------------------------------------
+     *
+     * Le motif retenu de la reference : carte claire, texte CENTRE, et une
+     * pastille d'icone circulaire posee en haut, qui deborde le bord superieur.
+     *
+     * Le debordement n'est pas un ornement. Il donne a la rangee une ligne de
+     * lecture haute — l'oeil accroche la file de pastilles avant de lire un
+     * seul mot, et sait immediatement combien il y a d'etapes.
+     *
+     * La carte est un ilot PLEIN, pas du verre : elle porte un paragraphe qu'on
+     * lit vraiment, et la section 70.4 reserve le verre aux surfaces qu'on
+     * survole. Le verre reste pour le panneau qui les contient.
+     */
+    .lp-feature-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border-radius: var(--radius-xl);
+        background: var(--inset-bg);
+        border: 1px solid var(--inset-border);
+        box-shadow: var(--inset-shadow);
+        padding: 3.25rem 1.5rem 1.75rem;
+        text-align: center;
+        transition:
+            transform var(--duration-state) var(--ease-out-expo),
+            box-shadow var(--duration-state) var(--ease-out-quart);
+    }
+
+    /*
+     * L'elevation au survol n'existe que la ou il y a un pointeur. Sur un
+     * ecran tactile, un `:hover` reste COLLE apres le doigt : la derniere carte
+     * touchee garde son ombre, et se lit comme une carte selectionnee alors que
+     * rien n'a ete selectionne.
+     */
+    @media (hover: hover) and (pointer: fine) {
+        .lp-feature-card:hover {
+            transform: translate3d(0, -4px, 0);
+            box-shadow: var(--stat-shadow-hover);
+        }
+
+        .lp-feature-card:hover .lp-feature-badge {
+            transform: translate3d(-50%, -2px, 0);
+        }
+    }
+
+    /*
+     * La pastille. Le degrade descend de `--azure-700` a `--azure-500` : il
+     * porte une icone blanche, et seule cette plage tient le contraste requis
+     * sur toute sa hauteur.
+     *
+     * Le halo est une seconde ombre, tres large et tres diluee. C'est ce qui
+     * fait la difference entre une pastille posee et une pastille ALLUMEE.
+     */
+    .lp-feature-badge {
+        position: absolute;
+        top: -1.75rem;
+        left: 50%;
+        transform: translate3d(-50%, 0, 0);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: 9999px;
+        background: linear-gradient(160deg, var(--azure-700), var(--azure-500));
+        color: #ffffff;
+        box-shadow:
+            0 8px 20px -6px rgba(0, 79, 158, 0.5),
+            0 0 0 6px var(--lp-badge-halo);
+        transition: transform var(--duration-state) var(--ease-out-expo);
+    }
+
+    /* En mode sombre la rampe azurine s'inverse (voir la section des jetons) :
+       `--azure-700` y est un bleu CLAIR. Le degre est donc repris a la main,
+       sur des valeurs fixes, pour que la pastille reste un aplat fonce portant
+       une icone blanche dans les deux themes. */
+    [data-theme='dark'] .lp-feature-badge {
+        background: linear-gradient(160deg, #0b4c8f, #1683e6);
+        box-shadow:
+            0 8px 20px -6px rgba(0, 0, 0, 0.7),
+            0 0 0 6px var(--lp-badge-halo);
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Bloc-grille
+     * ---------------------------------------------------------------------
+     *
+     * Un seul aplat azur decoupe par des filets, plutot que des cartes
+     * separees. La difference se lit : des cartes disent « voici des elements
+     * », un bloc decoupe dit « voici un ENSEMBLE ». Pour une liste de
+     * capacites qui vont ensemble, c'est le second sens qui est juste.
+     *
+     * Les filets sont tires en `box-shadow` et non en `border` : une bordure
+     * sur chaque cellule doublerait chaque trait interieur, et il faudrait
+     * ensuite les retirer un a un aux bords selon la colonne.
+     */
+    .lp-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        overflow: hidden;
+        border-radius: var(--radius-2xl);
+        background: linear-gradient(135deg, var(--lp-grid-from), var(--lp-grid-to));
+        box-shadow: var(--lp-grid-glow);
+    }
+
+    @media (min-width: 40rem) {
+        .lp-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 64rem) {
+        .lp-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .lp-grid-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2.5rem 1.75rem;
+        text-align: center;
+        /* Les deux filets de separation, tires vers l'exterieur. Ceux qui
+           tombent hors du bloc sont manges par l'`overflow: hidden`. */
+        box-shadow:
+            1px 0 0 var(--lp-grid-rule),
+            0 1px 0 var(--lp-grid-rule);
+        transition:
+            background-color var(--duration-state) var(--ease-out-quart),
+            color var(--duration-state) var(--ease-out-quart);
+    }
+
+    /*
+     * Les couleurs de texte sont tenues ICI, et non en utilitaires Tailwind.
+     *
+     * La raison n'est pas stylistique : `text-white` vit dans la couche
+     * `utilities`, qui l'emporte sur `components`. Ecrit en utilitaire, le
+     * blanc gagnait donc contre la regle de survol ci-dessous — la cellule
+     * passait en clair et le texte restait blanc dessus, illisible.
+     */
+    .lp-grid-cell h3 {
+        color: #ffffff;
+        transition: color var(--duration-state) var(--ease-out-quart);
+    }
+
+    .lp-grid-cell p {
+        color: rgba(255, 255, 255, 0.82);
+        transition: color var(--duration-state) var(--ease-out-quart);
+    }
+
+    /*
+     * L'icone en carre CONTOURNE, sans aplat : sur un fond deja colore, un
+     * second aplat ferait une tache. Le trait fin suffit, et il reprend le
+     * dessin des icones Lucide (section 80.6).
+     */
+    .lp-grid-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--lp-grid-icon-line);
+        color: #ffffff;
+        transition:
+            border-color var(--duration-state) var(--ease-out-quart),
+            color var(--duration-state) var(--ease-out-quart);
+    }
+
+    /*
+     * L'inversion au survol — la micro-interaction signature de ce bloc.
+     *
+     * Elle est PUREMENT decorative : ces cellules ne sont pas cliquables et ne
+     * cachent aucune information. C'est la condition pour qu'un effet n'ayant
+     * lieu qu'au pointeur soit acceptable — sur un ecran tactile, il ne manque
+     * rien (section 25 du brief).
+     */
+    @media (hover: hover) and (pointer: fine) {
+        .lp-grid-cell:hover {
+            background-color: var(--lp-grid-lift);
+        }
+
+        .lp-grid-cell:hover .lp-grid-icon {
+            border-color: var(--lp-grid-lift-accent);
+            color: var(--lp-grid-lift-accent);
+        }
+
+        .lp-grid-cell:hover h3 {
+            color: var(--lp-grid-lift-accent);
+        }
+
+        .lp-grid-cell:hover p {
+            color: var(--lp-grid-lift-ink);
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Banniere de tarif
+     * ---------------------------------------------------------------------
+     *
+     * Le meme aplat que le bloc-grille, avec un halo exterieur. Elle sert a
+     * poser un CHIFFRE : la commission est l'argument, elle doit se lire de
+     * loin et depuis n'importe quel point de la page.
+     */
+    .lp-banner {
+        border-radius: var(--radius-2xl);
+        background: linear-gradient(135deg, var(--lp-grid-from), var(--lp-grid-to));
+        box-shadow: var(--lp-grid-glow);
+    }
+
+    /* Le filet qui separe les deux taux : horizontal en colonne, vertical des
+       que les deux tiennent cote a cote. */
+    .lp-banner-split {
+        border-top: 1px solid var(--lp-grid-rule);
+    }
+
+    @media (min-width: 40rem) {
+        .lp-banner-split {
+            border-top: 0;
+            border-left: 1px solid var(--lp-grid-rule);
+        }
     }
 }
 
@@ -583,6 +2677,62 @@
     .defer-paint {
         content-visibility: auto;
         contain-intrinsic-size: auto 600px;
+    }
+
+    /*
+     * Barre de defilement masquee. Reservee aux rails de navigation et aux
+     * series d'onglets qui defilent horizontalement sur telephone — jamais sur
+     * une zone de contenu, ou elle est le seul indice qu'il reste a lire.
+     */
+    .no-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+
+    /*
+     * Defilement horizontal au doigt, avec accroche.
+     *
+     * Un tableau large sur telephone doit defiler DANS son cadre, jamais
+     * emporter la page avec lui : c'est la cause numero un de debordement
+     * horizontal, et elle se voit immediatement a l'usage.
+     */
+    .scroll-x {
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .snap-x-start {
+        scroll-snap-type: x mandatory;
+    }
+
+    .snap-x-start > * {
+        scroll-snap-align: start;
+    }
+
+    /*
+     * Zone sure du bas d'ecran (encoche, barre gestuelle iOS/Android).
+     * Utilisee par la barre de navigation inferieure : sans elle, la derniere
+     * rangee de cibles tactiles passe sous la barre systeme.
+     */
+    .pb-safe {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .mb-safe {
+        margin-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /*
+     * Reserve la hauteur de la barre de navigation inferieure sur telephone.
+     * Sans elle, le dernier bouton de chaque page est masque par la barre.
+     */
+    .pb-nav {
+        padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -631,10 +2781,14 @@
  * Il n'apparait jamais a l'utilisateur : c'est le fond de l'image telechargee.
  * Sans lui, le PNG serait a moitie transparent — le billet est en verre, il
  * n'a pas de fond a lui.
+ *
+ * Toujours clair, quel que soit le theme : l'image part dans une conversation
+ * WhatsApp ou elle sera vue par quelqu'un d'autre, sur son appareil a lui, et
+ * elle porte un QR Code qui doit rester noir sur clair.
  */
 [data-ticket-capture] {
-    background-image: linear-gradient(160deg, #EEF1F7 0%, #E2ECF8 55%, #D8E7F7 100%);
-    border-radius: 32px;
+    background-image: linear-gradient(160deg, #eef1f7 0%, #e2ecf8 55%, #d8e7f7 100%);
+    border-radius: var(--radius-2xl);
 }
 
 /*
@@ -646,8 +2800,8 @@
  * qui existe precisement pour compenser l'absence de flou.
  */
 [data-ticket-capture] .glass {
-    backdrop-filter: none;
     -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.84));
 }
 
@@ -659,116 +2813,4 @@
 
 [data-ticket-capture] .ticket-arrive {
     animation: none;
-}
-
-@layer components {
-    /* -------------------------------------------------------------------------
-     * Console d'administration
-     * ---------------------------------------------------------------------- */
-
-    /*
-     * Rail lateral en verre.
-     *
-     * Le seul endroit du produit ou une colonne entiere est en verre. Elle est
-     * fixe, ne defile pas, et se detache d'une nappe ambiante : les trois
-     * conditions qui rendent l'effet lisible plutot que decoratif (section 70.4).
-     *
-     * Blanc plus soutenu que `.glass` : cette colonne porte de la navigation lue
-     * en diagonale, pas du contenu qu'on relit. Le contraste prime sur la
-     * transparence.
-     */
-    .glass-rail {
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.74));
-        backdrop-filter: blur(24px) saturate(180%);
-        -webkit-backdrop-filter: blur(24px) saturate(180%);
-        border-right: 1px solid rgba(255, 255, 255, 0.75);
-        box-shadow: 1px 0 24px rgba(20, 84, 155, 0.06);
-    }
-
-    /* Appareil modeste : le flou tombe, la teinte monte pour compenser. */
-    :root[data-quality='reduced'] .glass-rail {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        background: rgba(255, 255, 255, 0.96);
-    }
-
-    /* Navigateur sans backdrop-filter : meme repli. */
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .glass-rail {
-            background: rgba(255, 255, 255, 0.96);
-        }
-    }
-
-    /*
-     * Carte de chiffre en verre, avec un liseré de lumiere sur l'arete haute.
-     *
-     * Ce liseré est ce qui distingue une vitre d'un rectangle blanc translucide :
-     * une surface de verre reçoit la lumiere par sa tranche. Un seul pixel suffit,
-     * et il ne coute rien a rendre.
-     */
-    .glass-stat {
-        position: relative;
-        background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58));
-        backdrop-filter: blur(20px) saturate(175%);
-        -webkit-backdrop-filter: blur(20px) saturate(175%);
-        border: 1px solid rgba(255, 255, 255, 0.7);
-        border-radius: 20px;
-        box-shadow:
-            0 8px 28px rgba(20, 84, 155, 0.1),
-            inset 0 1px 0 rgba(255, 255, 255, 0.85);
-    }
-
-    .glass-stat::before {
-        content: '';
-        position: absolute;
-        inset: 0 12% auto 12%;
-        height: 1px;
-        border-radius: 9999px;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
-    }
-
-    :root[data-quality='reduced'] .glass-stat {
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        background: rgba(255, 255, 255, 0.94);
-    }
-
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .glass-stat {
-            background: rgba(255, 255, 255, 0.94);
-        }
-    }
-
-    /*
-     * Relief au survol des cartes de chiffres.
-     *
-     * Une carte en verre monte de deux pixels et son ombre s'elargit : c'est ce
-     * que ferait une vitre qu'on souleve. Deux pixels et pas plus — au-dela, la
-     * grille se met a bouger et l'oeil suit le mouvement au lieu de lire le
-     * chiffre.
-     *
-     * Reserve aux appareils dotes d'un vrai pointeur. Au doigt, un etat de survol
-     * reste colle apres le tap et se lit comme un defaut.
-     */
-    @media (hover: hover) and (pointer: fine) {
-        .glass-stat {
-            transition:
-                transform var(--duration-state) var(--ease-out-quart),
-                box-shadow var(--duration-state) var(--ease-out-quart);
-        }
-
-        .glass-stat:hover {
-            transform: translate3d(0, -2px, 0);
-            box-shadow:
-                0 14px 38px rgba(20, 84, 155, 0.14),
-                inset 0 1px 0 rgba(255, 255, 255, 0.9);
-        }
-    }
-
-    /* Un mouvement reduit demande de ne rien deplacer du tout. */
-    @media (prefers-reduced-motion: reduce) {
-        .glass-stat:hover {
-            transform: none;
-        }
-    }
 }

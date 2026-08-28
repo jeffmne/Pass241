@@ -1,6 +1,7 @@
 @php
-    use App\Enums\OrderStatus;
     use App\Support\Money;
+
+    $tz = config('app.display_timezone');
 @endphp
 
 {{--
@@ -9,126 +10,111 @@
     Consultation seule, sans exception. Le numero de l'acheteur n'est jamais
     affiche, meme partiellement : cet ecran sert a reperer un ecart de montant
     ou un statut anormal, pas a retrouver quelqu'un (section 52).
+
+    UNE SEULE BOUCLE pour les deux compositions. Cet ecran ecrivait auparavant
+    chaque ligne deux fois — un tableau pour le bureau, une liste de cartes pour
+    le telephone — et les deux avaient deja commence a diverger : la carte
+    n'affichait ni les frais ni la date. Le tableau bascule maintenant en cartes
+    par le CSS (`data-table-stack`), a partir du meme balisage.
 --}}
-<div>
-    <header class="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-            <h1 class="font-display text-2xl font-extrabold text-ink sm:text-3xl">Transactions</h1>
-            <p class="mt-1 text-sm text-grey-500">
-                {{ number_format($orders->total(), 0, ',', "\u{202F}") }} commande{{ $orders->total() > 1 ? 's' : '' }}.
-            </p>
-        </div>
+<div class="space-y-5">
 
-        <div class="relative w-full sm:w-72">
-            <x-lucide-search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-grey-400"
-                             stroke-width="1.75" />
-            <input type="search" wire:model.live.debounce.400ms="search" class="field pl-10"
-                   placeholder="Reference, organisation" aria-label="Rechercher une transaction">
-        </div>
-    </header>
+    <x-ui.page-header
+        title="Transactions"
+        :description="Money::number($orders->total()) . ' commande' . ($orders->total() > 1 ? 's' : '') . '.'"
+        eyebrow="Administration Pass241">
+        <x-slot:actions>
+            <x-ui.search-input
+                id="transactions-search"
+                class="w-full sm:w-72"
+                label="Rechercher une transaction"
+                placeholder="Reference, organisation"
+                wire:model.live.debounce.400ms="search" />
+        </x-slot:actions>
+    </x-ui.page-header>
 
-    <div class="mb-4 flex flex-wrap gap-1 rounded-xl border border-white/60 bg-white/60 p-1 backdrop-blur">
-        @foreach ([
-            'all' => 'Toutes',
-            'paid' => 'Payees',
-            'refunded' => 'Remboursees',
-            'failed' => 'Echouees',
-        ] as $value => $label)
-            <button type="button" wire:click="$set('filter', '{{ $value }}')" @class([
-                'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                'bg-azure-600 text-white' => $filter === $value,
-                'text-grey-500 hover:text-ink' => $filter !== $value,
-            ])>{{ $label }}</button>
-        @endforeach
+    <div class="scroll-x no-scrollbar -mx-1 px-1">
+        <div class="seg" role="tablist" aria-label="Filtrer les transactions">
+            @foreach ([
+                'all' => 'Toutes',
+                'paid' => 'Payees',
+                'refunded' => 'Remboursees',
+                'failed' => 'Echouees',
+            ] as $value => $label)
+                <button type="button"
+                        role="tab"
+                        wire:click="$set('filter', '{{ $value }}')"
+                        aria-selected="{{ $filter === $value ? 'true' : 'false' }}"
+                        class="seg-item">{{ $label }}</button>
+            @endforeach
+        </div>
     </div>
 
-    {{-- Tableau sur grand ecran. Surface pleine et non du verre : la
-         section 70.4 ecarte le verre des tableaux denses, ou la lisibilite
-         prime sur la matiere. --}}
-    <div class="surface hidden overflow-x-auto p-0 lg:block">
-        <table class="w-full min-w-[56rem] text-sm">
-            <thead>
-                <tr class="border-b border-grey-200 text-left text-xs tracking-wide text-grey-500 uppercase">
-                    <th class="px-4 py-3 font-semibold">Reference</th>
-                    <th class="px-4 py-3 font-semibold">Organisation</th>
-                    <th class="px-4 py-3 font-semibold">Evenement</th>
-                    <th class="px-4 py-3 text-right font-semibold">Billets</th>
-                    <th class="px-4 py-3 text-right font-semibold">Frais</th>
-                    <th class="px-4 py-3 text-right font-semibold">Total debite</th>
-                    <th class="px-4 py-3 font-semibold">Statut</th>
-                    <th class="px-4 py-3 font-semibold">Date</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse ($orders as $order)
-                    <tr class="border-b border-grey-200/60 last:border-0">
-                        <td class="px-4 py-3 font-medium text-ink tabular">{{ $order->reference }}</td>
-                        <td class="px-4 py-3 text-grey-500">{{ $order->organization?->name }}</td>
-                        <td class="px-4 py-3 text-grey-500">{{ $order->event?->name }}</td>
-                        <td class="px-4 py-3 text-right text-grey-500 tabular">
+    <div wire:loading.delay wire:target="search, filter, gotoPage, previousPage, nextPage">
+        <x-ui.skeleton variant="table" :rows="6" />
+    </div>
+
+    {{-- Surface pleine et non du verre : la section 70.4 ecarte le verre des
+         tableaux denses, ou la lisibilite prime sur la matiere. --}}
+    <x-ui.panel flush
+                wire:loading.delay.class="opacity-40"
+                wire:target="search, filter, gotoPage, previousPage, nextPage"
+                class="transition-opacity">
+
+        @if ($orders->isEmpty())
+            <x-ui.empty-state
+                icon="search-x"
+                tone="filtered"
+                title="Aucune transaction"
+                description="Aucune transaction ne correspond." />
+        @else
+            <x-ui.table caption="Transactions de la plateforme">
+                <x-slot:head>
+                    <th scope="col">Reference</th>
+                    <th scope="col">Organisation</th>
+                    <th scope="col">Evenement</th>
+                    <th scope="col" class="col-amount">Billets</th>
+                    <th scope="col" class="col-amount">Frais</th>
+                    <th scope="col" class="col-amount">Total debite</th>
+                    <th scope="col">Statut</th>
+                    <th scope="col">Date</th>
+                </x-slot:head>
+
+                @foreach ($orders as $order)
+                    <tr wire:key="order-{{ $order->id }}">
+                        <td class="cell-primary tabular">{{ $order->reference }}</td>
+
+                        <td data-label="Organisation" class="text-grey-500">{{ $order->organization?->name }}</td>
+                        <td data-label="Evenement" class="text-grey-500">{{ $order->event?->name }}</td>
+
+                        <td data-label="Billets" class="col-amount font-normal text-grey-500">
                             {{ $order->formattedSubtotal() }}
                         </td>
-                        <td class="px-4 py-3 text-right text-grey-500 tabular">
+                        <td data-label="Frais" class="col-amount font-normal text-grey-500">
                             {{ $order->psp_fee_amount > 0 ? $order->formattedPspFee() : '—' }}
                         </td>
-                        <td class="px-4 py-3 text-right font-semibold text-ink tabular">
-                            {{ $order->formattedAmount() }}
-                        </td>
-                        <td class="px-4 py-3">
+                        <td data-label="Total debite" class="col-amount">{{ $order->formattedAmount() }}</td>
+
+                        <td data-label="Statut">
                             <x-order-state :status="$order->status" />
                         </td>
-                        <td class="px-4 py-3 text-grey-500 tabular">
-                            {{ ($order->paid_at ?? $order->created_at)
-                                ->timezone(config('app.display_timezone'))
-                                ->translatedFormat('j M Y') }}
+                        <td data-label="Date" class="text-grey-500 tabular">
+                            {{ ($order->paid_at ?? $order->created_at)->timezone($tz)->translatedFormat('j M Y') }}
                         </td>
                     </tr>
-                @empty
-                    <tr>
-                        <td colspan="8" class="px-4 py-12 text-center text-grey-500">
-                            Aucune transaction ne correspond.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
+                @endforeach
+            </x-ui.table>
+        @endif
 
-    {{-- Cartes sur telephone : un tableau de huit colonnes y devient
-         illisible. --}}
-    <div class="space-y-3 lg:hidden">
-        @forelse ($orders as $index => $order)
-            <div class="glass-stat glass-specular p-4"
-                 data-reveal data-reveal-step="{{ $index % 5 }}">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <p class="font-display font-bold text-ink tabular">{{ $order->reference }}</p>
-                        <p class="mt-0.5 truncate text-sm text-grey-500">{{ $order->organization?->name }}</p>
-                        <p class="truncate text-sm text-grey-400">{{ $order->event?->name }}</p>
-                    </div>
-                    <x-order-state :status="$order->status" />
-                </div>
-
-                <div class="mt-3 flex items-baseline justify-between border-t border-white/60 pt-3">
-                    <span class="text-sm text-grey-500">Total debite</span>
-                    <span class="font-display font-bold text-ink tabular">{{ $order->formattedAmount() }}</span>
-                </div>
-            </div>
-        @empty
-            <div class="surface p-10 text-center text-sm text-grey-500">
-                Aucune transaction ne correspond.
-            </div>
-        @endforelse
-    </div>
+        <x-slot:footer>
+            « Billets » est le prix des billets, « Frais » ceux du prestataire de
+            paiement, avances par l'acheteur. La commission Pass241 n'apparait pas
+            ici : elle se preleve sur le prix des billets, pas sur le total debite.
+            Le numero de l'acheteur n'est jamais affiche.
+        </x-slot:footer>
+    </x-ui.panel>
 
     @if ($orders->hasPages())
-        <div class="mt-6">{{ $orders->links() }}</div>
+        <div>{{ $orders->links() }}</div>
     @endif
-
-    <p class="mt-6 text-xs leading-relaxed text-grey-400">
-        « Billets » est le prix des billets, « Frais » ceux du prestataire de
-        paiement, avances par l'acheteur. La commission Pass241 n'apparait pas
-        ici : elle se preleve sur le prix des billets, pas sur le total debite.
-        Le numero de l'acheteur n'est jamais affiche.
-    </p>
 </div>

@@ -17,6 +17,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Adresse de support
+    |--------------------------------------------------------------------------
+    |
+    | Affichee en pied de colonne laterale, dans les espaces organisateur et
+    | Super Admin. Volontairement SANS VALEUR PAR DEFAUT : tant qu'elle n'est
+    | pas renseignee, le bloc d'aide ne s'affiche pas du tout.
+    |
+    | Un lien de support qui ouvre un brouillon vers une adresse inexistante
+    | est pire que pas de lien : l'organisateur croit avoir ecrit au support et
+    | attend une reponse qui n'arrivera jamais.
+    |
+    */
+
+    'support_email' => env('SUPPORT_EMAIL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
