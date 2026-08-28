@@ -182,6 +182,58 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-047 — Les trois questions ouvertes du module Votes, tranchées à l'ouverture de la phase 9
+**2026-08-28**
+
+L'analyse d'architecture (section 86.5) laissait trois points en suspens, à trancher avant d'écrire. Ils l'ont été à l'ouverture du jalon 9.1, par Jeff. La phase 9 est traitée **avant** la phase 8, à sa demande — l'ordre de la roadmap (section 78) n'était contraignant que de 1 à 7, où les modules partagent le chemin de l'argent.
+
+### 1. Commission des votes payants : 5 %
+
+Comme la billetterie, pas comme les collectes. Un vote payant est une **vente de service à un public**, pas un don à une cause : le votant achète une influence sur un résultat, il ne contribue pas à une œuvre. Assiette : le sous-total des bulletins, jamais le montant débité frais PSP compris (décision D-023).
+
+Le taux vit dans `config/commission.php` et reste réglable sans déploiement par le Super Admin, comme les deux autres. La contrainte `commissions_type_check` accepte désormais `VOTING`.
+
+### 2. Vote gratuit : assumé comme indicatif, et dit dans l'interface
+
+Sans compte utilisateur et sans OTP SMS (décision D-004), il n'existe aucun moyen honnête de garantir « une personne, un vote » : on peut exiger un numéro, en dériver un `voter_hash`, y ajouter IP et empreinte d'appareil, limiter le débit — on ne peut pas empêcher quelqu'un de saisir cinq numéros.
+
+Les deux autres issues ont été écartées : l'OTP SMS suppose un budget et rouvre D-004 ; le tout-payant fermerait les concours scolaires et associatifs, qui sont un usage visé.
+
+**Conséquence, et c'est la partie qui engage** : l'interface publique doit dire que le résultat d'une catégorie gratuite est indicatif. Le taire reviendrait à laisser croire à une garantie que le produit ne tient pas — et un concours dont le résultat est contesté après coup se retourne contre l'organisateur autant que contre nous.
+
+### 3. Rapport final : écran exportable, PDF plus tard
+
+L'organisateur consulte classement, totaux et revenus à l'écran, et exporte en CSV. Le PDF réutilisera le module de reçus (décision D-029) quand le besoin se confirmera, plutôt que d'être construit d'avance sur une mise en forme que personne n'a encore demandée.
+
+---
+
+## D-048 — `Poll` en code, « Vote » en interface — et aucun compteur nulle part
+**2026-08-28**
+
+Jalon 9.1. Deux choix de fondation, tous deux difficiles à corriger plus tard.
+
+### Le nommage
+
+En français, « vote » désigne à la fois le scrutin et le bulletin — `$vote->vote` ne veut rien dire. En base et en code : `Poll` (le scrutin), `PollCategory`, `Candidate`, `Ballot` (le bulletin). En interface, tout reste « Vote », « Catégorie », « Candidat » : le vocabulaire de l'organisateur ne change pas.
+
+### Aucune colonne de compteur
+
+Ni `votes_count` sur `candidates`, ni total sur `poll_categories`, ni revenu sur `polls`. Le total est la somme des bulletins confirmés, agrégée en SQL avec un cache court — le patron de `CampaignProgress` (décision D-031).
+
+C'est la traduction en schéma de « l'organisateur ne modifie jamais le nombre de votes » (section 86.4). Une colonne porterait le chiffre en double, et cette seconde vérité serait modifiable. **On ne peut pas falsifier ce qui n'est stocké nulle part** : la règle n'est pas seulement interdite, elle est impossible. Un test le vérifie explicitement, colonne par colonne.
+
+### Ce que la base refuse, plutôt que le formulaire
+
+Catégorie gratuite portant un prix, catégorie payante à zéro franc, plafond de votes nul, fenêtre à moitié renseignée, deux candidats au même numéro dans une catégorie, statut annulé sans date. Toutes ces règles sont des `CHECK` PostgreSQL : elles tiennent aussi contre une commande artisan et une correction manuelle en base.
+
+### Une catégorie ne peut jamais ouvrir ce que le scrutin a fermé
+
+Les catégories sont indépendantes entre elles, mais **subordonnées** au scrutin : leur fenêtre propre ne fait que restreindre. Sans cette subordination, une catégorie mal réglée laisserait voter après la clôture du concours, et le classement figé n'aurait plus de sens.
+
+La fenêtre héritée n'est **jamais recopiée en base** : `starts_at` et `ends_at` restent nuls tant que la catégorie n'a pas de réglage propre. Une copie se désynchroniserait le jour où l'organisateur décale la fenêtre du scrutin.
+
+---
+
 ## D-046 — Le reçu nomme le donateur, même quand le don est anonyme
 **2026-08-27**
 

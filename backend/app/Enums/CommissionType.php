@@ -15,12 +15,14 @@ enum CommissionType: string
 {
     case Ticketing = 'TICKETING';
     case Donation = 'DONATION';
+    case Voting = 'VOTING';
 
     public function label(): string
     {
         return match ($this) {
             self::Ticketing => 'Billetterie',
             self::Donation => 'Collecte de fonds',
+            self::Voting => 'Votes',
         };
     }
 

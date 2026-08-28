@@ -321,5 +321,14 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 
 **Analyse d'architecture faite le 2026-08-27, avant toute écriture** — périmètre détaillé, modèle de données, routes, organisation du code et stratégie anti-fraude en sections 86.4 et 86.5 de [docs/11-votes-futur.md](docs/11-votes-futur.md). Ce qui engage les autres modules est consigné dans la décision D-041, et traité en phase 7.
 
-- [ ] Module de vote (section 86) : `Poll`, `PollCategory`, `Candidate`, `Ballot`, `VoterQuota`, `poll_results`
-- [ ] **À trancher avant d'implémenter** : le taux de commission des votes (rien dans la spec — 5 % recommandé), et le sort du vote gratuit, structurellement limité sans compte ni OTP SMS
+**Traitée avant la phase 8, à la demande de Jeff (2026-08-28).** L'ordre de la roadmap n'était contraignant que de 1 à 7, où les modules partagent le chemin de l'argent.
+
+- [x] **Les trois questions ouvertes tranchées le 2026-08-28 (décision D-047)** : commission des votes à **5 %** comme la billetterie ; vote gratuit **assumé comme indicatif et annoncé dans l'interface** ; rapport final en **écran exportable**, PDF plus tard
+- [x] **Jalon 9.1 — Fondations, fait le 2026-08-28 (décision D-048)** : `polls`, `poll_categories`, `candidates`, enums `PollStatus` / `ResultsVisibility`, permissions `votes.view` / `votes.manage`, commission `VOTING` ouverte en base. Aucune colonne de compteur nulle part ; règles tenues par des `CHECK` PostgreSQL ; fenêtre de catégorie héritée jamais recopiée, et jamais capable d'ouvrir ce que le scrutin a fermé. 39 tests
+- [ ] Jalon 9.2 — Dashboard organisateur : création du vote, écran catégories + candidats, publication
+- [ ] Jalon 9.3 — Page publique et vote gratuit : `Ballot`, `VoterQuota`, quota atomique, déclencheur d'immuabilité, mention du caractère indicatif
+- [ ] Jalon 9.4 — Vote payant : `Ballot` comme `Payable`, `PayableResolver`, commission, webhooks
+- [ ] Jalon 9.5 — Résultats, clôture, rapport : `VotingStatistics`, `poll_results` figés, tâche `ClosePolls`, écran exportable
+
+**Reste ouvert, non bloquant :**
+- [ ] `Poll::publicUrl()` référence la route `polls.public`, qui n'existe qu'au jalon 9.3

@@ -59,6 +59,10 @@ enum RoleName: string
                 PermissionName::PromoCodesManage->value,
                 PermissionName::AccessControlManage->value,
                 PermissionName::CampaignsView->value,
+                // En lecture seule, comme les collectes : ouvrir ou cloturer un
+                // scrutin decide de qui gagne un concours, et engage
+                // l'organisateur devant son public.
+                PermissionName::VotesView->value,
             ],
 
             self::Manager => [
@@ -71,6 +75,8 @@ enum RoleName: string
                 PermissionName::AccessControlManage->value,
                 PermissionName::CampaignsView->value,
                 PermissionName::CampaignsManage->value,
+                PermissionName::VotesView->value,
+                PermissionName::VotesManage->value,
                 PermissionName::FinancesView->value,
                 PermissionName::MembersManage->value,
                 PermissionName::ExportsGenerate->value,

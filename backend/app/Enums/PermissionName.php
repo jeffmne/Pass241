@@ -32,6 +32,9 @@ enum PermissionName: string
     case CampaignsView = 'campaigns.view';
     case CampaignsManage = 'campaigns.manage';
 
+    case VotesView = 'votes.view';
+    case VotesManage = 'votes.manage';
+
     case FinancesView = 'finances.view';
     case FinancesRefund = 'finances.refund';
 
@@ -58,6 +61,8 @@ enum PermissionName: string
             self::AccessControlScan => 'Scanner les billets',
             self::CampaignsView => 'Consulter les collectes',
             self::CampaignsManage => 'Gerer les collectes',
+            self::VotesView => 'Consulter les votes',
+            self::VotesManage => 'Gerer les votes',
             self::FinancesView => 'Consulter les finances',
             self::FinancesRefund => 'Decider des remboursements',
             self::MembersManage => 'Gerer les membres de l\'organisation',
