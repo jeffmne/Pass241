@@ -122,6 +122,23 @@ enum AuditAction: string
     case CampaignCompleted = 'CAMPAIGN_COMPLETED';
     case CampaignCancelled = 'CAMPAIGN_CANCELLED';
 
+    /*
+     * Votes (sections 86.4, 86.5).
+     *
+     * Le candidat a ses propres entrees, contrairement aux billets d'un
+     * evenement : ajouter ou desactiver un candidat en cours de scrutin CHANGE
+     * ce sur quoi le public vote. C'est un geste que l'organisateur doit pouvoir
+     * justifier, et donc un geste dont il doit rester une trace.
+     */
+    case PollCreated = 'POLL_CREATED';
+    case PollUpdated = 'POLL_UPDATED';
+    case PollPublished = 'POLL_PUBLISHED';
+    case PollClosed = 'POLL_CLOSED';
+    case PollCancelled = 'POLL_CANCELLED';
+    case PollCategorySaved = 'POLL_CATEGORY_SAVED';
+    case CandidateSaved = 'CANDIDATE_SAVED';
+    case CandidateDisabled = 'CANDIDATE_DISABLED';
+
     // Exports
     case ExportGenerated = 'EXPORT_GENERATED';
 
@@ -209,6 +226,14 @@ enum AuditAction: string
             self::CampaignPaused => 'Campagne suspendue',
             self::CampaignCompleted => 'Campagne terminee',
             self::CampaignCancelled => 'Campagne annulee',
+            self::PollCreated => 'Vote cree',
+            self::PollUpdated => 'Vote modifie',
+            self::PollPublished => 'Vote publie',
+            self::PollClosed => 'Vote cloture',
+            self::PollCancelled => 'Vote annule',
+            self::PollCategorySaved => 'Categorie de vote enregistree',
+            self::CandidateSaved => 'Candidat enregistre',
+            self::CandidateDisabled => 'Candidat desactive',
 
             self::ExportGenerated => 'Export genere',
             self::PlatformSettingChanged => 'Reglage de la plateforme modifie',

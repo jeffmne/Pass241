@@ -182,6 +182,37 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-049 — Publier est un seul geste, et les règles du jeu se figent à l'ouverture
+**2026-08-28**
+
+Jalon 9.2, le dashboard organisateur des votes. Trois décisions, plus un piège de langage qui mérite d'être écrit.
+
+### Un seul bouton « publier »
+
+Pas de « publier » d'un côté et « programmer » de l'autre. L'organisateur publie, et **la date d'ouverture décide** : passée, le vote s'ouvre ; à venir, il est programmé. Lui demander de choisir lui ferait porter une distinction qui se lit déjà dans les dates qu'il vient de saisir.
+
+Conséquence sur le slug : il se fige **à la publication**, pas à la perte de modifiabilité. Un scrutin programmé est déjà publié — sa page circule pendant la campagne d'annonce — tout en restant modifiable. Ces deux notions se recouvrent partout ailleurs dans le produit et se séparent ici.
+
+### Les termes économiques se figent à l'ouverture
+
+Gratuité, prix unitaire, plafond par votant, fenêtre et visibilité des résultats ne bougent plus dès que le vote est ouvert. **Quelqu'un qui a payé 500 francs son vote l'a fait sous ces règles** ; les changer en cours de partie créerait deux catégories de votants dans un même scrutin, ou dévoilerait un classement promis scellé.
+
+Le nom, la description et l'ordre restent modifiables : corriger une faute de frappe ne change ce que personne a payé.
+
+L'action **retire** les attributs gelés au lieu de rejeter tout l'enregistrement. Une requête qui les porterait encore vient d'un onglet resté ouvert, pas d'une intention — refuser en bloc ferait perdre la correction de description que l'organisateur voulait vraiment.
+
+### Catégories et candidats sur un seul écran
+
+Une catégorie sans candidat n'existe pas vraiment. Les séparer obligerait à naviguer entre deux pages pour monter un concours, alors que le geste naturel est « je crée Miss Libreville, j'y mets mes cinq candidates, je passe à la suivante ».
+
+L'isolation multi-tenant y demande une précaution : `poll_categories` et `candidates` **ne portent pas de portée** — ils descendent du scrutin. Toute recherche part donc de `$this->poll`, déjà filtré. Un `PollCategory::find($id)` ouvrirait exactement le trou que la règle 80.4 interdit, et deux tests le vérifient en poussant un identifiant étranger.
+
+### Le piège : `QueryException` est une `RuntimeException`
+
+`QueryException` descend de `PDOException`, qui descend de `RuntimeException`. Un `catch (RuntimeException)` placé avant capture donc les erreurs SQL — et le doublon de numéro de candidat partait en simple notification au lieu de se poser sur le champ fautif. L'ordre des blocs `catch` n'est pas négociable ici.
+
+---
+
 ## D-047 — Les trois questions ouvertes du module Votes, tranchées à l'ouverture de la phase 9
 **2026-08-28**
 

@@ -31,6 +31,7 @@
         ['label' => 'Vue generale', 'icon' => 'layout-dashboard', 'route' => 'dashboard'],
         ['label' => 'Evenements', 'icon' => 'calendar-days', 'route' => 'events.index', 'match' => 'events.*', 'permission' => PermissionName::EventsView->value],
         ['label' => 'Collectes', 'icon' => 'hand-coins', 'route' => 'campaigns.index', 'match' => 'campaigns.*', 'permission' => PermissionName::CampaignsView->value],
+        ['label' => 'Votes', 'icon' => 'vote', 'route' => 'polls.index', 'match' => 'polls.*', 'permission' => PermissionName::VotesView->value],
         // Remboursements : le seul ecran financier transverse. Les reversements,
         // eux, s'affichent sur la vue generale — l'organisateur n'a rien a y
         // decider (section 21.2).

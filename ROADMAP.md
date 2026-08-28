@@ -325,10 +325,11 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 
 - [x] **Les trois questions ouvertes tranchées le 2026-08-28 (décision D-047)** : commission des votes à **5 %** comme la billetterie ; vote gratuit **assumé comme indicatif et annoncé dans l'interface** ; rapport final en **écran exportable**, PDF plus tard
 - [x] **Jalon 9.1 — Fondations, fait le 2026-08-28 (décision D-048)** : `polls`, `poll_categories`, `candidates`, enums `PollStatus` / `ResultsVisibility`, permissions `votes.view` / `votes.manage`, commission `VOTING` ouverte en base. Aucune colonne de compteur nulle part ; règles tenues par des `CHECK` PostgreSQL ; fenêtre de catégorie héritée jamais recopiée, et jamais capable d'ouvrir ce que le scrutin a fermé. 39 tests
-- [ ] Jalon 9.2 — Dashboard organisateur : création du vote, écran catégories + candidats, publication
+- [x] **Jalon 9.2 — Dashboard organisateur, fait le 2026-08-28 (décision D-049)** : `SavePoll`, `PublishPoll`, `SavePollCategory`, `SaveCandidate`, écrans liste / formulaire / catégories-et-candidats, entrée de menu, huit actions d'audit. Publier est un seul geste — la date d'ouverture décide entre actif et programmé ; les termes économiques se figent à l'ouverture ; catégories et candidats descendent du scrutin, donc toute recherche part de lui. 41 tests
 - [ ] Jalon 9.3 — Page publique et vote gratuit : `Ballot`, `VoterQuota`, quota atomique, déclencheur d'immuabilité, mention du caractère indicatif
 - [ ] Jalon 9.4 — Vote payant : `Ballot` comme `Payable`, `PayableResolver`, commission, webhooks
 - [ ] Jalon 9.5 — Résultats, clôture, rapport : `VotingStatistics`, `poll_results` figés, tâche `ClosePolls`, écran exportable
 
 **Reste ouvert, non bloquant :**
-- [ ] `Poll::publicUrl()` référence la route `polls.public`, qui n'existe qu'au jalon 9.3
+- [ ] `Poll::publicUrl()` référence la route `polls.public`, qui n'existe qu'au jalon 9.3 — le lien partageable n'apparaît donc pas encore sur les écrans organisateur
+- [ ] Le gel des termes économiques se déclenche à l'ouverture du vote. Le jalon 9.3 pourra l'affiner en regardant s'il existe réellement un bulletin

@@ -18,6 +18,9 @@ use App\Livewire\Auth\Register;
 use App\Livewire\Dashboard\Campaigns\Donations as CampaignDonations;
 use App\Livewire\Dashboard\Campaigns\Form as CampaignForm;
 use App\Livewire\Dashboard\Campaigns\Index as CampaignIndex;
+use App\Livewire\Dashboard\Polls\Categories as PollCategories;
+use App\Livewire\Dashboard\Polls\Form as PollForm;
+use App\Livewire\Dashboard\Polls\Index as PollIndex;
 use App\Livewire\Dashboard\Events\AccessControl as EventAccessControl;
 use App\Livewire\Dashboard\Events\Entries as EventEntries;
 use App\Livewire\Dashboard\Events\Form as EventForm;
@@ -243,6 +246,18 @@ Route::middleware('auth')->group(function () {
         // chemin d'ecriture n'existe sur cet ecran, et un test le verifie.
         Route::get('/collectes/{campaign}/dons', CampaignDonations::class)
             ->name('campaigns.donations');
+
+        // Section 86 : votes. « Vote » en interface, `Poll` en code — en
+        // francais, le mot designe a la fois le scrutin et le bulletin.
+        Route::get('/votes', PollIndex::class)->name('polls.index');
+        Route::get('/votes/nouveau', PollForm::class)->name('polls.create');
+        Route::get('/votes/{poll}/modifier', PollForm::class)->name('polls.edit');
+
+        // Categories ET candidats sur un seul ecran : une categorie sans
+        // candidat n'existe pas vraiment, et les separer obligerait a naviguer
+        // entre deux pages pour monter un concours (section 86.5).
+        Route::get('/votes/{poll}/categories', PollCategories::class)
+            ->name('polls.categories');
 
         // Section 24.1 : le client demande, l'organisateur decide.
         Route::get('/remboursements', DashboardRefunds::class)->name('refunds.index');
