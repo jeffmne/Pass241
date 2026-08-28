@@ -114,4 +114,31 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Delai d'inactivite
+    |--------------------------------------------------------------------------
+    |
+    | Minutes sans aucune requete au bout desquelles l'utilisateur est
+    | deconnecte, par `ExpireInactiveSessions` (section 66).
+    |
+    | DISTINCT DE `SESSION_LIFETIME`, et volontairement. Le premier repond a
+    | « au bout de combien de temps sans rien faire coupe-t-on », le second a
+    | « combien de temps une session peut-elle vivre au maximum ». Les
+    | confondre obligerait a retenir la plus courte des deux valeurs pour les
+    | deux usages.
+    |
+    | Trente minutes : un organisateur consulte ses ventes depuis un telephone
+    | ou un ordinateur partage, et le tableau de bord porte du chiffre
+    | d'affaires. Plus court gene le travail reel — remplir une grille de
+    | billets prend du temps ; plus long laisse une session ouverte derriere
+    | quelqu'un qui a quitte la piece.
+    |
+    | Zero desactive la coupure. Reglage explicite plutot que middleware
+    | retire du groupe et oublie.
+    |
+    */
+
+    'idle_timeout' => (int) env('AUTH_IDLE_TIMEOUT', 30),
+
 ];

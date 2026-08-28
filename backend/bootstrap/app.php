@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAgentToken;
 use App\Http\Middleware\EnsureOrganizationContext;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\ExpireInactiveSessions;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -55,6 +56,18 @@ return Application::configure(basePath: dirname(__DIR__))
             before: SubstituteBindings::class,
             prepend: EnsureOrganizationContext::class,
         );
+
+        /*
+         * Coupure apres inactivite (section 66).
+         *
+         * Sur le groupe `web` uniquement : l'API agent s'authentifie par jeton
+         * Sanctum, sans session, et un agent au controle des entrees ne doit
+         * surtout pas etre deconnecte parce qu'il n'a rien scanne pendant une
+         * demi-heure — c'est le creux entre deux vagues d'arrivees.
+         */
+        $middleware->web(append: [
+            ExpireInactiveSessions::class,
+        ]);
 
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo('/dashboard');

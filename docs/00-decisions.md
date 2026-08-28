@@ -182,6 +182,35 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-050 — La coupure après inactivité est un middleware, pas un réglage de session
+**2026-08-28**
+
+Demandé par Jeff. `SESSION_LIFETIME` était déjà à 120 minutes — il n'a jamais suffi, pour trois raisons.
+
+### 1. « Se souvenir de moi » annulait tout
+
+La case était **cochée par défaut**, ce qui la rendait décorative : personne ne décoche une option déjà cochée. Le cookie de rappel reconnecte silencieusement dès la requête suivante — l'expiration de session ne déconnectait donc **rien** pour la quasi-totalité des utilisateurs.
+
+Seul `Auth::logout()` fait tourner le jeton de rappel en base. C'est la raison d'être du middleware : l'expiration passive d'une session ne le touche pas.
+
+La case est désormais décochée par défaut. Elle ne dispense plus que de se reconnecter après avoir fermé le navigateur — elle ne permet pas de contourner le délai d'inactivité.
+
+### 2. L'expiration passive ne dit rien
+
+L'utilisateur revenait sur l'écran de connexion sans savoir pourquoi, et croyait à une panne plutôt qu'à une mesure de sécurité. Le message fait la moitié de la fonctionnalité : il nomme le délai réel, et la vue de connexion l'affiche — elle ne rendait `session('notice')` nulle part.
+
+### 3. Les deux réglages répondent à deux questions différentes
+
+`SESSION_LIFETIME` : « combien de temps une session peut-elle vivre au maximum ». `AUTH_IDLE_TIMEOUT` : « au bout de combien de temps sans rien faire coupe-t-on ». Les confondre obligerait à retenir la plus courte des deux valeurs pour les deux usages. Trente minutes par défaut, zéro pour désactiver — réglage explicite plutôt que middleware retiré du groupe et oublié.
+
+### Deux détails qui se paient sinon
+
+**Livewire reçoit un 419, pas une redirection.** Il ne sait pas suivre une redirection au milieu d'une requête de composant : il recevrait du HTML là où il attend du JSON, et l'écran resterait figé sur un état qui n'existe plus côté serveur. Le 419 est le code qu'il sait déjà traiter — il recharge la page.
+
+**Le groupe `web` uniquement.** L'API agent s'authentifie par jeton Sanctum, sans session. Un agent au contrôle des entrées ne doit surtout pas être déconnecté parce qu'il n'a rien scanné pendant trente minutes — c'est le creux entre deux vagues d'arrivées.
+
+---
+
 ## D-049 — Publier est un seul geste, et les règles du jeu se figent à l'ouverture
 **2026-08-28**
 

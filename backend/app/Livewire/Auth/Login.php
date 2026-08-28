@@ -21,7 +21,21 @@ class Login extends Component
     #[Validate('required|string')]
     public string $password = '';
 
-    public bool $remember = true;
+    /**
+     * « Se souvenir de moi », DECOCHE par defaut.
+     *
+     * Il l'etait a `true`, ce qui rendait la case decorative : personne ne
+     * decoche une option deja cochee. Le cookie de rappel survit a la fermeture
+     * du navigateur et rouvre la session sans mot de passe — sur un tableau de
+     * bord qui porte du chiffre d'affaires, ce n'est pas un defaut a subir sans
+     * l'avoir choisi.
+     *
+     * La coupure apres inactivite (`ExpireInactiveSessions`) fait tourner le
+     * jeton de rappel quand elle deconnecte : cocher la case ne permet donc pas
+     * de contourner le delai. Elle ne dispense que de se reconnecter apres avoir
+     * ferme le navigateur.
+     */
+    public bool $remember = false;
 
     public function login(AuditLogger $audit): void
     {

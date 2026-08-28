@@ -2,6 +2,18 @@
     <h1 class="font-display text-2xl font-extrabold text-ink">Connexion</h1>
     <p class="mt-1.5 text-sm text-grey-500">Accedez a votre espace organisateur.</p>
 
+    {{-- Message porte par la redirection, notamment celui de la coupure apres
+         inactivite. Sans ce bloc, l'utilisateur reviendrait sur l'ecran de
+         connexion sans savoir pourquoi — et croirait a une panne plutot qu'a
+         une mesure de securite. --}}
+    @if (session('notice'))
+        <div role="status"
+             class="mt-5 flex items-start gap-2.5 rounded-[var(--radius-md)] border border-azure-300/50 bg-azure-50 px-4 py-3 text-sm text-ink">
+            <x-lucide-info class="mt-0.5 size-4 shrink-0 text-azure-600" stroke-width="2" aria-hidden="true" />
+            <span>{{ session('notice') }}</span>
+        </div>
+    @endif
+
     <form wire:submit="login" class="mt-7 space-y-4">
         <div>
             <label for="email" class="mb-1.5 block text-sm font-medium text-ink">Adresse email</label>

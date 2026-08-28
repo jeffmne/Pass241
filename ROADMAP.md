@@ -316,6 +316,7 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 - [ ] Exports, analytics
 - [ ] Notifications
 - [ ] Monitoring, sécurité, performance
+- [x] **Déconnexion après inactivité, faite le 2026-08-28 (décision D-050)** — sortie de phase, demandée par Jeff : `ExpireInactiveSessions` sur le groupe `web`, `AUTH_IDLE_TIMEOUT` à 30 minutes, message nommant le délai, 419 pour Livewire. « Se souvenir de moi » passe à décoché par défaut — cochée, elle rendait l'expiration de session sans effet. 9 tests
 
 ### Phase 9 — Votes *(fonctionnalité future)*
 
