@@ -160,14 +160,11 @@ class DatabaseSeeder extends Seeder
                         'max_per_order' => 4,
                         'position' => 1,
                     ],
-                    [
-                        'name' => 'Derniere place',
-                        'description' => 'Il n\'en reste qu\'une.',
-                        'price' => 15_000,
-                        'quantity' => 1,
-                        'max_per_order' => 1,
-                        'position' => 2,
-                    ],
+                    // Un troisieme type « Derniere place » a ete retire de la
+                    // demonstration : a cote de « Standard » et « VIP », qui
+                    // sont des categories, il se lisait comme une troisieme
+                    // categorie alors qu'il ne decrivait qu'un stock residuel.
+                    // Un acheteur cherchait ce qu'elle donnait de plus.
                 ]);
             });
         }

@@ -116,10 +116,12 @@ it('ouvre sur la banniere, avant la date et le lieu', function () {
     // informations pratiques viennent apres.
     $html = $this->get('/e/concert-afro-2026')->assertOk()->getContent();
 
-    // L'ancre est le texte reel du document : « Date » est mis en majuscules
-    // par la feuille de style, pas dans le HTML.
+    // L'ancre a change avec la carte d'identite : le tableau « Date / Lieu /
+    // Capacite » repetait les pastilles posees juste au-dessus, il a ete
+    // retire. Ce sont donc les pastilles elles-memes qui portent desormais la
+    // date, et c'est leur position qui fait foi.
     $hero = strpos($html, 'event-hero-image');
-    $date = strpos($html, 'Date</dt>');
+    $date = strpos($html, 'info-chip');
 
     expect($hero)->not->toBeFalse()
         ->and($date)->not->toBeFalse()

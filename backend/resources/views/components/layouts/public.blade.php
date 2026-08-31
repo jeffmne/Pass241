@@ -115,12 +115,27 @@
                    'text-white group-data-[stuck=true]:text-azure-700' => $heroDark,
                    'text-azure-700' => ! $heroDark,
                ])>
-                {{-- Au-dessus d'un heros sombre, le symbole passe en `mono` et
-                     suit la couleur du texte, qui est alors blanc : sa
-                     lisibilite ne peut pas dependre de la photo choisie par
-                     l'organisateur. Sur les pages sans heros, il reprend ses
-                     couleurs. --}}
-                <x-brand-mark :variant="$heroDark ? 'mono' : 'color'" class="h-7 w-auto" />
+                {{-- LE LOGO EN COULEUR, PARTOUT, y compris au-dessus d'une
+                     affiche sombre.
+
+                     La variante `mono` etait employee ici : un contour plat en
+                     `currentColor`, sans le billet blanc, sans le degrade, sans
+                     le « 241 ». Ce n'est pas le logo, c'en est une silhouette —
+                     et c'etait la premiere chose que voyait un visiteur qui
+                     ouvre le lien, puis de nouveau des qu'il remontait en haut
+                     de page.
+
+                     Rien ne l'imposait : le pictogramme porte un billet BLANC
+                     et un bleu vif, qui se detachent franchement du voile
+                     sombre du heros. Et ce voile n'est pas l'image de
+                     l'organisateur — c'est un degre que le produit maitrise
+                     (`event-hero-scrim`), justement pour que la lisibilite de
+                     ce qui est pose dessus ne dependent pas de la photo.
+
+                     La variante `mono` reste utile la ou la couleur ne survit
+                     pas au support : capture du billet en image, impression en
+                     noir et blanc. Elle n'a simplement rien a faire ici. --}}
+                <x-brand-mark class="h-7 w-auto" />
 
                 @if ($heroDark)
                     {{-- Deux exemplaires, et un seul visible a la fois. Le

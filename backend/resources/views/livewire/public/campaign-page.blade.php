@@ -25,7 +25,10 @@
     {{-- ---------------------------------------------------------------
          Heros
     ---------------------------------------------------------------- --}}
-    <section class="relative isolate flex min-h-[60vh] items-end sm:min-h-[66vh]">
+    {{-- Meme cadrage que la page d'evenement : un rapport fixe plutot qu'une
+         fraction de la fenetre, pour que le bloc de progression commence a la
+         meme hauteur quel que soit le telephone. --}}
+    <section class="relative isolate flex aspect-[4/3] max-h-[64vh] min-h-[20rem] w-full items-end sm:aspect-[16/9] lg:aspect-[21/9]">
         @if ($cover)
             <div aria-hidden="true" class="event-hero -z-10">
                 <div class="event-hero-image" style="background-image: url({{ $cover }})"></div>
@@ -37,10 +40,8 @@
 
         {{-- Retrait bas genereux, et ce n'est pas de l'aeration : le voile du
              heros fond vers la couleur de page sur ses derniers pour-cent
-             (`event-hero-scrim`). Un texte pose la devient blanc sur blanc. La
-             page evenement s'en tire parce qu'elle finit sur un bouton plein ;
-             ici la derniere ligne est du texte, elle doit remonter. --}}
-        <div class="mx-auto w-full max-w-5xl px-5 pt-24 pb-20 sm:px-6 sm:pt-32 sm:pb-24">
+             (`event-hero-scrim`). Un texte pose la devient blanc sur blanc. --}}
+        <div class="mx-auto w-full max-w-5xl px-5 pt-24 pb-16 sm:px-6 sm:pt-32 sm:pb-20">
             @if ($state === CampaignStatus::Cancelled)
                 {{-- L'annulation passe avant tout : quelqu'un qui rouvre le lien
                      recu doit la lire immediatement, pas la deduire. --}}
@@ -64,35 +65,35 @@
             </p>
 
             <h1 @class([
-                'mt-3 max-w-3xl font-display text-4xl leading-[1.04] font-extrabold sm:text-6xl',
+                'mt-2.5 max-w-3xl font-display text-3xl leading-[1.06] font-extrabold sm:text-5xl',
                 'text-white [text-shadow:0_2px_24px_rgba(16,19,26,0.45)]' => $cover,
                 'text-ink' => ! $cover,
             ])>
                 {{ $campaign->name }}
             </h1>
 
-            {{-- Blanc plein et ombre portee, comme le titre : ces deux lignes
-                 vivent sur la partie la plus claire du voile, la ou une
-                 opacite reduite les effacerait. --}}
+            {{-- Blanc plein et ombre portee, comme le titre : cette ligne vit
+                 sur la partie la plus claire du voile, la ou une opacite
+                 reduite l'effacerait.
+
+                 « Organise par » a rejoint la carte de progression : le nom du
+                 beneficiaire est ce qui decide un donateur, celui de
+                 l'organisateur est ce qui le rassure — la premiere information
+                 appartient a l'affiche, la seconde au bloc qu'on lit ensuite. --}}
             <p @class([
-                'mt-5 text-sm font-medium',
+                'mt-4 text-sm font-medium',
                 'text-white [text-shadow:0_1px_12px_rgba(16,19,26,0.55)]' => $cover,
                 'text-grey-500' => ! $cover,
             ])>
                 Au profit de <span class="font-semibold">{{ $campaign->beneficiary_label }}</span>
             </p>
-
-            <p @class([
-                'mt-1.5 text-sm',
-                'text-white/85 [text-shadow:0_1px_12px_rgba(16,19,26,0.55)]' => $cover,
-                'text-grey-500' => ! $cover,
-            ])>
-                Organise par <span class="font-semibold">{{ $campaign->organization->name }}</span>
-            </p>
         </div>
     </section>
 
-    <section class="mx-auto w-full max-w-5xl px-5 pb-14 sm:px-6">
+    {{-- Le bloc de progression CHEVAUCHE la banniere, comme la carte
+         d'identite de la page d'evenement : c'est ce que le visiteur vient
+         verifier, il n'a pas a defiler pour l'atteindre. --}}
+    <section class="relative z-10 mx-auto -mt-12 w-full max-w-5xl px-5 pb-14 sm:px-6">
         @if ($state === CampaignStatus::Cancelled && $campaign->cancellation_reason)
             <div class="mb-6 flex items-start gap-3 rounded-2xl border border-danger/30 bg-danger/5 p-4 sm:p-5">
                 <x-lucide-circle-alert class="mt-0.5 size-5 shrink-0 text-danger" stroke-width="1.75" />
@@ -111,7 +112,11 @@
              alors qu'un objectif depasse est une bonne nouvelle ; le montant,
              lui, reste affiche tel quel.
         ---------------------------------------------------------------- --}}
-        <div class="surface p-5 sm:p-7" data-reveal>
+        {{-- En verre, et il est ici pleinement justifie (section 70.3) : la
+             carte est posee sur l'affiche, donc sur un fond qui a reellement
+             de la matiere a refracter. Les chiffres qu'elle porte restent sur
+             la carte elle-meme, jamais sur une surface imbriquee. --}}
+        <div class="glass glass-specular glass-panel p-5 sm:p-7" data-reveal>
             {{-- Une seule colonne, alignee a gauche, du telephone au grand
                  ecran. Deux blocs opposes se cassaient sur un ecran etroit :
                  l'objectif passait a la ligne en restant aligne a droite, et
@@ -149,40 +154,51 @@
             </div>
 
             @if ($ends)
-                <p class="mt-4 flex items-center gap-2 text-sm text-grey-500">
-                    <x-lucide-calendar-clock class="size-4 shrink-0" stroke-width="1.75" />
-                    @if ($campaign->hasLapsed())
-                        Collecte terminee le {{ $ends->translatedFormat('j F Y') }}
-                    @else
-                        Jusqu'au {{ $ends->translatedFormat('j F Y') }}
-                    @endif
-                </p>
+                {{-- En pilule, comme la date d'un evenement : c'est la meme
+                     information — jusqu'a quand ceci est ouvert — et les deux
+                     pages publiques doivent la presenter pareil. --}}
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                    <span class="info-chip">
+                        <x-lucide-calendar-clock class="size-4 shrink-0" stroke-width="1.75" />
+                        @if ($campaign->hasLapsed())
+                            Collecte terminee le {{ $ends->translatedFormat('j F Y') }}
+                        @else
+                            Jusqu'au {{ $ends->translatedFormat('j F Y') }}
+                        @endif
+                    </span>
+                </div>
             @endif
 
-            {{--
-                Le don en ligne arrive au jalon suivant : la couche de paiement
-                partagee est en cours (decision D-041). Le bouton est rendu
-                inerte plutot que masque — le visiteur voit ce que la page
-                proposera, sans cliquer dans le vide. Meme parti pris que les
-                entrees de menu du tableau de bord.
-            --}}
-            @if ($open)
-                {{-- Taille normale, largeur au contenu : c'est la mesure des
-                     boutons principaux du produit. Un bouton pleine largeur en
-                     grande taille ecrasait le bloc de progression, qui est ce
-                     que le visiteur vient lire en premier. --}}
-                <a href="#donner" class="btn btn-primary btn-pill mt-6">
-                    <x-lucide-hand-coins class="size-4" stroke-width="2" />
-                    Faire un don
-                </a>
-            @else
-                <p class="mt-6 rounded-xl bg-canvas px-4 py-3 text-sm text-grey-500">
+            {{-- Organisateur et appel au don sur la meme rangee : « qui porte
+                 cette collecte, et comment je contribue ». Empiles sur
+                 telephone, cote a cote des qu'il y a la place. --}}
+            <div class="mt-5 flex flex-col gap-4 border-t border-grey-200/60 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex min-w-0 items-center gap-3">
+                    <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-azure-100">
+                        <x-lucide-building-2 class="size-5 text-azure-700" stroke-width="1.75" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-xs text-grey-500">Organise par</p>
+                        <p class="truncate font-semibold text-ink">{{ $campaign->organization->name }}</p>
+                    </div>
+                </div>
+
+                @if ($open)
+                    <a href="#donner" class="btn btn-primary btn-pill btn-lg w-full shrink-0 sm:w-auto">
+                        <x-lucide-hand-coins class="size-4" stroke-width="2" />
+                        Faire un don
+                    </a>
+                @endif
+            </div>
+
+            @unless ($open)
+                <p class="surface mt-4 px-4 py-3 text-sm text-grey-500">
                     Cette collecte n'accepte plus de dons.
                     @if ($progress['donations'] > 0)
                         Les contributions deja recues restent visibles ci-dessous.
                     @endif
                 </p>
-            @endif
+            @endunless
         </div>
 
         {{-- ---------------------------------------------------------------

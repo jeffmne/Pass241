@@ -320,6 +320,45 @@
     --perforation: rgba(20, 84, 155, 0.34);
     --notch-shadow: inset 0 1px 2px rgba(20, 84, 155, 0.14);
 
+    /*
+     * CARTE D'OFFRE — le billet qu'on n'a pas encore achete.
+     *
+     * Distincte de `--stub-*` ci-dessus, qui teinte la souche du billet EMIS.
+     * Les deux objets se ressemblent volontairement, mais ils ne disent pas la
+     * meme chose : l'offre est un aplat azurin plein qui appelle le regard sur
+     * le prix, le billet emis est une souche pale qui accueille un QR Code. Un
+     * seul jeu de jetons pour les deux ferait forcement un compromis, et le
+     * prix — la donnee la plus relue de l'ecran d'achat — y perdrait.
+     *
+     * LES DEUX BORNES SONT CHOISIES POUR PORTER DU TEXTE BLANC, et c'est la
+     * seule contrainte qui a decide de leurs valeurs : le degrade traverse
+     * toute la carte, donc chaque point du parcours doit tenir 4,5:1 sur du
+     * blanc. `--azure-500` (#007FFF) en est exclu pour cette raison exacte,
+     * comme il l'est deja des aplats de bouton (voir section 2, plus haut) :
+     * il plafonne a 3,8:1. Les deux bornes retenues tiennent 8,1:1 et 5,6:1.
+     */
+    --offer-from: #004f9e;
+    --offer-to: #0066cc;
+    --offer-ink: #ffffff;
+    /* Texte secondaire de la carte. Blanc a 90 %, et pas plus bas : sur la
+       borne claire du degrade, une opacite de 82 % tombait a 3,6:1. */
+    --offer-muted: rgba(255, 255, 255, 0.9);
+    /* La souche est LEGEREMENT assombrie par-dessus le degrade, plutot que
+       peinte d'une couleur a elle : le degrade doit rester continu d'un bout a
+       l'autre de la carte, la souche n'est qu'une zone un peu plus profonde. */
+    --offer-stub-veil: rgba(0, 28, 58, 0.28);
+    --offer-perforation: rgba(255, 255, 255, 0.5);
+    /* Carte eteinte : le billet reste lisible mais ne s'achete plus. Gris
+       desature plutot qu'azur eclairci — « epuise » doit se lire comme hors
+       service, pas comme une autre categorie de billet.
+       Les deux bornes sont assez sombres pour porter le meme blanc que la
+       carte active (7,1:1 et 5,0:1) : un billet epuise doit rester LISIBLE,
+       il n'a que perdu son bouton. */
+    --offer-off-from: #4f5865;
+    --offer-off-to: #667080;
+    --offer-off-ink: #ffffff;
+    --offer-off-muted: rgba(255, 255, 255, 0.88);
+
     --scrollbar: var(--grey-200);
 }
 
@@ -495,6 +534,26 @@
     --stub-to: rgba(22, 34, 52, 0.75);
     --perforation: rgba(162, 196, 235, 0.35);
     --notch-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+
+    /* La carte d'offre s'eclaircit en mode sombre, comme le bouton primaire et
+       pour la meme raison : sur une encre profonde, un azur fonce s'enfonce
+       dans le fond et le prix cesse de se detacher. L'encre bascule donc au
+       marine du produit — sur ces deux bleus clairs, c'est elle qui porte le
+       contraste, et non le blanc, qui n'y tiendrait que 2,4:1. */
+    --offer-from: #0f7ae8;
+    --offer-to: #4dabff;
+    --offer-ink: #04101f;
+    --offer-muted: rgba(4, 16, 31, 0.72);
+    --offer-stub-veil: rgba(255, 255, 255, 0.16);
+    --offer-perforation: rgba(4, 16, 31, 0.38);
+    /* En mode sombre la carte eteinte redevient sombre — sinon elle brillerait
+       plus que la carte active, ce qui dirait exactement l'inverse de ce
+       qu'elle doit dire. Son encre repasse donc au clair : elle ne peut pas
+       partager `--offer-ink`, qui est le marine des cartes actives. */
+    --offer-off-from: #2f3a49;
+    --offer-off-to: #3d4959;
+    --offer-off-ink: #c3ccd8;
+    --offer-off-muted: rgba(195, 204, 216, 0.82);
 
     --scrollbar: #2c384a;
 }
@@ -1803,6 +1862,232 @@
      */
     .ticket-stub {
         background-image: linear-gradient(180deg, var(--stub-from), var(--stub-to));
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Carte d'offre — un type de billet en vente
+     * ---------------------------------------------------------------------
+     *
+     * Le meme objet que le billet emis, vu AVANT l'achat : souche a gauche
+     * portant le prix, perforation verticale, corps portant le nom et le stock.
+     *
+     * Ce n'est pas un habillage. Une liste de types de billets rendue en lignes
+     * de tableau se lit comme un tarif ; rendue en billets, elle se lit comme
+     * ce qu'on va recevoir. L'acheteur reconnait l'objet avant d'en lire le
+     * texte — et c'est exactement l'objet que le composant `glass-ticket` lui
+     * remettra apres paiement. La continuite entre les deux ecrans est le
+     * propos ; elle vaut mieux qu'une carte generique de plus.
+     *
+     * Surface PLEINE et non du verre : ces cartes vivent deja dans un panneau
+     * de verre, et la regle 70.4 interdit un niveau de verre imbrique dans un
+     * autre. Deux flous superposes n'ajoutent aucune profondeur — ils enlevent
+     * du contraste au prix, qui est la donnee la plus relue de l'ecran.
+     */
+    .ticket-option {
+        /* Reprises en CSS et non en classes utilitaires : la largeur de souche
+           sert a la fois a la grille, a la perforation et a la position des
+           encoches. Trois valeurs a garder d'accord, donc une seule variable. */
+        /* Souche etroite : le billet doit tenir en une bande basse, comme un
+           talon de carnet. Elle etait assez large pour que la carte fasse deux
+           fois la hauteur utile sur telephone, et trois billets ne tenaient
+           plus dans un ecran. */
+        --stub-w: 4.75rem;
+        --notch-r: 0.5rem;
+
+        position: relative;
+        display: grid;
+        /*
+         * `minmax(0, 1fr)` et surtout PAS `1fr`.
+         *
+         * `1fr` vaut `minmax(auto, 1fr)` : la colonne refuse alors de descendre
+         * sous la largeur minimale de son contenu. Le corps du billet debordait
+         * donc la carte des qu'il s'allongeait — la ligne « 1 × 10 000 FCFA »
+         * n'apparaissant qu'apres selection, le stepper se decalait vers la
+         * droite au premier appui sur « + », sortait de la carte, et se faisait
+         * rogner par le masque des encoches.
+         *
+         * Avec une borne basse a zero, la colonne peut se contraindre : c'est
+         * le texte qui se tronque, et les boutons ne bougent plus d'un pixel.
+         */
+        grid-template-columns: var(--stub-w) minmax(0, 1fr);
+        /* La carte ENTIERE est peinte, souche comprise : le degrade traverse
+           l'objet d'un bord a l'autre, et la souche n'est qu'un voile pose
+           dessus. Une carte blanche a souche coloree lisait comme une ligne de
+           tarif ; peinte en plein, elle lit comme un billet. */
+        background-image: linear-gradient(105deg, var(--offer-from), var(--offer-to));
+        color: var(--offer-ink);
+        border-radius: var(--radius-lg);
+        transition: box-shadow var(--duration-state) var(--ease-out-quart);
+    }
+
+    /*
+     * AUCUNE OMBRE PORTEE SUR CETTE CARTE, et ce n'est pas un oubli.
+     *
+     * Les encoches sont percees au masque (voir plus bas), et un masque rogne
+     * TOUT ce qui deborde de la boite — l'ombre exterieure comprise. Une
+     * `box-shadow` ecrite ici serait purement et simplement invisible : du CSS
+     * mort, que le prochain lecteur croirait actif.
+     *
+     * La carte n'en a de toute facon pas besoin pour se detacher : c'est un
+     * aplat azurin sature pose sur un panneau clair. Et le seul moyen d'obtenir
+     * une ombre qui epouse une forme encochee serait un `filter: drop-shadow`
+     * sur un conteneur supplementaire — un noeud et un filtre de plus par
+     * billet, sur un marche ou l'on vise des telephones modestes (section 72).
+     */
+
+    /* Texte secondaire de la carte — stock restant, quantite choisie. */
+    .ticket-option-muted {
+        color: var(--offer-muted);
+    }
+
+    @media (min-width: 640px) {
+        .ticket-option {
+            --stub-w: 6.5rem;
+        }
+    }
+
+    /*
+     * Les encoches sont de VRAIS TROUS, perces au masque, et non deux pastilles
+     * de la couleur du fond posees par-dessus.
+     *
+     * La carte est posee sur la nappe azurine, qui est un degrade : une
+     * pastille de couleur fixe y ferait deux taches visibles des que la page
+     * defile. Le masque, lui, laisse passer ce qui est reellement derriere.
+     *
+     * `mask-composite` intersecte les deux couches : sans lui, elles
+     * s'additionneraient et la carte entiere resterait pleine.
+     */
+    @supports (mask-composite: intersect) or (-webkit-mask-composite: source-in) {
+        .ticket-option {
+            --notch-mask: radial-gradient(
+                    circle var(--notch-r) at var(--stub-w) 0,
+                    transparent 98%,
+                    #000 100%
+                ),
+                radial-gradient(circle var(--notch-r) at var(--stub-w) 100%, transparent 98%, #000 100%);
+
+            -webkit-mask-image: var(--notch-mask);
+            mask-image: var(--notch-mask);
+            -webkit-mask-composite: source-in;
+            mask-composite: intersect;
+        }
+    }
+
+    /* Souche : c'est elle qui porte le prix. Un voile sombre pose sur le
+       degrade, et non une couleur a elle — le degrade doit rester continu
+       d'un bord a l'autre de la carte. */
+    .ticket-option-stub {
+        background-color: var(--offer-stub-veil);
+        border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+    }
+
+    /* Billet indisponible : la carte s'eteint sans disparaitre. Un visiteur
+       doit voir qu'une categorie existe et qu'elle est epuisee — la masquer
+       lui ferait croire a une erreur. */
+    .ticket-option-off {
+        background-image: linear-gradient(105deg, var(--offer-off-from), var(--offer-off-to));
+        color: var(--offer-off-ink);
+    }
+
+    .ticket-option-off .ticket-option-muted {
+        color: var(--offer-off-muted);
+    }
+
+    /*
+     * Perforation verticale, entre la souche et le corps.
+     *
+     * Meme motif que `.ticket-perforation`, tourne d'un quart de tour : une
+     * vraie ligne de points, jamais un `border-dashed` — aucun billet imprime
+     * n'a jamais eu de tirets rectangulaires.
+     *
+     * Jeton distinct de `--perforation` : celui-la est un bleu sombre, dessine
+     * pour une souche pale. Sur la carte d'offre, qui est elle-meme un aplat
+     * azurin, il disparaitrait purement et simplement.
+     */
+    .ticket-perforation-y {
+        width: 3px;
+        background-image: radial-gradient(circle, var(--offer-perforation) 1.4px, transparent 1.5px);
+        background-size: 3px 9px;
+        background-repeat: repeat-y;
+        background-position: center;
+    }
+
+    /*
+     * Carte choisie : un anneau BLANC, pas azurin. Sur une carte deja bleue,
+     * un anneau bleu ne se voit pas — c'est tout le probleme d'un etat porte
+     * par une nuance de la meme teinte. Le blanc s'en detache franchement,
+     * quel que soit le theme.
+     *
+     * Et l'anneau ne porte pas l'information a lui seul : la quantite est
+     * ecrite en toutes lettres dans le corps de la carte (regle 1, contraste
+     * et non couleur seule).
+     */
+    .ticket-option-picked {
+        /* `inset`, imperativement : un anneau exterieur serait rogne par le
+           masque des encoches et n'apparaitrait qu'a moitie — c'est ce qui
+           faisait sauter la carte a l'oeil des le premier appui sur « + ». */
+        box-shadow: inset 0 0 0 2.5px var(--offer-ink);
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .ticket-option:not(.ticket-option-off):not(.ticket-option-picked):hover {
+            box-shadow: inset 0 0 0 1.5px var(--offer-muted);
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Barre d'achat collante
+     * ---------------------------------------------------------------------
+     *
+     * Sur telephone, le recapitulatif et le bouton de paiement vivent en bas
+     * de la liste des billets — donc hors de l'ecran au moment ou l'acheteur
+     * choisit. Il compose sa commande sans jamais voir ce qu'elle coute, et
+     * doit defiler pour verifier. La barre remonte les deux informations la
+     * ou se trouve deja son pouce.
+     *
+     * Elle n'apparait QUE lorsqu'un billet est choisi : une barre collante
+     * permanente mange un sixieme de l'ecran pour ne rien dire.
+     *
+     * Elle emprunte la matiere du rail du tableau de bord, comme l'en-tete
+     * flottant : les surfaces fixes du produit sont toutes le meme verre.
+     */
+    .checkout-bar {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* Le contenu de la page doit pouvoir passer SOUS la barre, sinon la barre
+       masque le dernier bouton du formulaire — celui-la meme qu'elle duplique. */
+    .checkout-bar-gap {
+        padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * Pastilles d'information de la banniere
+     * ---------------------------------------------------------------------
+     *
+     * Date, lieu, capacite : ce qu'on cherche en priorite quand on vient de
+     * recevoir un lien. Posees en pilules sur la carte qui chevauche l'affiche,
+     * elles se lisent d'un coup d'oeil sur un telephone, la ou une ligne de
+     * texte separee par des points mediants oblige a lire en entier.
+     */
+    .info-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        border-radius: 9999px;
+        background-color: var(--azure-50);
+        padding: 0.375rem 0.75rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.25rem;
+        color: var(--azure-700);
+    }
+
+    .info-chip svg {
+        color: var(--azure-600);
     }
 
     /* -------------------------------------------------------------------------

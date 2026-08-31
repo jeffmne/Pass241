@@ -14,14 +14,19 @@
     Aucun emoji (regle 80.6).
 --}}
 <div>
-    {{-- Montants proposes. Un donateur qui hesite donne moins, ou renonce. --}}
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    {{-- Montants proposes. Un donateur qui hesite donne moins, ou renonce.
+
+         Cibles hautes et montant en gros : sur telephone, c'est le premier
+         geste du parcours de don et il se fait au pouce. Un rang de petits
+         boutons demandait de viser. --}}
+    <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         @foreach ($presets as $preset)
             <button type="button" wire:click="choose({{ $preset }})"
+                    aria-pressed="{{ $amount === $preset ? 'true' : 'false' }}"
                     @class([
-                        'min-h-12 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors tabular',
-                        'border-azure-500 bg-azure-50 text-azure-700' => $amount === $preset,
-                        'border-grey-200 bg-white text-ink hover:border-azure-300' => $amount !== $preset,
+                        'flex min-h-14 items-center justify-center rounded-xl border px-3 py-3 font-display text-base font-bold transition-colors tabular',
+                        'border-azure-500 bg-azure-50 text-azure-700 ring-1 ring-azure-500' => $amount === $preset,
+                        'border-grey-200 bg-surface text-ink hover:border-azure-300' => $amount !== $preset,
                     ])>
                 {{ $money($preset) }}
             </button>
@@ -116,7 +121,7 @@
                         class="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors"
                         :class="chosen === '{{ $paymentProvider->value }}'
                             ? 'border-azure-500 bg-azure-50 font-semibold text-azure-700'
-                            : 'border-grey-200 bg-white text-grey-500 hover:border-azure-300'">
+                            : 'border-grey-200 bg-surface text-grey-500 hover:border-azure-300'">
                         <input type="radio" name="provider" value="{{ $paymentProvider->value }}"
                                wire:model="provider"
                                @change="chosen = '{{ $paymentProvider->value }}'"
@@ -147,7 +152,11 @@
             </p>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-pill mt-5" wire:loading.attr="disabled">
+        {{-- Pleine largeur sur telephone : c'est l'action de l'ecran, elle n'a
+             pas a etre visee. Elle reprend sa largeur naturelle des qu'il y a
+             la place, ou un bouton etale se lirait comme une banniere. --}}
+        <button type="submit" class="btn btn-primary btn-pill btn-lg mt-5 w-full sm:w-auto"
+                wire:loading.attr="disabled">
             <x-lucide-hand-coins class="size-4" stroke-width="2" />
             <span wire:loading.remove wire:target="donate">Faire mon don</span>
             <span wire:loading wire:target="donate">Envoi en cours</span>
