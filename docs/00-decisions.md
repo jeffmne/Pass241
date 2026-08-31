@@ -182,8 +182,54 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
-## D-053 — Le vote gratuit ne demande plus de numéro : l'IP et l'appareil suffisent
+## D-056 — La page de vote ne dit plus que le résultat est indicatif
 **2026-08-31**
+
+Demandé par Jeff. La phrase « Le résultat reste indicatif — nous limitons les votes multiples sans pouvoir les empêcher totalement » est retirée de la page publique. Ce qui reste explique à quoi sert le numéro : compter une fois, ne jamais être conservé en clair.
+
+**C'est un assouplissement de la décision D-047**, et il faut le dire : cette décision faisait de l'annonce dans l'interface la contrepartie explicite d'assumer la faiblesse du vote gratuit — « à condition que l'interface le DISE ». Un test la verrouillait ; il est remplacé par un test sur la mention qui subsiste.
+
+**Ce qui a été mis en balance.** La phrase jetait un doute sur le concours au moment précis où le visiteur s'apprête à voter, et cette hésitation a un coût réel pour l'organisateur, qui est le client. En face : un concours dont le résultat serait contesté après coup se retourne contre l'organisateur autant que contre nous.
+
+**Ce qui n'a pas bougé, et qui compte davantage** : la faiblesse elle-même est traitée par le mécanisme, pas par la mention. Le plafond par personne est tenu sur le numéro (décision D-055), les bulletins sont immuables, l'adresse IP reste consignée pour l'analyse d'abus, et aucun compteur de votes n'existe en base. Le produit ne promet toujours rien qu'il ne tienne — il cesse simplement de commenter sa propre limite sur l'écran de vote.
+
+---
+
+## D-055 — Le numéro, et non le nom, porte le « un vote par personne »
+**2026-08-31**
+
+**Remplace la décision D-053**, prise le même jour. Jeff a tranché pour « par personne » et m'a laissé choisir l'identifiant. Le numéro de téléphone est redemandé dès qu'une catégorie pose un plafond ; sans plafond, rien n'est demandé.
+
+### Pourquoi pas le nom
+
+Un nom n'est pas un identifiant, c'est une étiquette. Il échoue **dans les deux sens à la fois** :
+
+- on le contourne en tapant « Marie 2 » — coût de la fraude : zéro seconde ;
+- il bloque des votants honnêtes, puisque deux Jean Obame existent réellement ;
+- il n'est pas normalisable : « J. Obame », « jean obame » et « Jean Obame » sont trois identités pour une seule personne.
+
+### Pourquoi pas l'empreinte d'appareil seule
+
+C'était la décision D-053. Elle achetait la fluidité au prix d'un **faux positif inacceptable** : au Gabon, une famille ou un bureau passe souvent par le même partage de connexion. Deux personnes avec le même modèle de téléphone y partagent une empreinte, et la seconde se voit refuser un vote légitime. Refuser un votant réel est pire que laisser passer un doublon.
+
+### Pourquoi le numéro
+
+C'est le seul des trois qui se **normalise** en forme canonique — le code le fait déjà : indicatif 241 et zéros initiaux retirés — et le seul qui **coûte quelque chose à multiplier**, puisqu'il faut acheter une puce.
+
+Ce n'est pas une garantie d'unicité, et la décision D-047 ne prétend pas le contraire : c'est un **coût de fraude**, et c'est tout ce qu'on peut tenir sans OTP SMS. La différence avec le nom n'est pas de nature mais d'ordre de grandeur, et elle suffit.
+
+Argument décisif pour ce marché : c'est déjà l'identité que le produit utilise partout ailleurs — mobile money, billetterie. Le votant ne découvre pas une exigence nouvelle.
+
+### Ce qui ne change pas
+
+Le numéro n'est **jamais stocké en clair** et son empreinte reste salée par catégorie (décision D-048). L'adresse IP continue d'être consignée sur chaque bulletin : elle ne porte plus le plafond, mais elle reste ce qui permet de constater après coup qu'une centaine de numéros ont voté depuis une seule connexion.
+
+L'interface revient à « un vote par personne », qui redevient vrai.
+
+---
+
+## D-053 — Le vote gratuit ne demande plus de numéro : l'IP et l'appareil suffisent
+**2026-08-31** — *remplacée le jour même par la décision D-055 : l'empreinte d'appareil refusait des votants légitimes derrière un partage de connexion.*
 
 Demandé par Jeff. Le numéro de téléphone était exigé dès qu'une catégorie posait un plafond. Il ne l'est plus pour aucun vote gratuit ; le votant est compté sur son adresse IP et son navigateur, tous deux déjà enregistrés sur chaque bulletin.
 

@@ -256,21 +256,28 @@ class PollPage extends Component
     /**
      * Le numero est-il exige pour voter dans cette categorie ?
      *
-     * PLUS JAMAIS POUR UN VOTE GRATUIT (decision D-053). Le votant y est
-     * identifie par son adresse IP et son navigateur, deja enregistres sur
-     * chaque bulletin.
+     * Des qu'un plafond existe (decision D-055). Sans plafond, il n'y a rien a
+     * compter par personne, et demander un numero ne serait que collecter une
+     * donnee dont on n'a pas l'usage.
      *
-     * Le numero etait exige des qu'un plafond existait, et il coutait plus
-     * qu'il ne rapportait : c'est le champ qui fait abandonner: on demandait une
-     * donnee personnelle pour un geste gratuit qui prend une seconde. Il ne
-     * garantissait rien non plus — rien n'empeche de saisir cinq numeros, ce
-     * que la decision D-047 assumait deja.
+     * LE NUMERO PLUTOT QUE LE NOM, et plutot que l'appareil seul.
      *
-     * Un vote PAYANT en demandera un, au jalon 9.4 : la, il ne sert pas a
+     * Un nom n'est pas un identifiant, c'est une etiquette : on le contourne en
+     * tapant « Marie 2 », et il bloque des votants honnetes puisque deux Jean
+     * Obame existent reellement. L'appareil seul, lui, confond une famille
+     * derriere un meme partage de connexion.
+     *
+     * Le numero est le seul des trois qui se normalise en forme canonique et
+     * qui coute quelque chose a multiplier — il faut acheter une puce. Ce n'est
+     * pas une garantie d'unicite, et la decision D-047 ne pretend pas le
+     * contraire ; c'est un cout de fraude, et c'est tout ce qu'on peut tenir
+     * sans OTP.
+     *
+     * Un vote PAYANT en demandera un aussi, au jalon 9.4 : la, il ne sert pas a
      * compter mais a pousser la demande de paiement sur un telephone.
      */
     private function requiresPhone(PollCategory $category): bool
     {
-        return $category->is_paid;
+        return $category->is_paid || $category->voteLimit() !== null;
     }
 }

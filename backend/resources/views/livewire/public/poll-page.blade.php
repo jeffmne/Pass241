@@ -127,38 +127,31 @@
 
                     @if ($category->voteLimit())
                         <span aria-hidden="true">·</span>
-                        {{-- « par appareil » et non « par personne » pour un
-                             vote gratuit : depuis que le numero n'est plus
-                             demande, c'est l'appareil et la connexion qui sont
-                             comptes. Ecrire « par personne » annoncerait une
-                             garantie que le produit ne tient pas. --}}
+                        {{-- « par personne » : le plafond est compte sur le
+                             numero, qui est redemande des qu'une categorie
+                             plafonne (decision D-055). --}}
                         <span>
                             {{ $category->voteLimit() }}
-                            vote{{ $category->voteLimit() > 1 ? 's' : '' }}
-                            {{ $category->is_paid ? 'par personne' : 'par appareil' }}
+                            vote{{ $category->voteLimit() > 1 ? 's' : '' }} par personne
                         </span>
                     @endif
                 </p>
 
                 {{--
-                    LE CARACTERE INDICATIF DU VOTE GRATUIT, dit en clair
-                    (decision D-047).
+                    A QUOI SERT LE NUMERO, dit la ou on le demande.
 
-                    Sans compte utilisateur ni verification par SMS, rien
-                    n'empeche quelqu'un de saisir plusieurs numeros. Le taire
-                    laisserait croire a une garantie que le produit ne tient
-                    pas — et un concours dont le resultat est conteste apres
-                    coup se retourne contre l'organisateur autant que contre
-                    nous.
+                    La mention du caractere indicatif du resultat a ete retiree
+                    a la demande de Jeff (decision D-056) : elle jetait un doute
+                    sur le concours au moment precis ou le visiteur s'apprete a
+                    voter. Ce qui reste est ce qui le rassure — le numero sert a
+                    compter, pas a etre publie.
                 --}}
                 @unless ($category->is_paid)
                     <p class="mt-3 flex items-start gap-2 rounded-[var(--radius-sm)] bg-surface-muted px-3 py-2 text-xs leading-relaxed text-grey-500">
                         <x-lucide-info class="mt-0.5 size-3.5 shrink-0 text-grey-400" stroke-width="2" aria-hidden="true" />
                         <span>
-                            Vote gratuit, sans inscription ni numero a donner. Nous comptons un vote
-                            par appareil et par connexion : le resultat de cette categorie est donc
-                            indicatif — nous limitons les votes multiples sans pouvoir les empecher
-                            totalement.
+                            Vote gratuit, sans inscription. Votre numero sert uniquement a compter
+                            votre vote une seule fois : il n'est jamais conserve en clair.
                         </span>
                     </p>
                 @endunless

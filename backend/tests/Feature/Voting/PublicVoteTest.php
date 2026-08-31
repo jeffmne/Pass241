@@ -182,20 +182,30 @@ it('affiche plusieurs categories, ouverte et scellee, sur la meme page', functio
         ->assertSee('Prix du public', escape: false);
 });
 
-it('annonce le caractere indicatif du vote gratuit', function () {
+it('dit a quoi sert le numero, la ou il est demande', function () {
     /*
-     * Decision D-047. Le vote gratuit ne peut pas garantir « une personne, un
-     * vote » sans OTP SMS : la contrepartie assumee est que l'interface le
-     * DISE. Ce test est la pour que la mention ne disparaisse pas au detour
-     * d'une refonte de la page.
+     * Ce test remplace celui qui verifiait la mention du caractere indicatif
+     * du resultat, retiree a la demande de Jeff (decision D-056).
+     *
+     * Ce qui reste doit rester : le numero est la donnee personnelle que la
+     * page reclame, et le visiteur doit lire a quoi elle sert AVANT de la
+     * donner, pas dans des conditions generales.
      */
-    [$poll] = activePollWithCandidates();
+    [$poll] = activePollWithCandidates(['max_votes_per_voter' => 1]);
 
     asVisitor();
 
+    /*
+     * Les fragments sont choisis pour tenir sur UNE ligne du fichier Blade :
+     * le rendu conserve les retours a la ligne du source, et une assertion a
+     * cheval sur deux lignes echoue sur un espace qu'on ne voit pas.
+     */
     $this->get('/vote/'.$poll->slug)
         ->assertOk()
-        ->assertSee('indicatif', escape: false);
+        ->assertSee('sert uniquement a compter', escape: false)
+        ->assertSee('jamais conserve en clair', escape: false)
+        // La mention retiree ne doit pas revenir par megarde.
+        ->assertDontSee('indicatif', escape: false);
 });
 
 it('ne fait jamais transiter un classement scelle dans le HTML', function () {
@@ -599,14 +609,15 @@ it('enregistre un vote depuis la page et confirme au votant', function () {
     expect(Ballot::query()->acrossOrganizations()->count())->toBe(1);
 });
 
-it('ne demande jamais de numero pour un vote gratuit, meme avec un plafond', function () {
+it('exige le numero des qu\'un plafond existe', function () {
     /*
-     * Decision D-053. Le numero etait exige des qu'un plafond existait ; il
-     * coutait plus qu'il ne rapportait — un champ de donnee personnelle sur un
-     * geste gratuit qui prend une seconde — et ne garantissait rien, puisque
-     * rien n'empeche d'en saisir cinq.
+     * Decision D-055. Un plafond « par personne » suppose de savoir qui est la
+     * personne, et le numero est le seul des identifiants disponibles qui se
+     * normalise et qui coute quelque chose a multiplier.
      *
-     * Le votant est desormais compte sur son adresse IP et son navigateur.
+     * L'empreinte d'appareil ne pourrait pas porter ce plafond : deux personnes
+     * derriere le meme partage de connexion — frequent au Gabon — la
+     * partageraient, et la seconde se verrait refuser un vote legitime.
      */
     [$poll, , $candidate] = activePollWithCandidates(['max_votes_per_voter' => 1]);
 
@@ -616,37 +627,49 @@ it('ne demande jamais de numero pour un vote gratuit, meme avec un plafond', fun
         ->call('choose', $candidate->poll_category_id, $candidate->getKey())
         ->set('phone', '')
         ->call('vote')
-        ->assertHasNoErrors();
+        ->assertHasErrors('phone');
 
-    expect(Ballot::query()->acrossOrganizations()->count())->toBe(1);
+    expect(Ballot::query()->acrossOrganizations()->count())->toBe(0);
 });
 
-it('enregistre l\'adresse IP du votant, et compte le plafond dessus', function () {
+it('compte le plafond sur le numero, pas sur la connexion', function () {
     /*
-     * C'est ce qui remplace le numero. L'adresse est stockee en clair sur le
-     * bulletin — elle sert l'analyse d'abus — tandis que l'empreinte qui porte
-     * le plafond, elle, reste hachee et salee par categorie.
+     * Deux votants DIFFERENTS derriere la meme adresse — une famille, un
+     * bureau — doivent pouvoir voter tous les deux. C'est ce que l'empreinte
+     * d'appareil seule rendait impossible, et la raison d'etre du numero.
      */
     [, $category, $candidate] = activePollWithCandidates(['max_votes_per_voter' => 1]);
 
-    $ballot = forOrganization($this->organization, fn () => app(CastFreeBallot::class)
-        ->handle($candidate, 1, null, voterRequest('41.158.7.7')));
+    forOrganization($this->organization, fn () => app(CastFreeBallot::class)
+        ->handle($candidate, 1, '077111111', voterRequest('41.158.7.7')));
 
-    expect($ballot->ip_address)->toBe('41.158.7.7')
-        ->and($ballot->voter_hash)->not->toBe('41.158.7.7')
-        ->and($ballot->user_agent_hash)->toHaveLength(64);
-
-    // Le meme appareil, sur la meme connexion : le plafond le reconnait sans
-    // qu'aucun numero n'ait ete demande.
+    // Meme numero, autre connexion : refuse. C'est la personne qui est comptee.
     expect(fn () => forOrganization($this->organization, fn () => app(CastFreeBallot::class)
-        ->handle($candidate, 1, null, voterRequest('41.158.7.7'))))
+        ->handle($candidate, 1, '077111111', voterRequest('41.158.9.9'))))
         ->toThrow(RuntimeException::class);
 
-    // Une autre connexion vote librement.
+    // Autre numero, MEME connexion : accepte.
     forOrganization($this->organization, fn () => app(CastFreeBallot::class)
-        ->handle($candidate, 1, null, voterRequest('41.158.9.9')));
+        ->handle($candidate, 1, '077222222', voterRequest('41.158.7.7')));
 
     expect((int) app(VotingStatistics::class)->forCategory($category->fresh())['votes'])->toBe(2);
+});
+
+it('enregistre tout de meme l\'adresse IP, pour l\'analyse d\'abus', function () {
+    /*
+     * L'adresse ne porte plus le plafond, mais elle reste consignee : c'est ce
+     * qui permet de constater apres coup qu'une centaine de numeros ont vote
+     * depuis une seule connexion. Elle est stockee en clair — c'est une donnee
+     * technique — tandis que l'empreinte du votant, elle, reste hachee.
+     */
+    [, , $candidate] = activePollWithCandidates(['max_votes_per_voter' => 1]);
+
+    $ballot = forOrganization($this->organization, fn () => app(CastFreeBallot::class)
+        ->handle($candidate, 1, '077123456', voterRequest('41.158.7.7')));
+
+    expect($ballot->ip_address)->toBe('41.158.7.7')
+        ->and($ballot->user_agent_hash)->toHaveLength(64)
+        ->and($ballot->voter_hash)->not->toContain('41.158.7.7');
 });
 
 it('ne demande pas de numero quand la categorie n\'a pas de plafond', function () {

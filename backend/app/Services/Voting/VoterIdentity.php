@@ -72,23 +72,19 @@ class VoterIdentity
     }
 
     /**
-     * Empreinte d'appareil. C'EST DESORMAIS LE CHEMIN PRINCIPAL DU VOTE
-     * GRATUIT, et non plus un repli (decision D-053).
+     * Empreinte d'appareil : adresse IP et agent utilisateur.
      *
-     * Adresse IP et agent utilisateur. L'IP seule ne suffirait pas : au Gabon,
-     * une famille ou un bureau passe souvent par le meme partage de connexion,
-     * et tous ces gens auraient une seule et meme empreinte. L'agent
-     * utilisateur les redistingue des qu'ils n'ont pas le meme telephone, ce
-     * qui est le cas courant.
+     * REPLI, ET NON CHEMIN PRINCIPAL (decision D-055). Elle ne sert que
+     * lorsqu'aucun numero n'est demande — c'est-a-dire lorsqu'aucun plafond
+     * n'existe, donc lorsqu'il n'y a precisement rien a faire respecter. Elle
+     * alimente alors le comptage des votants distincts, pas une limite.
      *
-     * CE QU'IL FAUT SAVOIR, ET QUI EST ASSUME : deux personnes avec le meme
-     * modele de telephone, le meme navigateur et la meme connexion partagent
-     * une empreinte. La seconde se verra refuser son vote — le plafond la
-     * comptera comme la premiere. C'est le prix de ne plus demander de numero,
-     * et il est paye dans le bon sens : un concours gratuit dont le resultat
-     * est de toute facon indicatif (decision D-047) doit d'abord etre facile a
-     * voter. L'interface annonce la limite en ces termes — « un vote par
-     * appareil » — plutot qu'en « un vote par personne », qui serait faux.
+     * ELLE NE POURRAIT PAS PORTER UN PLAFOND. Au Gabon, une famille ou un
+     * bureau passe souvent par le meme partage de connexion : deux personnes
+     * avec le meme modele de telephone y auraient une seule et meme empreinte,
+     * et la seconde se verrait refuser un vote legitime. C'est la raison pour
+     * laquelle le numero redevient obligatoire des qu'une categorie plafonne
+     * (voir `PollPage::requiresPhone`).
      */
     private function deviceFingerprint(Request $request): string
     {
