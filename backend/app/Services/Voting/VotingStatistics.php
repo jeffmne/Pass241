@@ -85,7 +85,11 @@ class VotingStatistics
                     // Le revenu ne retient QUE les confirmes : un bulletin
                     // rembourse garde sa voix mais rend son argent.
                     DB::raw(sprintf(
-                        "COALESCE(SUM(CASE WHEN status = '%s' THEN amount ELSE 0 END), 0) AS revenue",
+                        // `subtotal` et NON `amount` : le revenu de
+                        // l'organisateur, ce sont les voix — pas les frais de
+                        // l'operateur, que le votant a avances et qui ne lui
+                        // reviendront jamais (decision D-023).
+                        "COALESCE(SUM(CASE WHEN status = '%s' THEN subtotal ELSE 0 END), 0) AS revenue",
                         BallotStatus::Confirmed->value,
                     )),
                 ])
@@ -163,7 +167,12 @@ class VotingStatistics
                 ->selectRaw('COALESCE(SUM(quantity), 0) AS votes')
                 ->selectRaw('COUNT(*) AS ballots')
                 ->selectRaw(sprintf(
-                    "COALESCE(SUM(CASE WHEN status = '%s' THEN amount ELSE 0 END), 0) AS revenue",
+                    // `subtotal` et NON `amount` : le revenu de l'organisateur,
+                    // ce sont les voix — pas les frais de l'operateur, que le
+                    // votant a avances et qui ne lui reviendront jamais
+                    // (decision D-023). Compter le total ferait annoncer a
+                    // l'organisateur un revenu qu'il ne touchera pas.
+                    "COALESCE(SUM(CASE WHEN status = '%s' THEN subtotal ELSE 0 END), 0) AS revenue",
                     BallotStatus::Confirmed->value,
                 ))
                 // Le nombre de VOTANTS distincts, qui n'est pas le nombre de
@@ -193,7 +202,12 @@ class VotingStatistics
                 ->selectRaw('COALESCE(SUM(quantity), 0) AS votes')
                 ->selectRaw('COUNT(*) AS ballots')
                 ->selectRaw(sprintf(
-                    "COALESCE(SUM(CASE WHEN status = '%s' THEN amount ELSE 0 END), 0) AS revenue",
+                    // `subtotal` et NON `amount` : le revenu de l'organisateur,
+                    // ce sont les voix — pas les frais de l'operateur, que le
+                    // votant a avances et qui ne lui reviendront jamais
+                    // (decision D-023). Compter le total ferait annoncer a
+                    // l'organisateur un revenu qu'il ne touchera pas.
+                    "COALESCE(SUM(CASE WHEN status = '%s' THEN subtotal ELSE 0 END), 0) AS revenue",
                     BallotStatus::Confirmed->value,
                 ))
                 ->selectRaw('COUNT(DISTINCT voter_hash) AS voters')

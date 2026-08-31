@@ -3,9 +3,13 @@
 namespace App\Livewire\Public;
 
 use App\Actions\Voting\CastFreeBallot;
+use App\Actions\Voting\CreatePaidBallot;
+use App\Enums\PaymentProvider;
 use App\Models\Candidate;
 use App\Models\Poll;
 use App\Models\PollCategory;
+use App\Rules\MobileMoneyNumber;
+use App\Services\Payments\PaymentManager;
 use App\Services\Voting\VoteQuotaLedger;
 use App\Services\Voting\VoterIdentity;
 use App\Services\Voting\VotingStatistics;
@@ -13,6 +17,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use RuntimeException;
+use Throwable;
 
 /**
  * Page publique d'un scrutin (section 86.4).
@@ -40,6 +45,16 @@ class PollPage extends Component
     public int $quantity = 1;
 
     public string $phone = '';
+
+    /*
+     * Vote payant : l'operateur et le numero vers lequel pousser la demande.
+     * Distincts de `$phone`, qui n'identifie que le votant d'un vote gratuit —
+     * les confondre ferait servir un meme champ a deux fins, et rendrait
+     * incomprehensible la regle qui dit lequel est exige quand.
+     */
+    public string $provider = '';
+
+    public string $payerPhone = '';
 
     public string $confirmation = '';
 
@@ -117,16 +132,24 @@ class PollPage extends Component
 
         RateLimiter::hit($key, decaySeconds: 60);
 
-        if ($category->is_paid) {
-            // Le vote payant arrive au jalon 9.4 : il passe par la couche
-            // paiement, pas par cette action.
-            $this->addError('vote', 'Le vote payant n\'est pas encore disponible.');
-
-            return;
-        }
-
         $rules = ['quantity' => ['required', 'integer', 'min:1']];
         $messages = [];
+
+        if ($category->is_paid) {
+            /*
+             * Le vote payant exige l'operateur ET le numero : c'est sur ce
+             * numero que la demande de paiement sera poussee (section 16.1).
+             * L'operateur est un choix explicite du votant, jamais une
+             * deduction faite depuis son numero.
+             */
+            $rules['provider'] = ['required', 'in:'.implode(',', PaymentProvider::values())];
+            $rules['payerPhone'] = [
+                'required', 'string', 'max:20',
+                new MobileMoneyNumber(PaymentProvider::tryFrom($this->provider)),
+            ];
+            $messages['provider.required'] = 'Choisissez Airtel Money ou Moov Money.';
+            $messages['provider.in'] = 'Choisissez Airtel Money ou Moov Money.';
+        }
 
         if ($this->requiresPhone($category)) {
             /*
@@ -139,7 +162,25 @@ class PollPage extends Component
             $messages['phone.required'] = 'Indiquez votre numero pour que votre vote soit compte une seule fois.';
         }
 
-        $this->validate($rules, $messages, ['quantity' => 'nombre de votes', 'phone' => 'numero']);
+        $this->validate($rules, $messages, [
+            'quantity' => 'nombre de votes',
+            'phone' => 'numero',
+            'payerPhone' => 'numero de telephone',
+            'provider' => 'moyen de paiement',
+        ]);
+
+        /*
+         * LE VOTE PAYANT PART VERS LE PAIEMENT, il ne compte pas ici.
+         *
+         * Le bulletin nait en attente, la demande est poussee sur le telephone,
+         * et le votant suit son etat sur une page dediee. Sa voix n'entrera au
+         * classement qu'a la confirmation du prestataire (section 86.4).
+         */
+        if ($category->is_paid) {
+            $this->payAndRedirect($candidate, $category);
+
+            return;
+        }
 
         try {
             $ballot = $castBallot->handle(
@@ -168,6 +209,46 @@ class PollPage extends Component
         );
 
         $this->reset('votingCategory', 'selectedCandidate', 'quantity', 'phone');
+    }
+
+    /**
+     * Cree le bulletin payant, pousse la demande de paiement, et renvoie le
+     * votant vers le suivi (sections 21.1, 86.4).
+     *
+     * L'ECHEC DU PUSH NE REMET PAS LE BULLETIN EN CAUSE : il existe, sa voix
+     * est reservee, et le votant peut relancer depuis l'ecran de suivi. Le
+     * faire echouer ici lui ferait tout resaisir — meme parti pris que le
+     * parcours d'achat de billets.
+     */
+    private function payAndRedirect(Candidate $candidate, PollCategory $category): void
+    {
+        try {
+            $ballot = app(CreatePaidBallot::class)->handle(
+                $candidate,
+                (int) $this->quantity,
+                PaymentProvider::from($this->provider),
+                trim($this->payerPhone),
+                request(),
+            );
+        } catch (RuntimeException $e) {
+            $this->addError('vote', $e->getMessage());
+
+            return;
+        }
+
+        try {
+            $initialization = app(PaymentManager::class)->driver()->initializePayment($ballot);
+
+            if ($initialization->providerReference) {
+                $ballot->forceFill([
+                    'provider_reference' => $initialization->providerReference,
+                ])->save();
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        $this->redirect($ballot->statusUrl(), navigate: true);
     }
 
     /*
@@ -254,11 +335,17 @@ class PollPage extends Component
     }
 
     /**
-     * Le numero est-il exige pour voter dans cette categorie ?
+     * Le champ « votre numero » est-il exige dans cette categorie ?
      *
-     * Des qu'un plafond existe (decision D-055). Sans plafond, il n'y a rien a
-     * compter par personne, et demander un numero ne serait que collecter une
-     * donnee dont on n'a pas l'usage.
+     * SEULEMENT POUR UN VOTE GRATUIT, et seulement s'il plafonne
+     * (decision D-055). Sans plafond, il n'y a rien a compter par personne, et
+     * demander un numero ne serait que collecter une donnee dont on n'a pas
+     * l'usage.
+     *
+     * UN VOTE PAYANT NE PASSE PAS PAR CE CHAMP : il demande deja le numero vers
+     * lequel pousser la demande de paiement, et c'est CE numero qui identifie
+     * le votant. En exiger un second reviendrait a poser deux fois la meme
+     * question sur le meme ecran, dont l'une pour rien.
      *
      * LE NUMERO PLUTOT QUE LE NOM, et plutot que l'appareil seul.
      *
@@ -273,11 +360,14 @@ class PollPage extends Component
      * contraire ; c'est un cout de fraude, et c'est tout ce qu'on peut tenir
      * sans OTP.
      *
-     * Un vote PAYANT en demandera un aussi, au jalon 9.4 : la, il ne sert pas a
-     * compter mais a pousser la demande de paiement sur un telephone.
+     * Le numero plutot que le nom, et plutot que l'appareil seul : un nom se
+     * contourne en tapant « Marie 2 » et bloque deux homonymes reels ;
+     * l'appareil confond une famille derriere un meme partage de connexion. Le
+     * numero est le seul des trois a se normaliser et a couter quelque chose a
+     * multiplier — il faut acheter une puce.
      */
     private function requiresPhone(PollCategory $category): bool
     {
-        return $category->is_paid || $category->voteLimit() !== null;
+        return ! $category->is_paid && $category->voteLimit() !== null;
     }
 }

@@ -326,9 +326,29 @@ class DatabaseSeeder extends Seeder
                 'position' => 1,
             ], $owner);
 
+            /*
+             * Une categorie PAYANTE, pour que le parcours de paiement soit
+             * verifiable a la main : le bulletin nait en attente, la demande
+             * part sur le telephone, et la voix n'entre au classement qu'a la
+             * confirmation (jalon 9.4). Sans elle, la demonstration ne montre
+             * que la moitie du module.
+             */
+            $prix = $categories->create($poll, [
+                'name' => 'Coup de coeur',
+                'description' => 'Vote payant : chaque voix coute 500 F.',
+                'is_paid' => true,
+                'unit_price' => 500,
+                // Pas de plafond : dans un vote payant, c'est le paiement qui
+                // fait la limite (section 86.3).
+                'max_votes_per_voter' => null,
+                'results_visibility' => ResultsVisibility::Live,
+                'is_active' => true,
+                'position' => 2,
+            ], $owner);
+
             $names = ['Awa Ndong', 'Sylvie Mba', 'Grace Ondo', 'Laure Bekale'];
 
-            foreach ([$miss, $public] as $category) {
+            foreach ([$miss, $public, $prix] as $category) {
                 foreach ($names as $index => $name) {
                     $candidate = $candidates->create($category, [
                         'name' => $name,
@@ -378,6 +398,20 @@ class DatabaseSeeder extends Seeder
         $cast = app(CastFreeBallot::class);
 
         foreach ($poll->categories()->with('candidates')->get() as $category) {
+            /*
+             * Les categories PAYANTES sont laissees vides, et c'est voulu.
+             *
+             * `CastFreeBallot` les refuse — un vote payant nait en attente et ne
+             * compte qu'apres confirmation du prestataire (section 86.4). Les
+             * remplir supposerait de simuler des paiements confirmes dans un
+             * seeder, c'est-a-dire de fabriquer de l'argent qui n'est jamais
+             * entre. Le classement de cette categorie demarre donc a zero, ce
+             * qui est exactement ce qu'un vrai concours affiche a l'ouverture.
+             */
+            if ($category->is_paid) {
+                continue;
+            }
+
             $candidates = $category->candidates->values();
 
             // Un nombre de voix decroissant, pour que le classement ait un ordre

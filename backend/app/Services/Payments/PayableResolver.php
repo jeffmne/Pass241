@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Models\Ballot;
 use App\Models\Donation;
 use App\Models\Order;
 use Illuminate\Database\Eloquent\Model;
@@ -28,13 +29,16 @@ class PayableResolver
     /**
      * Types encaissables, dans l'ordre de recherche.
      *
-     * Le module Votes ajoutera `Ballot::class` ici, et nulle part ailleurs.
+     * Le module Votes a ajoute `Ballot::class` ici, et NULLE PART AILLEURS :
+     * c'est tout ce qu'il a fallu pour que les bulletins payants empruntent le
+     * chemin de l'argent existant, contrainte tenue (decision D-041).
      *
      * @var list<class-string<Model>>
      */
     private array $payables = [
         Order::class,
         Donation::class,
+        Ballot::class,
     ];
 
     public function byReference(string $reference): (Payable&Model)|null

@@ -126,9 +126,12 @@ class CastFreeBallot
                         'candidate_id' => $candidate->getKey(),
                         'reference' => $this->uniqueReference(),
                         'quantity' => $quantity,
-                        // Gratuit : le montant est nul, et la contrainte
-                        // `amount = quantity * unit_price` le verifie.
+                        // Gratuit : les trois montants sont nuls, et la
+                        // contrainte `subtotal = quantity * unit_price` puis
+                        // `amount = subtotal + psp_fee_amount` le verifie.
                         'unit_price' => 0,
+                        'subtotal' => 0,
+                        'psp_fee_amount' => 0,
                         'amount' => 0,
                         'status' => BallotStatus::Confirmed,
                         'confirmed_at' => now(),

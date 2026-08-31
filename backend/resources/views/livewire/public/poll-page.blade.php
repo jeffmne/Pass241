@@ -341,7 +341,111 @@
                             <span class="font-semibold text-ink">{{ $chosen?->name }}</span>.
                         </p>
 
-                        @if ($requiresPhone[$category->id])
+                        {{-- LE NOMBRE DE VOTES VIENT AVANT LE PRIX, et non apres :
+                             le total affiche plus bas decoule de ce champ,
+                             et un recapitulatif pose au-dessus de la saisie
+                             qui le determine se lit a l'envers.
+
+                             Il se choisit des qu'il peut valoir
+                             autre chose que 1 : plafond superieur a un, ou
+                             categorie payante — ou l'on achete autant de voix
+                             qu'on veut, et ou c'est meme le propos.
+
+                             `.live` sur une categorie payante : le total
+                             affiche juste en dessous doit suivre la saisie,
+                             sans quoi le votant lirait le prix d'une quantite
+                             qu'il vient de changer. --}}
+                        @if ($category->is_paid || ($category->voteLimit() ?? 1) > 1)
+                            <x-ui.field label="Nombre de votes" for="vote-qty-{{ $category->id }}"
+                                        :error="$errors->first('quantity')">
+                                <input id="vote-qty-{{ $category->id }}" type="number"
+                                       @if ($category->is_paid)
+                                           wire:model.live.debounce.400ms="quantity"
+                                       @else
+                                           wire:model="quantity"
+                                       @endif
+                                       class="field tabular" min="1" step="1"
+                                       @if ($category->voteLimit()) max="{{ $category->voteLimit() }}" @endif>
+                            </x-ui.field>
+                        @endif
+
+                        @if ($category->is_paid)
+                            {{-- Section 16.1 : l'operateur est un choix
+                                 EXPLICITE du votant, jamais une deduction faite
+                                 depuis son numero. --}}
+                            <fieldset x-data="{ chosen: $wire.provider }">
+                                <legend class="mb-1.5 block text-sm font-medium text-ink">
+                                    Moyen de paiement
+                                </legend>
+
+                                <div class="grid gap-2 sm:grid-cols-2">
+                                    @foreach (App\Enums\PaymentProvider::cases() as $paymentProvider)
+                                        <label
+                                            class="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors"
+                                            :class="chosen === '{{ $paymentProvider->value }}'
+                                                ? 'border-azure-500 bg-azure-50 font-semibold text-azure-700'
+                                                : 'border-grey-200 bg-surface text-grey-500 hover:border-azure-300'">
+                                            <input type="radio" name="vote-provider-{{ $category->id }}"
+                                                   value="{{ $paymentProvider->value }}"
+                                                   wire:model="provider"
+                                                   @change="chosen = '{{ $paymentProvider->value }}'"
+                                                   class="size-4">
+                                            {{ $paymentProvider->label() }}
+                                        </label>
+                                    @endforeach
+                                </div>
+
+                                @error('provider')
+                                    <p class="mt-1.5 text-sm text-danger">{{ $message }}</p>
+                                @enderror
+                            </fieldset>
+
+                            <x-ui.field label="Numero de telephone" for="vote-payer-{{ $category->id }}"
+                                        :error="$errors->first('payerPhone')"
+                                        hint="C'est sur ce numero que vous validerez le paiement."
+                                        required>
+                                <input id="vote-payer-{{ $category->id }}" type="tel" inputmode="tel"
+                                       wire:model="payerPhone" class="field" placeholder="074 00 00 00"
+                                       maxlength="20" required>
+                            </x-ui.field>
+
+                            {{-- Eclatement du montant AVANT le paiement
+                                 (decision D-023) : le votant doit savoir que le
+                                 supplement est le prix du transport de l'argent,
+                                 pas une marge. Les chiffres viennent du serveur
+                                 et sont recalcules a la creation du bulletin —
+                                 cet affichage ne fait jamais foi (regle 80.5). --}}
+                            @php
+                                $voteSubtotal = $category->priceFor(max(1, (int) $quantity));
+                                $voteFee = app(App\Services\Payments\PspFeeCalculator::class)
+                                    ->feeFor($voteSubtotal)->amount;
+                            @endphp
+
+                            <dl class="surface space-y-1.5 px-4 py-3 text-sm">
+                                <div class="flex items-center justify-between">
+                                    <dt class="text-grey-500">
+                                        {{ max(1, (int) $quantity) }}
+                                        vote{{ max(1, (int) $quantity) > 1 ? 's' : '' }}
+                                    </dt>
+                                    <dd class="text-ink tabular">{{ Money::formatShort($voteSubtotal) }}</dd>
+                                </div>
+
+                                @if ($voteFee > 0)
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-grey-500">Frais de paiement</dt>
+                                        <dd class="text-grey-500 tabular">{{ Money::formatShort($voteFee) }}</dd>
+                                    </div>
+                                @endif
+
+                                <div class="flex items-center justify-between border-t border-grey-200 pt-1.5">
+                                    <dt class="font-semibold text-ink">Total a payer</dt>
+                                    <dd class="font-display font-extrabold text-ink tabular">
+                                        {{ Money::formatShort($voteSubtotal + $voteFee) }}
+                                    </dd>
+                                </div>
+                            </dl>
+
+                        @elseif ($requiresPhone[$category->id])
                             <x-ui.field label="Votre numero" for="vote-phone-{{ $category->id }}"
                                         :error="$errors->first('phone')"
                                         hint="Il sert uniquement a compter votre vote une seule fois. Il n'est pas conserve en clair."
@@ -352,13 +456,6 @@
                             </x-ui.field>
                         @endif
 
-                        @if (($category->voteLimit() ?? 1) > 1)
-                            <x-ui.field label="Nombre de votes" for="vote-qty-{{ $category->id }}"
-                                        :error="$errors->first('quantity')">
-                                <input id="vote-qty-{{ $category->id }}" type="number" wire:model="quantity"
-                                       class="field" min="1" max="{{ $category->voteLimit() }}" step="1">
-                            </x-ui.field>
-                        @endif
 
                         {{-- Meme raison que le bouton des cartes : ces deux
                              libelles ne doivent pas passer par le traducteur
@@ -366,7 +463,7 @@
                         <div class="flex flex-wrap gap-2.5" translate="no">
                             <button type="submit" class="btn btn-primary"
                                     wire:loading.attr="disabled" wire:target="vote">
-                                Confirmer mon vote
+                                {{ $category->is_paid ? 'Payer et voter' : 'Confirmer mon vote' }}
                             </button>
                             <button type="button" wire:click="cancelVote" class="btn btn-secondary">
                                 Annuler

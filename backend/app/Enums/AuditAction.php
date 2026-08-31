@@ -139,6 +139,19 @@ enum AuditAction: string
     case CandidateSaved = 'CANDIDATE_SAVED';
     case CandidateDisabled = 'CANDIDATE_DISABLED';
 
+    /*
+     * Le bulletin paye a ses propres entrees, distinctes de PaymentConfirmed.
+     *
+     * Un vote paye est un encaissement ET une voix. Le confondre avec un
+     * paiement ordinaire ferait perdre, dans le journal, la seule information
+     * qui compte en cas de contestation : sur quel candidat cet argent a-t-il
+     * pese. Le vote gratuit, lui, n'a rien a journaliser — il n'engage aucun
+     * argent, et un journal qui grossit d'une ligne par clic ne se lit plus.
+     */
+    case BallotCreated = 'BALLOT_CREATED';
+    case BallotConfirmed = 'BALLOT_CONFIRMED';
+    case BallotFailed = 'BALLOT_FAILED';
+
     // Exports
     case ExportGenerated = 'EXPORT_GENERATED';
 
@@ -234,6 +247,9 @@ enum AuditAction: string
             self::PollCategorySaved => 'Categorie de vote enregistree',
             self::CandidateSaved => 'Candidat enregistre',
             self::CandidateDisabled => 'Candidat desactive',
+            self::BallotCreated => 'Vote paye engage',
+            self::BallotConfirmed => 'Vote paye confirme',
+            self::BallotFailed => 'Vote paye echoue',
 
             self::ExportGenerated => 'Export genere',
             self::PlatformSettingChanged => 'Reglage de la plateforme modifie',
@@ -258,6 +274,9 @@ enum AuditAction: string
             self::RefundRejected, self::RefundExpired,
             self::DonationCreated, self::DonationConfirmed,
             self::DonationFailed, self::DonationRefunded,
+            // Un vote paye engage de l'argent : il appartient au journal
+            // financier au meme titre qu'un don.
+            self::BallotCreated, self::BallotConfirmed, self::BallotFailed,
         ], true);
     }
 }

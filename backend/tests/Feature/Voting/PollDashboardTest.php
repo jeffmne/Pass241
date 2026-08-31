@@ -8,11 +8,11 @@ use App\Data\PollDraft;
 use App\Enums\AuditAction;
 use App\Enums\PollStatus;
 use App\Enums\ResultsVisibility;
+use App\Enums\RoleName;
 use App\Livewire\Dashboard\Polls\Categories as PollCategories;
 use App\Livewire\Dashboard\Polls\Form as PollForm;
 use App\Livewire\Dashboard\Polls\Index as PollIndex;
 use App\Models\AuditLog;
-use App\Models\Candidate;
 use App\Models\Poll;
 use App\Models\PollCategory;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -474,7 +474,7 @@ it('ne montre pas les votes d\'une autre organisation', function () {
 });
 
 it('refuse l\'ecran de gestion a qui n\'a pas la permission', function () {
-    $member = addMemberTo($this->organization, App\Enums\RoleName::CoOrganizer);
+    $member = addMemberTo($this->organization, RoleName::CoOrganizer);
 
     $this->actingAs($member);
 
@@ -482,7 +482,7 @@ it('refuse l\'ecran de gestion a qui n\'a pas la permission', function () {
 });
 
 it('laisse le co-organisateur consulter la liste', function () {
-    $member = addMemberTo($this->organization, App\Enums\RoleName::CoOrganizer);
+    $member = addMemberTo($this->organization, RoleName::CoOrganizer);
 
     $this->actingAs($member);
 

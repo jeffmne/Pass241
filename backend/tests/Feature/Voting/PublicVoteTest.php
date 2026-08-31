@@ -2,6 +2,9 @@
 
 use App\Actions\Voting\CastFreeBallot;
 use App\Enums\BallotStatus;
+use App\Enums\PaymentProvider;
+use App\Enums\PollStatus;
+use App\Enums\ResultsVisibility;
 use App\Livewire\Public\PollPage;
 use App\Models\Ballot;
 use App\Models\Candidate;
@@ -11,6 +14,8 @@ use App\Services\Voting\VoteQuotaLedger;
 use App\Services\Voting\VoterIdentity;
 use App\Services\Voting\VotingStatistics;
 use App\Support\Tenancy\OrganizationContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -98,7 +103,7 @@ function voterRequest(string $ip = '41.158.0.10'): Request
 function refusedByDatabase(callable $write): void
 {
     expect(fn () => DB::transaction($write))
-        ->toThrow(Illuminate\Database\QueryException::class);
+        ->toThrow(QueryException::class);
 }
 
 /*
@@ -242,7 +247,7 @@ it('affiche le classement quand la categorie l\'ouvre au public', function () {
         'max_votes_per_voter' => null,
     ]);
 
-    $category->forceFill(['results_visibility' => App\Enums\ResultsVisibility::Live])->save();
+    $category->forceFill(['results_visibility' => ResultsVisibility::Live])->save();
 
     forOrganization($this->organization, function () use ($winner) {
         app(CastFreeBallot::class)->handle($winner, 3, null, voterRequest());
@@ -309,7 +314,7 @@ it('refuse un vote apres l\'echeance, meme si le statut dit encore ACTIVE', func
     $candidate = Candidate::factory()->for($category, 'category')->create();
 
     // L'etiquette dit encore ACTIVE : c'est tout l'interet du cas.
-    expect($poll->status)->toBe(App\Enums\PollStatus::Active)
+    expect($poll->status)->toBe(PollStatus::Active)
         ->and($poll->hasLapsed())->toBeTrue();
 
     forOrganization($this->organization, fn () => app(CastFreeBallot::class)
@@ -563,7 +568,7 @@ it('refuse de deposer une voix sur le candidat d\'un autre scrutin', function ()
     // en fait un 404 ; ce qui compte ici est qu'aucune voix ne soit deposee.
     expect(fn () => Livewire::test(PollPage::class, ['slug' => $poll->slug])
         ->call('choose', $intruder->poll_category_id, $intruder->getKey()))
-        ->toThrow(Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        ->toThrow(ModelNotFoundException::class);
 
     expect(Ballot::query()->acrossOrganizations()->count())->toBe(0);
 });
@@ -688,9 +693,13 @@ it('ne demande pas de numero quand la categorie n\'a pas de plafond', function (
     expect(Ballot::query()->acrossOrganizations()->count())->toBe(1);
 });
 
-it('annonce que le vote payant n\'est pas encore ouvert', function () {
-    // Le jalon 9.4 le branchera sur la couche paiement. En attendant, l'etat
-    // est annonce honnetement plutot que de laisser cliquer dans le vide.
+it('exige l\'operateur et le numero pour un vote payant', function () {
+    /*
+     * Le vote payant est branche depuis le jalon 9.4 — la couverture complete
+     * vit dans PaidVoteTest. Ce qui est verifie ici est ce qui appartient a
+     * l'ECRAN : on ne part pas vers un paiement sans savoir chez quel operateur
+     * ni sur quel numero le pousser (section 16.1).
+     */
     [$poll, , $candidate] = activePollWithCandidates([
         'is_paid' => true,
         'unit_price' => 500,
@@ -701,8 +710,36 @@ it('annonce que le vote payant n\'est pas encore ouvert', function () {
 
     Livewire::test(PollPage::class, ['slug' => $poll->slug])
         ->call('choose', $candidate->poll_category_id, $candidate->getKey())
+        ->set('provider', '')
+        ->set('payerPhone', '')
         ->call('vote')
-        ->assertHasErrors('vote');
+        ->assertHasErrors(['provider', 'payerPhone']);
 
     expect(Ballot::query()->acrossOrganizations()->count())->toBe(0);
+});
+
+it('emmene le votant payant vers le suivi du paiement', function () {
+    // Sa voix n'entrera au classement qu'a la confirmation du prestataire : la
+    // page de suivi est l'endroit ou il l'apprend.
+    [$poll, , $candidate] = activePollWithCandidates([
+        'is_paid' => true,
+        'unit_price' => 500,
+        'max_votes_per_voter' => null,
+    ]);
+
+    asVisitor();
+
+    Livewire::test(PollPage::class, ['slug' => $poll->slug])
+        ->call('choose', $candidate->poll_category_id, $candidate->getKey())
+        ->set('provider', PaymentProvider::Airtel->value)
+        ->set('payerPhone', '074000000')
+        ->set('quantity', 2)
+        ->call('vote')
+        ->assertHasNoErrors()
+        ->assertRedirect();
+
+    $ballot = Ballot::query()->acrossOrganizations()->sole();
+
+    expect($ballot->status)->toBe(BallotStatus::Pending)
+        ->and($ballot->subtotal)->toBe(1_000);
 });

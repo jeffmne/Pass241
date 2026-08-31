@@ -34,6 +34,7 @@ use App\Livewire\Organizations\Settings as OrganizationSettings;
 use App\Livewire\Public\CampaignPage;
 use App\Livewire\Public\DonationStatus;
 use App\Livewire\Public\EventPage;
+use App\Livewire\Public\BallotStatus;
 use App\Livewire\Public\InvitationPage;
 use App\Livewire\Public\MyTickets;
 use App\Livewire\Public\OrderStatus;
@@ -79,6 +80,18 @@ Route::get('/collecte/{slug}', CampaignPage::class)->name('campaigns.public');
  * categories du meme concours ne doit pas etre bloque pour autant.
  */
 Route::get('/vote/{slug}', PollPage::class)->name('polls.public');
+
+/*
+ * Suivi d'un vote paye (sections 21.1, 86.4).
+ *
+ * Meme parti pris que le suivi de commande et de don : lien signe sans
+ * expiration, parce que le votant n'a pas de compte et conserve ce lien. La
+ * signature empeche de parcourir les bulletins en devinant des references — on
+ * y lirait le numero du payeur, et sur quel candidat il a mise.
+ */
+Route::get('/bulletin/{reference}', BallotStatus::class)
+    ->middleware('signed')
+    ->name('ballots.show');
 
 /*
  * Suivi d'une commande (sections 15.1, 21.1).
