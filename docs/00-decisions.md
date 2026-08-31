@@ -182,6 +182,40 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-057 — Le barème PVit dépend de l'opérateur, et `get-fees` fait foi
+**2026-08-31**
+
+Branchement du driver PVit. Deux choses ont été mesurées sur le compte de test plutôt que supposées, et toutes deux contredisaient une hypothèse du code.
+
+### Le barème n'est pas propre au prestataire, mais à l'opérateur
+
+`PspFeeCalculator` indexait les frais par **pilote** (`fees.fake`, `fees.pvit`). PVit prend **3,5 % sur Airtel Money et 2,5 % sur Moov Money** : un barème unique aurait surfacturé les uns ou sous-facturé les autres, et la sous-facturation se paie en découvert sur le compte marchand.
+
+Le calculateur accepte désormais un opérateur. Les trois créateurs de transaction — commande, don, bulletin — le lui transmettent. Quand il n'est pas encore connu (un écran affiche le total avant le choix), **le barème le plus cher est retenu** : annoncer moins que ce qui sera débité est la seule erreur qui se voit sur le relevé du client.
+
+### `get-fees` donne le total, l'API de statut n'en montre qu'une part
+
+Un écart apparent avait été diagnostiqué — nous semblions surfacturer de 5 F sur 500 F. **Ce diagnostic était faux**, et c'est la mesure qui l'a montré :
+
+|  | `get-fees` | `fees` du statut | écart |
+|---|---|---|---|
+| Airtel | 3,5 % | 2,5 % | 1 point |
+| Moov | 2,5 % | 2,5 % | aucun |
+
+Moov concorde exactement ; Airtel diffère d'exactement un point. PVit facture **deux composantes** — sa part et celle de l'opérateur — et l'API de statut ne renvoie que la sienne. L'exemple de callback de leur documentation le confirme : `amount 150 + fees 3,5 + operatorFees 1,5 = totalAmount 155`.
+
+**`get-fees` fait donc foi** pour ce que le payeur voit partir de son téléphone, et les taux configurés sont justes. `PvitProvider::debitedAmount()` ne recompose un montant que lorsque PVit le donne complet ; à défaut il rend `null`, pour que l'appelant sache qu'il ne sait pas plutôt que de recevoir un nombre faux.
+
+### Ce que la documentation PVit dit de travers
+
+Trois écarts relevés en tapant sur l'API, tous consignés dans [docs/12-pvit-paiements.md](12-pvit-paiements.md) :
+
+1. L'API de statut attend **notre référence marchande** dans le paramètre `transactionId`, et non l'identifiant `PAY…` que la doc montre en exemple.
+2. Les références doivent être **purement alphanumériques** — les nôtres portent des tirets, elles partent compactées.
+3. L'identifiant de transaction s'appelle `reference_id` à l'initiation et `transactionId` dans le webhook.
+
+---
+
 ## D-056 — La page de vote ne dit plus que le résultat est indicatif
 **2026-08-31**
 

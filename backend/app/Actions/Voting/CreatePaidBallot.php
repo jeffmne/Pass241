@@ -122,7 +122,7 @@ class CreatePaidBallot
                      * annonce du vote. Le bareme est fige sur le bulletin.
                      */
                     $psp = $this->payments->driver()->name();
-                    $fee = $this->fees->feeFor($subtotal, $psp);
+                    $fee = $this->fees->feeFor($subtotal, $psp, $provider);
 
                     $ballot = new Ballot;
 

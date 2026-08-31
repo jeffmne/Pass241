@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Services\Payments\Pvit\PvitProvider;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -25,6 +26,7 @@ class PaymentManager
     /** @var array<string, class-string<CollectionProvider>> */
     private array $providers = [
         'fake' => FakeProvider::class,
+        'pvit' => PvitProvider::class,
     ];
 
     /** Prestataire d'encaissement. */

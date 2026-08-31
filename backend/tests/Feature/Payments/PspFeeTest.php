@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\PaymentProvider;
 use App\Livewire\Public\Checkout;
 use App\Models\Event;
 use App\Models\Order;
@@ -9,6 +10,7 @@ use App\Support\Money;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /*
  * Frais du prestataire de paiement (decision D-023).
@@ -145,3 +147,63 @@ it('affiche les frais au checkout avant le paiement', function () {
         ->assertSee(Money::format(400), escape: false)
         ->assertSee(Money::format(20_400), escape: false);
 });
+
+/*
+ * ---------------------------------------------------------------------------
+ * Un bareme par operateur — PVit
+ * ---------------------------------------------------------------------------
+ */
+
+it('applique le bareme de l\'operateur, et non celui du prestataire', function () {
+    /*
+     * PVit ne prend pas le meme taux selon l'operateur : 3,5 % sur Airtel
+     * Money, 2,5 % sur Moov Money. Un bareme unique par prestataire —
+     * l'hypothese d'origine de ce service — surfacturerait les uns ou
+     * sous-facturerait les autres, et la sous-facturation se paie en decouvert
+     * sur le compte marchand.
+     *
+     * Valeurs relevees sur l'API `get-fees` de PVit, pas supposees.
+     */
+    expect($this->fees->feeFor(10_000, 'pvit', PaymentProvider::Airtel)->amount)->toBe(350)
+        ->and($this->fees->feeFor(10_000, 'pvit', PaymentProvider::Moov)->amount)->toBe(250);
+});
+
+it('arrondit au franc superieur, le franc CFA n\'ayant pas de subdivision', function () {
+    /*
+     * PVit rend des frais fractionnaires : 17,5 F sur 500 F Airtel. L'arrondi
+     * se fait au SUPERIEUR — un franc de frais en moins est un decouvert sur le
+     * compte marchand, qu'il faudrait combler transaction apres transaction.
+     */
+    expect($this->fees->feeFor(500, 'pvit', PaymentProvider::Airtel)->amount)->toBe(18)
+        ->and($this->fees->feeFor(1_500, 'pvit', PaymentProvider::Airtel)->amount)->toBe(53)
+        ->and($this->fees->feeFor(1_500, 'pvit', PaymentProvider::Moov)->amount)->toBe(38);
+});
+
+it('retient le bareme le plus cher quand l\'operateur n\'est pas encore choisi', function () {
+    /*
+     * Un ecran affiche le total avant que l'acheteur n'ait choisi son
+     * operateur. Annoncer moins que ce qui sera debite est la seule erreur qui
+     * se voit sur le releve du client — on retient donc le plus penalisant.
+     */
+    expect($this->fees->feeFor(10_000, 'pvit')->amount)->toBe(350);
+});
+
+it('fige le bareme employe sur la transaction', function () {
+    // Sans cet instantane, une transaction devient inexplicable apres un
+    // changement de tarif : on saurait ce qu'on a preleve, sans pouvoir dire
+    // pourquoi.
+    $fee = $this->fees->feeFor(10_000, 'pvit', PaymentProvider::Moov);
+
+    expect($fee->basisPoints)->toBe(250)
+        ->and($fee->fixed)->toBe(0);
+});
+
+it('refuse d\'encaisser avec un operateur sans bareme', function () {
+    // Echec bruyant plutot qu'absorption silencieuse : c'est la regle de ce
+    // service, et elle vaut aussi a l'echelon de l'operateur.
+    $this->fees->feeFor(10_000, 'pvit', PaymentProvider::from('AIRTEL'));
+
+    config(['payments.fees.pvit.operators' => ['MOOV' => ['basis_points' => 250, 'fixed' => 0]]]);
+
+    $this->fees->feeFor(10_000, 'pvit', PaymentProvider::Airtel);
+})->throws(RuntimeException::class);

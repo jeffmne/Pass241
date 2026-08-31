@@ -107,6 +107,123 @@ return [
             'basis_points' => 200,  // 2,00 % — fictif
             'fixed' => 0,           // en entiers XAF
         ],
+
+        /*
+        | PVit : UN BAREME PAR OPERATEUR, releve sur leur API `get-fees` et non
+        | suppose. Airtel Money et Moov Money n'ont pas le meme taux, et un
+        | bareme unique surfacturerait les uns ou sous-facturerait les autres.
+        |
+        | Mesure faite le 2026-08-31 sur le compte de test, lineaire et sans
+        | part fixe sur toute la plage essayee (200 F a 50 000 F) :
+        |   Airtel  1 000 -> 35    10 000 -> 350    50 000 -> 1 750   = 3,50 %
+        |   Moov    1 000 -> 25    10 000 -> 250    50 000 -> 1 250   = 2,50 %
+        |
+        | En dessous de 200 F, PVit repond FEES_SCHEDULE_NOT_IMPLEMENTED : il
+        | existe un montant minimum, a borner cote produit.
+        |
+        | CES TAUX SONT LE TOTAL DEBITE AU PAYEUR, part operateur comprise.
+        |
+        | PVit facture en deux composantes : sa propre part, et celle de
+        | l'operateur. L'API `get-fees` rend la somme des deux ; l'API de
+        | statut, elle, ne montre que la part PVit — 2,5 % chez les deux
+        | operateurs. D'ou un ecart qui n'existe que sur Airtel :
+        |
+        |              get-fees   `fees` du statut   ecart
+        |   Airtel      3,5 %          2,5 %          1 point = part Airtel
+        |   Moov        2,5 %          2,5 %          aucun
+        |
+        | Verifie sur transactions reelles le 2026-08-31. C'est `get-fees` qui
+        | fait foi pour ce que le payeur voit partir de son telephone : lire le
+        | statut comme un total ferait conclure a tort que nous surfacturons.
+        |
+        | PVit rend des frais FRACTIONNAIRES (52,5 F sur 1 500 F Airtel) alors
+        | que le franc CFA n'a pas de subdivision. Notre calcul arrondit au
+        | franc SUPERIEUR — la seule direction qui ne cree jamais de decouvert
+        | sur le compte marchand.
+        */
+        'pvit' => [
+            'operators' => [
+                'AIRTEL' => ['basis_points' => 350, 'fixed' => 0],
+                'MOOV' => ['basis_points' => 250, 'fixed' => 0],
+            ],
+        ],
+
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | PVit — agregateur mobile money et carte (Gabon et CEMAC)
+    |--------------------------------------------------------------------------
+    |
+    | CHAQUE API A SON PROPRE CODE D'URL, et ils different tous : ce ne sont pas
+    | six occurrences d'une meme valeur. Ils sont lus depuis l'environnement
+    | parce qu'ils sont propres au compte marchand, et qu'un compte de test et
+    | un compte de production n'ont pas les memes.
+    |
+    | La version de l'API n'est pas uniforme non plus — `rest` et `renew-secret`
+    | sont en v2, `status` et `balance` en v1 — d'ou des chemins complets
+    | plutot qu'une base commune a laquelle on ajouterait un code.
+    |
+    | LA CLE SECRETE N'EST PAS ICI : elle est temporaire (3 600 secondes) et
+    | s'obtient par `renew-secret`. Ce qui vit dans l'environnement, c'est le
+    | mot de passe qui autorise sa rotation.
+    |
+    */
+
+    'pvit' => [
+
+        'base_url' => env('PVIT_BASE_URL', 'https://api.mypvit.pro'),
+
+        /*
+        | Compte d'operation (ACC_xxx). Il identifie le compte a crediter, et
+        | il est exige par presque toutes les API — y compris le simple
+        | controle de sante.
+        */
+        'operation_account_code' => env('PVIT_OPERATION_ACCOUNT_CODE'),
+
+        // Mot de passe de rotation de la cle secrete, defini dans le menu APIs
+        // de l'espace marchand.
+        'secret_password' => env('PVIT_SECRET_PASSWORD'),
+
+        /*
+        | Code de l'URL de callback, obtenu apres avoir enregistre une adresse
+        | PUBLIQUE dans l'espace marchand. PVit refuse `localhost` et
+        | `127.0.0.1` : en developpement, il faut un tunnel.
+        */
+        'callback_url_code' => env('PVIT_CALLBACK_URL_CODE'),
+
+        'endpoints' => [
+            'renew_secret' => env('PVIT_ENDPOINT_RENEW_SECRET'),
+            'payment' => env('PVIT_ENDPOINT_PAYMENT'),
+            'status' => env('PVIT_ENDPOINT_STATUS'),
+            'balance' => env('PVIT_ENDPOINT_BALANCE'),
+            'fees' => env('PVIT_ENDPOINT_FEES'),
+            'link' => env('PVIT_ENDPOINT_LINK'),
+        ],
+
+        /*
+        | Correspondance entre NOS operateurs et les codes PVit.
+        |
+        | Relevee sur l'API `get-operators` pour le Gabon, et non supposee. PVit
+        | expose aussi les memes operateurs via GIMAC (`GAB_AIRTEL`,
+        | `GAB_MOOV`) : ce sont d'autres chemins d'acces, que l'on n'emprunte
+        | pas — les codes retenus ici sont ceux des fournisseurs directs.
+        */
+        'operators' => [
+            'AIRTEL' => 'AIRTEL_MONEY',
+            'MOOV' => 'MOOV_MONEY',
+        ],
+
+        /*
+        | Qui supporte les frais du prestataire.
+        |
+        | `CUSTOMER` traduit exactement la decision D-023 : les frais sont
+        | avances par le payeur, pour que l'organisateur recoive le montant
+        | annonce. Les mettre a la charge du marchand changerait le modele
+        | economique du produit — ne pas modifier sans revoir D-023.
+        */
+        'charge_owner' => 'CUSTOMER',
+
     ],
 
     /*

@@ -108,7 +108,7 @@ class CreateOrder
                  * prestataire.
                  */
                 $psp = $this->payments->driver()->name();
-                $fee = $this->fees->feeFor($ticketsTotal, $psp);
+                $fee = $this->fees->feeFor($ticketsTotal, $psp, $provider);
 
                 $order = new Order([
                     'event_id' => $event->getKey(),

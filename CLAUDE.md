@@ -41,6 +41,7 @@ Le détail de chaque domaine vit dans `docs/`. La numérotation des sections (1 
 | [docs/09-tests-git-documentation.md](docs/09-tests-git-documentation.md) | 74–77 | Tests, tests anti-fraude des collectes, Git, documentation |
 | [docs/10-design-system.md](docs/10-design-system.md) | 70 (détail) | Palette bleu azurin/blanc cassé, typographie, principes du liquid glass — démo : [docs/10-design-system-preview.html](docs/10-design-system-preview.html) |
 | [docs/11-votes-futur.md](docs/11-votes-futur.md) | 86–87 | Module Votes — fonctionnalité future (Phase 9), extension du dashboard organisateur |
+| [docs/12-pvit-paiements.md](docs/12-pvit-paiements.md) | — | Procédure d'intégration PVit : identifiants, endpoints, barèmes, callbacks — mesuré sur l'API, écarts avec leur documentation signalés |
 
 **Comment lire ce projet :** ce fichier `CLAUDE.md` porte la vision d'ensemble, la roadmap et les règles non négociables — c'est ce qui doit toujours être en tête. Pour travailler sur un module précis, ouvrir le fichier `docs/` correspondant ; il rappelle en en-tête que les règles absolues de ce fichier priment en cas de doute.
 

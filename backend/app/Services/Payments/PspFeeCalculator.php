@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Enums\PaymentProvider;
 use RuntimeException;
 
 /**
@@ -34,13 +35,13 @@ class PspFeeCalculator
      * Un montant nul ne produit aucun frais, part fixe comprise : une commande
      * gratuite ne passe pas par le prestataire, il n'y a rien a lui payer.
      */
-    public function feeFor(int $subtotal, ?string $driver = null): PspFee
+    public function feeFor(int $subtotal, ?string $driver = null, ?PaymentProvider $operator = null): PspFee
     {
         if ($subtotal <= 0) {
             return PspFee::none();
         }
 
-        $schedule = $this->schedule($driver);
+        $schedule = $this->schedule($driver, $operator);
 
         $basisPoints = (int) $schedule['basis_points'];
         $fixed = (int) $schedule['fixed'];
@@ -56,9 +57,9 @@ class PspFeeCalculator
     }
 
     /** Montant total debite a l'acheteur. */
-    public function totalFor(int $subtotal, ?string $driver = null): int
+    public function totalFor(int $subtotal, ?string $driver = null, ?PaymentProvider $operator = null): int
     {
-        return $subtotal + $this->feeFor($subtotal, $driver)->amount;
+        return $subtotal + $this->feeFor($subtotal, $driver, $operator)->amount;
     }
 
     /**
@@ -69,25 +70,97 @@ class PspFeeCalculator
      * ses frais les ferait absorber en silence par Pass241, transaction apres
      * transaction, sans que rien ne le signale.
      *
+     * UN BAREME PEUT DEPENDRE DE L'OPERATEUR, et pas seulement du prestataire.
+     * C'est le cas de PVit, qui prend 3,5 % sur Airtel Money et 2,5 % sur Moov
+     * Money — releve sur leur API `get-fees`, pas suppose. Un bareme unique par
+     * prestataire ferait donc surfacturer les uns ou sous-facturer les autres,
+     * et la sous-facturation se paie en decouvert sur le compte marchand.
+     *
+     * L'operateur n'est pas toujours connu : un ecran affiche le total avant
+     * que l'acheteur n'ait choisi. Dans ce cas, et seulement si le prestataire
+     * a des baremes distincts, LE PLUS ELEVE est retenu — annoncer moins que ce
+     * qui sera debite est la seule erreur qui se voit sur le releve du client.
+     *
      * @return array{basis_points: int|string, fixed: int|string}
      */
-    private function schedule(?string $driver): array
+    private function schedule(?string $driver, ?PaymentProvider $operator = null): array
     {
         $driver ??= (string) config('payments.default');
 
-        $schedule = config('payments.fees.'.$driver);
+        $configured = config('payments.fees.'.$driver);
 
-        if (! is_array($schedule)
-            || ! array_key_exists('basis_points', $schedule)
-            || ! array_key_exists('fixed', $schedule)) {
+        // Bareme unique, sans distinction d'operateur : le cas courant.
+        if (is_array($configured)
+            && array_key_exists('basis_points', $configured)
+            && array_key_exists('fixed', $configured)) {
+            return $configured;
+        }
+
+        $perOperator = is_array($configured) ? ($configured['operators'] ?? null) : null;
+
+        if (is_array($perOperator) && $perOperator !== []) {
+            if ($operator !== null) {
+                $schedule = $perOperator[$operator->value] ?? null;
+
+                if (is_array($schedule)
+                    && array_key_exists('basis_points', $schedule)
+                    && array_key_exists('fixed', $schedule)) {
+                    return $schedule;
+                }
+
+                throw new RuntimeException(sprintf(
+                    'Aucun bareme de frais configure pour l\'operateur « %s » chez « %s ».',
+                    $operator->value,
+                    $driver,
+                ));
+            }
+
+            return $this->mostExpensive($perOperator, $driver);
+        }
+
+        throw new RuntimeException(sprintf(
+            'Aucun bareme de frais configure pour le prestataire « %s ». '
+            .'Renseignez payments.fees.%s avant d\'encaisser avec ce prestataire.',
+            $driver,
+            $driver,
+        ));
+    }
+
+    /**
+     * Le bareme le plus cher parmi ceux d'un prestataire.
+     *
+     * Employe quand l'operateur n'est pas encore choisi. La comparaison porte
+     * sur les points de base ET la part fixe : un bareme peut etre plus cher
+     * sur les petits montants et moins cher sur les gros. A defaut de pouvoir
+     * trancher sans montant, on retient le plus penalisant sur chacun des deux
+     * axes — ce qui ne sous-estime jamais.
+     *
+     * @param  array<string, mixed>  $schedules
+     * @return array{basis_points: int, fixed: int}
+     */
+    private function mostExpensive(array $schedules, string $driver): array
+    {
+        $basisPoints = null;
+        $fixed = null;
+
+        foreach ($schedules as $schedule) {
+            if (! is_array($schedule)
+                || ! array_key_exists('basis_points', $schedule)
+                || ! array_key_exists('fixed', $schedule)) {
+                continue;
+            }
+
+            $basisPoints = max($basisPoints ?? 0, (int) $schedule['basis_points']);
+            $fixed = max($fixed ?? 0, (int) $schedule['fixed']);
+        }
+
+        if ($basisPoints === null) {
             throw new RuntimeException(sprintf(
-                'Aucun bareme de frais configure pour le prestataire « %s ». '
-                .'Renseignez payments.fees.%s avant d\'encaisser avec ce prestataire.',
-                $driver,
+                'Les baremes par operateur de « %s » sont mal formes.',
                 $driver,
             ));
         }
 
-        return $schedule;
+        return ['basis_points' => $basisPoints, 'fixed' => $fixed ?? 0];
     }
 }

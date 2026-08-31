@@ -97,7 +97,7 @@ class CreateDonation
                  * prestataire.
                  */
                 $psp = $this->payments->driver()->name();
-                $fee = $this->fees->feeFor($amount, $psp);
+                $fee = $this->fees->feeFor($amount, $psp, $provider);
 
                 $donation = new Donation([
                     'campaign_id' => $campaign->getKey(),
