@@ -93,9 +93,25 @@
                                 {{ $poll->results_visibility->label() }}
                             </span>
                         </p>
+
+                        {{-- Le lien public, sur la ligne meme du scrutin : c'est
+                             ce que l'organisateur vient chercher pour le coller
+                             dans un message. Meme place que sur la liste des
+                             evenements et celle des collectes. --}}
+                        @if ($poll->isPublished())
+                            <p class="mt-2 truncate text-xs text-azure-700">{{ $poll->publicUrl() }}</p>
+                        @endif
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">
+                        @if ($poll->status->hasPublicPage())
+                            <a href="{{ $poll->publicUrl() }}" target="_blank" rel="noopener"
+                               class="btn btn-icon"
+                               aria-label="Ouvrir la page publique de {{ $poll->name }}">
+                                <x-lucide-external-link class="size-4" stroke-width="2" aria-hidden="true" />
+                            </a>
+                        @endif
+
                         @if ($canManage)
                             <a href="{{ route('polls.categories', $poll) }}" wire:navigate class="btn btn-secondary">
                                 Categories

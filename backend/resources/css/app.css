@@ -2038,6 +2038,237 @@
 
     /*
      * ---------------------------------------------------------------------
+     * Carte de candidat — page publique d'un scrutin
+     * ---------------------------------------------------------------------
+     *
+     * Le portrait occupe la carte, le nom passe dessous.
+     *
+     * Ce n'est pas une preference d'affichage. Un concours ne se joue pas sur
+     * des noms : le public reconnait des VISAGES, et c'est la photo qui decide
+     * du vote. Une liste de lignes avec une vignette ronde se lit comme un
+     * annuaire — on parcourt, on ne choisit pas.
+     *
+     * Surface pleine et non du verre : la legende est posee juste sous une
+     * photo dont on ne maitrise ni la clarte ni le contraste, et elle porte le
+     * nom du candidat et son score. La lisibilite prime (regle 70.4).
+     */
+    .candidate-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        /*
+         * UNE SEULE CARTE A LA FOIS SUR TELEPHONE.
+         *
+         * Le portrait est ce qui decide du vote : il doit occuper l'ecran, pas
+         * le partager. A deux cartes par vue, chaque visage tombait sous les
+         * 150 pixels de large — de quoi parcourir une liste, pas de quoi
+         * reconnaitre quelqu'un.
+         *
+         * `78vw` et non `100%` : le liseré de la carte suivante est la seule
+         * chose qui dise qu'il y en a d'autres. Sans lui, un rail se lit comme
+         * une carte unique et personne ne fait glisser. C'est un huitieme
+         * d'ecran paye pour rendre le reste du concours visible.
+         *
+         * Sur grand ecran la contrainte tombe : la place ne manque plus, et
+         * comparer plusieurs candidats d'un coup d'oeil redevient l'interet.
+         */
+        width: min(78vw, 20rem);
+        flex: 0 0 auto;
+    }
+
+    @media (min-width: 640px) {
+        .candidate-card {
+            width: 15rem;
+        }
+    }
+
+    /*
+     * Cadrage fige a 3/4. Sans lui, des photos de proportions differentes —
+     * et l'organisateur televerse ce qu'il veut — donneraient des cartes de
+     * hauteurs inegales, et la grille se disloquerait des la deuxieme ligne.
+     */
+    .candidate-portrait {
+        position: relative;
+        aspect-ratio: 3 / 4;
+        overflow: hidden;
+        border-radius: var(--radius-lg);
+        background-color: var(--azure-50);
+        box-shadow: 0 6px 18px -6px rgba(20, 84, 155, 0.32);
+    }
+
+    [data-theme='dark'] .candidate-portrait {
+        box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Le numero, pose sur la photo comme un dossard. Fond sombre constant et
+       non translucide : par-dessus une photo claire, une pastille translucide
+       laisserait le chiffre illisible. */
+    .candidate-number {
+        position: absolute;
+        top: 0.5rem;
+        left: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.75rem;
+        height: 1.75rem;
+        padding: 0 0.5rem;
+        border-radius: 9999px;
+        background-color: var(--azure-700);
+        color: #ffffff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /*
+     * La legende, EN VERRE, posee sur le bas du portrait.
+     *
+     * C'est l'emploi le plus justifie du verre liquide de tout le produit
+     * (section 70.3) : il lui faut un fond qui ait de la matiere a refracter,
+     * et une photographie en est la meilleure. Sur un aplat uni, l'effet est
+     * invisible et coute du rendu pour rien.
+     *
+     * ELLE NE MORD QUE D'UN CENTIMETRE SUR L'IMAGE. Le portrait est ce qui
+     * decide du vote — le recouvrir a moitie d'un bandeau reviendrait a cacher
+     * ce qu'on est venu regarder. Sur un cadrage 3/4, ce dernier centimetre ne
+     * porte jamais le visage : le verre y trouve de quoi vivre sans rien
+     * masquer.
+     *
+     * C'est aussi le SEUL niveau de verre de cet ecran : la section de
+     * categorie qui l'entoure est passee en surface pleine pour cela — deux
+     * flous superposes n'ajoutent aucune profondeur, ils enlevent du contraste
+     * au nom du candidat et doublent le cout de rendu sur telephone
+     * (regle 70.4).
+     */
+    .candidate-caption {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        margin: -1rem 0.5rem 0;
+        padding: 0.75rem;
+        border-radius: var(--radius-md);
+    }
+
+    /* Le bouton se colle en bas : sans cela, deux cartes voisines dont les
+       biographies n'ont pas la meme longueur poseraient leurs boutons a deux
+       hauteurs differentes, et la rangee se lirait de travers. */
+    .candidate-caption > .btn {
+        margin-top: auto;
+    }
+
+    /* Candidat choisi : l'anneau se pose sur le PORTRAIT, qui est ce qu'on
+       regarde. Le libelle du bouton passe a « Selectionne » en meme temps —
+       l'etat ne repose donc pas sur la couleur seule. */
+    .candidate-card-picked .candidate-portrait {
+        box-shadow:
+            0 0 0 3px var(--azure-500),
+            0 6px 18px -6px rgba(20, 84, 155, 0.32);
+    }
+
+    /* Candidat desactive : la carte reste visible et ses voix restent
+       comptees (section 86.4), mais elle recule d'un plan. */
+    .candidate-card-off .candidate-portrait {
+        filter: grayscale(1);
+        opacity: 0.72;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .candidate-card:not(.candidate-card-picked):hover .candidate-portrait {
+            box-shadow:
+                0 0 0 2px var(--azure-300),
+                0 10px 24px -8px rgba(20, 84, 155, 0.4);
+        }
+    }
+
+    /*
+     * Le rail de portraits.
+     *
+     * IL DEFILE AU DOIGT, ET NE DEFILE PAS TOUT SEUL. Le modele de reference
+     * fait avancer ses portraits en continu, mais chez lui on vote par SMS :
+     * les cartes n'y sont qu'une vitrine. Ici, la carte EST la cible du vote —
+     * une cible qui bouge se rate, et le mouvement automatique se retourne
+     * contre le geste qu'il met en avant.
+     *
+     * Les marges negatives font sortir le rail des retraits de la page : sans
+     * elles, la derniere carte parait coupee par la marge plutot que par le
+     * bord de l'ecran, et rien ne dit qu'on peut faire glisser.
+     */
+    .candidate-rail {
+        display: flex;
+        gap: 0.75rem;
+        padding-bottom: 0.5rem;
+        scroll-padding-left: 1.25rem;
+    }
+
+    @media (min-width: 640px) {
+        .candidate-rail {
+            gap: 1rem;
+            scroll-padding-left: 1.75rem;
+        }
+    }
+
+    /*
+     * Les fleches du rail.
+     *
+     * MASQUEES PAR DEFAUT, et affichees uniquement la ou il y a un vrai
+     * pointeur. Au doigt elles ne serviraient a rien — on fait glisser — et
+     * elles mangeraient deux fois quarante pixels sur la largeur du portrait,
+     * qui est exactement ce qu'on cherche a preserver sur un telephone.
+     *
+     * Posees a hauteur du portrait et non du milieu de la carte : la legende
+     * fait varier la hauteur totale selon la longueur des biographies, et une
+     * fleche centree sur l'ensemble finirait a des hauteurs differentes d'une
+     * categorie a l'autre.
+     */
+    .candidate-nav {
+        display: none;
+    }
+
+    @media (hover: hover) and (pointer: fine) {
+        .candidate-nav {
+            position: absolute;
+            top: 33%;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 1px solid var(--grey-200);
+            border-radius: 9999px;
+            background-color: var(--surface);
+            color: var(--ink);
+            box-shadow: 0 4px 14px -4px rgba(20, 84, 155, 0.35);
+            transition:
+                opacity var(--duration-state) var(--ease-out-quart),
+                background-color var(--duration-feedback) var(--ease-out-quart);
+        }
+
+        .candidate-nav:hover:not(:disabled) {
+            background-color: var(--azure-50);
+        }
+
+        /* Desactivee et non masquee : un bouton qui disparait deplace ce qu'il
+           y a autour, et la fleche restante saute sous le curseur. */
+        .candidate-nav:disabled {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .candidate-nav-prev {
+            left: -0.75rem;
+        }
+
+        .candidate-nav-next {
+            right: -0.75rem;
+        }
+    }
+
+    /*
+     * ---------------------------------------------------------------------
      * Barre d'achat collante
      * ---------------------------------------------------------------------
      *

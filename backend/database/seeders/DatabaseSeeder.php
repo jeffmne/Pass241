@@ -330,13 +330,30 @@ class DatabaseSeeder extends Seeder
 
             foreach ([$miss, $public] as $category) {
                 foreach ($names as $index => $name) {
-                    $candidates->create($category, [
+                    $candidate = $candidates->create($category, [
                         'name' => $name,
                         'number' => (string) ($index + 1),
                         'biography' => 'Candidate de demonstration.',
                         'is_active' => true,
                         'position' => $index,
                     ], $owner);
+
+                    /*
+                     * Une photo, meme de remplacement.
+                     *
+                     * La page de vote est faite AUTOUR du portrait : sans
+                     * image, la demonstration montre huit pastilles grises et
+                     * ne permet de juger ni le cadrage, ni la legende en
+                     * verre, ni le rail qui defile. Le placeholder est un
+                     * aplat azurin au format portrait, ce qui suffit a voir la
+                     * mise en page reelle.
+                     */
+                    $candidate->forceFill([
+                        'photo_path' => PosterPlaceholder::for(
+                            'candidat-'.$category->getKey().'-'.($index + 1),
+                            $name,
+                        ),
+                    ])->save();
                 }
             }
 

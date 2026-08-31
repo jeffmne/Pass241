@@ -49,6 +49,24 @@ class VotingStatistics
             Cache::forget($key);
         }
 
+        /*
+         * CE QUI TRANSITE PAR LE CACHE EST UN TABLEAU NU, jamais une
+         * `Collection` ni un `stdClass`.
+         *
+         * Le cache de developpement est un tableau en memoire : il rend
+         * l'objet tel quel, et tout se passe bien. Les caches reels — fichier,
+         * base, Redis — SERIALISENT. A la relecture, PHP reconstruisait un
+         * `__PHP_Incomplete_Class` et la page entiere tombait sur « The script
+         * tried to call a method on an incomplete object ».
+         *
+         * Le defaut ne pouvait pas apparaitre en test, ou le pilote `array` ne
+         * serialise rien. Il s'est vu a la premiere requete HTTP reelle, une
+         * fois le cache rempli — donc PAS sur la premiere, ce qui le rendait
+         * d'autant plus deroutant.
+         *
+         * La regle a retenir : ne mettre en cache que des types que n'importe
+         * quel pilote sait porter, et reconstruire les objets au retour.
+         */
         $rows = Cache::remember($key, self::CACHE_SECONDS, function () use ($category) {
             /*
              * Aucune portee par organisation n'est appliquee, et il n'y a pas de
@@ -77,10 +95,21 @@ class VotingStatistics
                     BallotStatus::Refunded->value,
                 ])
                 ->groupBy('candidate_id')
-                ->get();
+                ->get()
+                // Chaque ligne devient un tableau associatif de scalaires, et
+                // l'ensemble un tableau PHP : rien qui doive etre reconstruit
+                // par un autoloader a la deserialisation.
+                ->map(fn (object $row): array => [
+                    'candidate_id' => (int) $row->candidate_id,
+                    'votes' => (int) $row->votes,
+                    'ballots' => (int) $row->ballots,
+                    'revenue' => (int) $row->revenue,
+                ])
+                ->all();
         });
 
-        $total = $rows->sum('votes');
+        $byCandidateRow = array_column($rows, null, 'candidate_id');
+        $total = array_sum(array_column($rows, 'votes'));
 
         /*
          * Le classement est calcule ICI et non par la base.
@@ -90,23 +119,21 @@ class VotingStatistics
          * au classement, a zero. Les completer en PHP evite une jointure
          * externe sur `candidates` dans une requete deja mise en cache.
          */
-        $byCandidate = $rows->keyBy('candidate_id');
-
         $candidates = $category->relationLoaded('candidates')
             ? $category->candidates
             : $category->candidates()->get();
 
         return $candidates
-            ->map(function ($candidate) use ($byCandidate, $total) {
-                $row = $byCandidate->get($candidate->getKey());
+            ->map(function ($candidate) use ($byCandidateRow, $total) {
+                $row = $byCandidateRow[$candidate->getKey()] ?? null;
 
-                $votes = (int) ($row->votes ?? 0);
+                $votes = (int) ($row['votes'] ?? 0);
 
                 return [
                     'candidate_id' => $candidate->getKey(),
                     'votes' => $votes,
-                    'ballots' => (int) ($row->ballots ?? 0),
-                    'revenue' => (int) ($row->revenue ?? 0),
+                    'ballots' => (int) ($row['ballots'] ?? 0),
+                    'revenue' => (int) ($row['revenue'] ?? 0),
                     'rank' => 0,
                     // Le pourcentage est de la PART DES VOIX, pas une
                     // progression vers un objectif : un concours n'en a pas.
@@ -132,7 +159,7 @@ class VotingStatistics
         return Cache::remember(
             'votes:category:'.$category->getKey(),
             self::CACHE_SECONDS,
-            fn () => (array) DB::table('ballots')
+            fn () => array_map('intval', (array) DB::table('ballots')
                 ->selectRaw('COALESCE(SUM(quantity), 0) AS votes')
                 ->selectRaw('COUNT(*) AS ballots')
                 ->selectRaw(sprintf(
@@ -148,7 +175,7 @@ class VotingStatistics
                     BallotStatus::Confirmed->value,
                     BallotStatus::Refunded->value,
                 ])
-                ->first(),
+                ->first()),
         );
     }
 
@@ -162,7 +189,7 @@ class VotingStatistics
         return Cache::remember(
             'votes:poll:'.$poll->getKey(),
             self::CACHE_SECONDS,
-            fn () => (array) DB::table('ballots')
+            fn () => array_map('intval', (array) DB::table('ballots')
                 ->selectRaw('COALESCE(SUM(quantity), 0) AS votes')
                 ->selectRaw('COUNT(*) AS ballots')
                 ->selectRaw(sprintf(
@@ -175,7 +202,7 @@ class VotingStatistics
                     BallotStatus::Confirmed->value,
                     BallotStatus::Refunded->value,
                 ])
-                ->first(),
+                ->first()),
         );
     }
 

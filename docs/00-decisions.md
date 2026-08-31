@@ -182,6 +182,32 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-053 — Le vote gratuit ne demande plus de numéro : l'IP et l'appareil suffisent
+**2026-08-31**
+
+Demandé par Jeff. Le numéro de téléphone était exigé dès qu'une catégorie posait un plafond. Il ne l'est plus pour aucun vote gratuit ; le votant est compté sur son adresse IP et son navigateur, tous deux déjà enregistrés sur chaque bulletin.
+
+**Raison** : il coûtait plus qu'il ne rapportait. C'est le champ qui fait abandonner — une donnée personnelle demandée pour un geste gratuit qui prend une seconde. Et il ne garantissait rien : rien n'empêche de saisir cinq numéros, ce que la décision D-047 assumait déjà en qualifiant le vote gratuit d'indicatif.
+
+**Ce qui est assumé, et doit être dit** : deux personnes avec le même modèle de téléphone, le même navigateur et la même connexion partagent une empreinte. La seconde se verra refuser son vote. C'est le prix de ne plus demander de numéro, et il est payé dans le bon sens — un concours gratuit dont le résultat est de toute façon indicatif doit d'abord être facile à voter.
+
+**Conséquence sur les mots** : l'interface annonce « un vote par appareil » et non « un vote par personne », qui serait faux. Un vote **payant** continuera de demander un numéro au jalon 9.4 — mais pour pousser la demande de paiement, pas pour compter.
+
+---
+
+## D-054 — Ne mettre en cache que ce que n'importe quel pilote sait porter
+**2026-08-31**
+
+`VotingStatistics::standings()` met en cache un tableau PHP de tableaux associatifs, jamais une `Collection` ni un `stdClass`.
+
+**Raison** : la page publique de vote répondait 500 **à partir de la deuxième requête**. Le cache de développement est un tableau en mémoire, qui rend l'objet tel quel ; les caches réels — fichier, base, Redis — sérialisent. À la relecture, PHP reconstruisait un `__PHP_Incomplete_Class` et tout appel de méthode dessus levait « The script tried to call a method on an incomplete object ».
+
+Le défaut ne pouvait pas apparaître en test, où le pilote `array` ne sérialise rien — le même angle mort que celui de la décision D-051, sous une autre forme. Il ne se voyait pas non plus sur la première requête, ce qui le rendait d'autant plus déroutant.
+
+**Règle générale** : ce qui traverse le cache doit être du scalaire, du tableau ou du null. Les objets se reconstruisent au retour. Les agrégats sont convertis en entiers au passage, ce qui corrige au passage un typage qui promettait des `int` et rendait les chaînes de PostgreSQL.
+
+---
+
 ## D-051 — Un modèle du module Votes retrouve toujours son parent lui-même
 **2026-08-31**
 

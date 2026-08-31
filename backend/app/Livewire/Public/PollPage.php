@@ -256,12 +256,21 @@ class PollPage extends Component
     /**
      * Le numero est-il exige pour voter dans cette categorie ?
      *
-     * Seulement quand un plafond existe : sans plafond, il n'y a rien a compter
-     * par personne, et demander un numero ne servirait qu'a collecter une donnee
-     * dont on n'a pas l'usage.
+     * PLUS JAMAIS POUR UN VOTE GRATUIT (decision D-053). Le votant y est
+     * identifie par son adresse IP et son navigateur, deja enregistres sur
+     * chaque bulletin.
+     *
+     * Le numero etait exige des qu'un plafond existait, et il coutait plus
+     * qu'il ne rapportait : c'est le champ qui fait abandonner: on demandait une
+     * donnee personnelle pour un geste gratuit qui prend une seconde. Il ne
+     * garantissait rien non plus — rien n'empeche de saisir cinq numeros, ce
+     * que la decision D-047 assumait deja.
+     *
+     * Un vote PAYANT en demandera un, au jalon 9.4 : la, il ne sert pas a
+     * compter mais a pousser la demande de paiement sur un telephone.
      */
     private function requiresPhone(PollCategory $category): bool
     {
-        return $category->voteLimit() !== null;
+        return $category->is_paid;
     }
 }

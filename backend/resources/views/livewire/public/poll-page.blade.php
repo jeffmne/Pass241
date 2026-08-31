@@ -95,7 +95,15 @@
                 $closed = $category->closureReason();
             @endphp
 
-            <section wire:key="category-{{ $category->id }}" class="glass glass-panel p-5 sm:p-7">
+            {{-- Surface pleine, et non plus du verre.
+
+                 Le verre est passe aux legendes des portraits, ou il a une
+                 photo a refracter. Le garder ici en ferait un second niveau
+                 imbrique dans le premier, ce que la regle 70.4 interdit — et
+                 deux flous superposes n'ajoutent aucune profondeur : ils
+                 enlevent du contraste au nom du candidat et doublent le cout
+                 de rendu sur telephone. --}}
+            <section wire:key="category-{{ $category->id }}" class="glass-inset p-5 sm:p-7">
                 <div class="flex flex-wrap items-baseline justify-between gap-3">
                     <h2 class="font-display text-xl font-extrabold text-ink sm:text-2xl">{{ $category->name }}</h2>
 
@@ -119,9 +127,15 @@
 
                     @if ($category->voteLimit())
                         <span aria-hidden="true">·</span>
+                        {{-- « par appareil » et non « par personne » pour un
+                             vote gratuit : depuis que le numero n'est plus
+                             demande, c'est l'appareil et la connexion qui sont
+                             comptes. Ecrire « par personne » annoncerait une
+                             garantie que le produit ne tient pas. --}}
                         <span>
                             {{ $category->voteLimit() }}
-                            vote{{ $category->voteLimit() > 1 ? 's' : '' }} par personne
+                            vote{{ $category->voteLimit() > 1 ? 's' : '' }}
+                            {{ $category->is_paid ? 'par personne' : 'par appareil' }}
                         </span>
                     @endif
                 </p>
@@ -141,8 +155,10 @@
                     <p class="mt-3 flex items-start gap-2 rounded-[var(--radius-sm)] bg-surface-muted px-3 py-2 text-xs leading-relaxed text-grey-500">
                         <x-lucide-info class="mt-0.5 size-3.5 shrink-0 text-grey-400" stroke-width="2" aria-hidden="true" />
                         <span>
-                            Vote gratuit : le resultat de cette categorie est indicatif. Nous limitons
-                            les votes multiples, sans pouvoir les empecher totalement.
+                            Vote gratuit, sans inscription ni numero a donner. Nous comptons un vote
+                            par appareil et par connexion : le resultat de cette categorie est donc
+                            indicatif — nous limitons les votes multiples sans pouvoir les empecher
+                            totalement.
                         </span>
                     </p>
                 @endunless
@@ -151,32 +167,126 @@
                     <p class="mt-4 text-sm text-grey-500">{{ $closed }}</p>
                 @endif
 
-                {{-- Les candidats --}}
-                <ul class="mt-6 space-y-3">
+                {{--
+                    Les candidats, EN PORTRAITS.
+
+                    Une liste de lignes avec une vignette ronde de 56px se lit
+                    comme un annuaire : on parcourt des noms. Un concours ne se
+                    joue pas sur des noms — le public reconnait des VISAGES,
+                    et c'est la photo qui decide du vote. Elle prend donc la
+                    carte, et le nom passe en dessous.
+
+                    Deux colonnes des le telephone : c'est ce qui permet de
+                    comparer deux candidats d'un coup d'oeil, ce qu'une liste
+                    verticale interdit par construction.
+                --}}
+                {{--
+                    Le rail et ses deux fleches.
+
+                    AU DOIGT, ON FAIT GLISSER ; A LA SOURIS, ON N'A RIEN. Le
+                    rail masque sa barre de defilement — elle traverserait les
+                    portraits — et un pointeur n'a alors plus aucun moyen
+                    d'avancer, sinon une combinaison que personne ne connait.
+                    Les fleches sont ce qui rend le rail utilisable ailleurs
+                    que sur un telephone ; elles n'apparaissent donc que la ou
+                    le doigt n'existe pas.
+
+                    Elles se desactivent aux extremites plutot que de
+                    disparaitre : un bouton qui s'efface deplace ce qu'il y a
+                    autour, et la fleche restante saute sous le curseur.
+                --}}
+                <div class="relative mt-6"
+                     x-data="{
+                         atStart: true,
+                         atEnd: false,
+                         step() {
+                             const rail = this.$refs.rail;
+                             const card = rail.firstElementChild;
+                             if (! card) return rail.clientWidth;
+                             return card.offsetWidth + (parseFloat(getComputedStyle(rail).columnGap) || 0);
+                         },
+                         move(direction) {
+                             this.$refs.rail.scrollBy({ left: direction * this.step(), behavior: 'smooth' });
+                         },
+                         sync() {
+                             const rail = this.$refs.rail;
+                             this.atStart = rail.scrollLeft <= 2;
+                             this.atEnd = rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2;
+                         },
+                     }"
+                     x-init="$nextTick(() => sync())"
+                     @resize.window.debounce.150ms="sync()">
+
+                    <button type="button" class="candidate-nav candidate-nav-prev"
+                            @click="move(-1)" :disabled="atStart"
+                            aria-label="Voir les candidats precedents">
+                        <x-lucide-chevron-left class="size-5" stroke-width="2.25" aria-hidden="true" />
+                    </button>
+
+                    <button type="button" class="candidate-nav candidate-nav-next"
+                            @click="move(1)" :disabled="atEnd"
+                            aria-label="Voir les candidats suivants">
+                        <x-lucide-chevron-right class="size-5" stroke-width="2.25" aria-hidden="true" />
+                    </button>
+
+                {{-- `tabindex` et `aria-label` : une zone qui defile
+                     horizontalement doit pouvoir etre atteinte et parcourue au
+                     clavier, sinon les candidats hors champ sont simplement
+                     inaccessibles a qui n'utilise ni doigt ni souris. --}}
+                <ul class="candidate-rail scroll-x snap-x-start no-scrollbar -mx-5 px-5 sm:-mx-7 sm:px-7"
+                    x-ref="rail"
+                    @scroll.passive="sync()"
+                    tabindex="0"
+                    role="group"
+                    aria-label="Candidats de la categorie {{ $category->name }}">
                     @foreach ($category->candidates as $candidate)
                         @php
                             $row = $ranking?->firstWhere('candidate_id', $candidate->id);
+                            $votable = $candidate->acceptsBallots();
+                            $picked = $selectedCandidate === $candidate->id
+                                && $votingCategory === $category->id;
                         @endphp
 
-                        <li wire:key="candidate-{{ $candidate->id }}"
-                            class="glass-inset flex flex-wrap items-center gap-4 p-4">
+                        <li wire:key="candidate-{{ $candidate->id }}" @class([
+                            'candidate-card',
+                            'candidate-card-picked' => $picked,
+                            'candidate-card-off' => ! $candidate->is_active,
+                        ])>
+                            {{-- Le portrait. `aspect-[3/4]` fige le cadrage :
+                                 sans lui, des photos de proportions differentes
+                                 donneraient des cartes de hauteurs inegales, et
+                                 la grille se disloquerait. --}}
+                            <div class="candidate-portrait">
+                                @if ($candidate->photoUrl())
+                                    <img src="{{ $candidate->photoUrl() }}" alt=""
+                                         class="size-full object-cover"
+                                         loading="lazy" decoding="async">
+                                @else
+                                    <span class="flex size-full items-center justify-center bg-azure-100 text-azure-700">
+                                        <x-lucide-user class="size-10" stroke-width="1.5" aria-hidden="true" />
+                                    </span>
+                                @endif
 
-                            @if ($candidate->photoUrl())
-                                <img src="{{ $candidate->photoUrl() }}" alt=""
-                                     class="size-14 shrink-0 rounded-full object-cover">
-                            @else
-                                <span class="flex size-14 shrink-0 items-center justify-center rounded-full bg-azure-100 text-azure-700">
-                                    <x-lucide-user class="size-6" stroke-width="1.75" aria-hidden="true" />
-                                </span>
-                            @endif
+                                {{-- Le numero par-dessus la photo, comme un
+                                     dossard : c'est sous ce numero que le
+                                     public parle des candidats. --}}
+                                @if ($candidate->number !== null)
+                                    <span class="candidate-number">{{ $candidate->number }}</span>
+                                @endif
+                            </div>
 
-                            <div class="min-w-0 flex-1">
-                                <p class="font-display text-base font-bold text-ink">
-                                    {{ $candidate->displayName() }}
+                            {{-- La legende, en verre pose sur le bas de la
+                                 photo : c'est l'emploi le plus justifie du
+                                 verre liquide du produit — il lui faut un fond
+                                 qui ait de la matiere a refracter, et une
+                                 photographie en est la meilleure. --}}
+                            <div class="candidate-caption glass">
+                                <p class="font-display text-sm leading-tight font-bold text-ink sm:text-base">
+                                    {{ $candidate->name }}
                                 </p>
 
                                 @if ($candidate->biography)
-                                    <p class="mt-0.5 text-sm leading-relaxed text-grey-500">
+                                    <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-grey-500">
                                         {{ $candidate->biography }}
                                     </p>
                                 @endif
@@ -188,8 +298,8 @@
                                         <div class="progress-track">
                                             <div class="progress-fill" style="--progress: {{ $row['share'] }}%"></div>
                                         </div>
-                                        <p class="mt-1.5 text-sm text-grey-500 tabular">
-                                            <span class="font-display font-bold text-ink">{{ $row['votes'] }}</span>
+                                        <p class="mt-1.5 text-xs text-grey-500 tabular">
+                                            <span class="font-display text-sm font-bold text-ink">{{ $row['votes'] }}</span>
                                             {{ $row['votes'] > 1 ? 'votes' : 'vote' }}
                                             · {{ Money::number($row['share']) }} %
                                         </p>
@@ -198,21 +308,32 @@
 
                                 @unless ($candidate->is_active)
                                     <p class="mt-1.5 text-xs text-grey-400">
-                                        Ce candidat ne recoit plus de vote. Ses voix restent comptees.
+                                        Ne recoit plus de vote. Ses voix restent comptees.
                                     </p>
                                 @endunless
-                            </div>
 
-                            @if ($candidate->acceptsBallots())
-                                <button type="button"
-                                        wire:click="choose({{ $category->id }}, {{ $candidate->id }})"
-                                        class="btn btn-primary shrink-0">
-                                    Voter
-                                </button>
-                            @endif
+                                @if ($votable)
+                                    {{-- `translate="no"` : « Voter » est aussi
+                                         un mot anglais — le nom de celui qui
+                                         vote. Le traducteur du navigateur le
+                                         prend pour de l'anglais et rend
+                                         « Electeur », qui ne veut plus rien
+                                         dire sur un bouton. L'attribut le lui
+                                         interdit, et il est pose sur l'action
+                                         plutot que sur la page pour laisser le
+                                         reste traduisible. --}}
+                                    <button type="button" translate="no"
+                                            wire:click="choose({{ $category->id }}, {{ $candidate->id }})"
+                                            class="btn btn-primary btn-pill btn-sm mt-3 w-full"
+                                            aria-label="Voter pour {{ $candidate->displayName() }}">
+                                        {{ $picked ? 'Selectionne' : 'Voter' }}
+                                    </button>
+                                @endif
+                            </div>
                         </li>
                     @endforeach
                 </ul>
+                </div>
 
                 {{-- Formulaire de vote, ouvert sous SA categorie --}}
                 @if ($votingCategory === $category->id && $selectedCandidate)
@@ -246,7 +367,10 @@
                             </x-ui.field>
                         @endif
 
-                        <div class="flex flex-wrap gap-2.5">
+                        {{-- Meme raison que le bouton des cartes : ces deux
+                             libelles ne doivent pas passer par le traducteur
+                             automatique du navigateur. --}}
+                        <div class="flex flex-wrap gap-2.5" translate="no">
                             <button type="submit" class="btn btn-primary"
                                     wire:loading.attr="disabled" wire:target="vote">
                                 Confirmer mon vote

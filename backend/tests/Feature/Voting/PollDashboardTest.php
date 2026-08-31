@@ -641,3 +641,46 @@ it('refuse de rouvrir un vote clos', function () {
 
     app(PublishPoll::class)->open($poll, $this->owner);
 })->throws(RuntimeException::class);
+
+/*
+ * ---------------------------------------------------------------------------
+ * Le lien public
+ * ---------------------------------------------------------------------------
+ */
+
+it('donne a l\'organisateur le lien public de son scrutin, des la publication', function () {
+    /*
+     * Il n'y a pas de vitrine sur Pass241 : un scrutin n'existe pour le public
+     * que par ce lien, que l'organisateur partage lui-meme (sections 4 a 6).
+     * Il manquait des deux ecrans, alors que l'evenement et la collecte
+     * l'affichent tous les deux — un concours publie dont on ne peut pas
+     * recuperer l'adresse n'est pas publie.
+     *
+     * Verifie sur un scrutin PROGRAMME, et non ouvert : la page circule
+     * pendant la campagne d'annonce, c'est precisement la qu'on a besoin du
+     * lien (decision D-049).
+     */
+    $poll = app(PublishPoll::class)->publish(
+        ($this->makeReadyPoll)(['startsAt' => now()->addWeek()]),
+        $this->owner,
+    );
+
+    expect($poll->status)->toBe(PollStatus::Scheduled);
+
+    Livewire::test(PollForm::class, ['poll' => $poll])
+        ->assertSee($poll->publicUrl(), escape: false);
+
+    Livewire::test(PollIndex::class)
+        ->assertSee($poll->publicUrl(), escape: false);
+});
+
+it('ne montre aucun lien public tant que le scrutin est un brouillon', function () {
+    // Un brouillon n'a pas de page : afficher son adresse ferait partager un
+    // lien qui repond 404.
+    $poll = ($this->makeReadyPoll)();
+
+    expect($poll->status)->toBe(PollStatus::Draft);
+
+    Livewire::test(PollIndex::class)
+        ->assertDontSee($poll->publicUrl(), escape: false);
+});

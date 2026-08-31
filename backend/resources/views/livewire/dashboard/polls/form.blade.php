@@ -49,6 +49,49 @@
         </div>
     @enderror
 
+    {{--
+        Le lien public, des qu'il existe.
+
+        C'EST LE PRODUIT DU TRAVAIL DE L'ORGANISATEUR. Il n'y a pas de vitrine
+        sur Pass241 : un scrutin n'existe pour le public que par ce lien, que
+        l'organisateur partage lui-meme (sections 4 a 6). Il manquait ici, alors
+        que l'evenement et la collecte l'affichent tous les deux — un concours
+        publie dont on ne peut pas recuperer l'adresse n'est pas publie.
+
+        Il apparait des la PUBLICATION et non a l'ouverture des votes : un
+        scrutin programme circule pendant la campagne d'annonce, sa page est
+        deja consultable, et c'est precisement le moment ou l'on a besoin du
+        lien (decision D-049).
+    --}}
+    @if ($editing && $poll->isPublished())
+        <div class="glass-inset flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+             x-data="{ copied: false }">
+            <div class="min-w-0">
+                <p class="text-xs font-bold tracking-wider text-grey-500 uppercase">Lien public</p>
+                <p class="mt-1 truncate font-semibold text-azure-700">{{ $poll->publicUrl() }}</p>
+            </div>
+
+            <div class="flex shrink-0 gap-2">
+                {{-- La confirmation de copie remplace le libelle sur place et
+                     revient seule au bout de deux secondes : une notification
+                     flottante pour un geste aussi anodin coute plus d'attention
+                     qu'elle n'en merite. --}}
+                <button type="button"
+                        @click="navigator.clipboard.writeText('{{ $poll->publicUrl() }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                        class="btn btn-secondary">
+                    <x-lucide-copy class="size-4 shrink-0" stroke-width="2" x-show="!copied" aria-hidden="true" />
+                    <x-lucide-check class="size-4 shrink-0 text-success" stroke-width="2.5" x-show="copied" x-cloak aria-hidden="true" />
+                    <span x-text="copied ? 'Copie' : 'Copier'">Copier</span>
+                </button>
+
+                <a href="{{ $poll->publicUrl() }}" target="_blank" rel="noopener" class="btn btn-primary">
+                    <x-lucide-external-link class="size-4 shrink-0" stroke-width="2" aria-hidden="true" />
+                    Ouvrir
+                </a>
+            </div>
+        </div>
+    @endif
+
     <form wire:submit="save" class="space-y-5">
 
         <x-ui.panel title="Le vote">
