@@ -50,6 +50,36 @@ class Candidate extends Model
     }
 
     /**
+     * Categorie porteuse, SANS DEPENDRE DU CHARGEMENT DIFFERE.
+     *
+     * Le produit interdit le chargement differe hors production, precisement
+     * pour faire apparaitre les N+1 pendant le developpement. Un candidat
+     * charge par `with('candidates')` ignore d'ou il vient : toute methode qui
+     * remontait a `$this->category` levait donc une violation en developpement,
+     * et faisait une requete par candidat en production.
+     *
+     * Le repli lit la categorie une fois et la retient sur l'instance. Les
+     * appelants qui posent deja la relation — la page publique le fait — n'en
+     * paient rien ; ceux qui ne le font pas obtiennent quand meme une reponse
+     * juste. C'est le pendant de `PollCategory::resolvedPoll()`, pour l'etage
+     * du dessous.
+     */
+    public function resolvedCategory(): ?PollCategory
+    {
+        if ($this->relationLoaded('category') && $this->category) {
+            return $this->category;
+        }
+
+        $category = PollCategory::query()->find($this->poll_category_id);
+
+        if ($category) {
+            $this->setRelation('category', $category);
+        }
+
+        return $category;
+    }
+
+    /**
      * Le candidat peut-il encore recevoir un vote ?
      *
      * Un candidat desactive reste VISIBLE sur la page publique et dans le
@@ -59,7 +89,8 @@ class Candidate extends Model
      */
     public function acceptsBallots(): bool
     {
-        return $this->is_active && $this->category->acceptsBallots();
+        // Echec en ferme : sans categorie lisible, le vote est ferme.
+        return $this->is_active && (bool) $this->resolvedCategory()?->acceptsBallots();
     }
 
     public function photoUrl(): ?string

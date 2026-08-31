@@ -73,6 +73,44 @@ class PollCategory extends Model
         return $this->belongsTo(Poll::class);
     }
 
+    /**
+     * Scrutin porteur, LISIBLE HORS CONTEXTE D'ORGANISATION.
+     *
+     * Sans ce repli, toute cette classe s'effondrait sur la page publique.
+     *
+     * Une categorie ne porte pas de portee par organisation — elle descend du
+     * scrutin. Le SCRUTIN, lui, en porte une. Un visiteur n'etant membre
+     * d'aucune organisation, `$this->poll` charge en differe revenait `null`, et
+     * les sept methodes qui s'en servent levaient « Attempt to read property on
+     * null ». La page publique repondait 500, et `acceptsBallots()` — donc le
+     * vote lui-meme — echouait pour tout le monde sauf en test, ou le contexte
+     * restait pose par la creation des donnees.
+     *
+     * C'est exactement le piege annonce dans `Poll::publicBySlug`, et c'est
+     * exactement le remede employe par `TicketType::resolvedEvent()` pour la
+     * meme raison sur la page d'un evenement. Le faire porter par le modele
+     * plutot que par chaque appelant est ce qui evite que le piege se referme
+     * une fois de plus : personne n'a plus a y penser.
+     *
+     * Publique, contrairement a son equivalent sur `TicketType` : l'action qui
+     * enregistre un bulletin en a besoin elle aussi, pour retrouver
+     * l'organisation a crediter depuis un chemin sans contexte.
+     */
+    public function resolvedPoll(): ?Poll
+    {
+        if ($this->relationLoaded('poll') && $this->poll) {
+            return $this->poll;
+        }
+
+        $poll = Poll::query()->acrossOrganizations()->find($this->poll_id);
+
+        if ($poll) {
+            $this->setRelation('poll', $poll);
+        }
+
+        return $poll;
+    }
+
     public function candidates(): HasMany
     {
         return $this->hasMany(Candidate::class)->orderBy('position')->orderBy('id');
@@ -91,12 +129,12 @@ class PollCategory extends Model
 
     public function effectiveStartsAt(): CarbonInterface
     {
-        return $this->starts_at ?? $this->poll->starts_at;
+        return $this->starts_at ?? $this->resolvedPoll()->starts_at;
     }
 
     public function effectiveEndsAt(): CarbonInterface
     {
-        return $this->ends_at ?? $this->poll->ends_at;
+        return $this->ends_at ?? $this->resolvedPoll()->ends_at;
     }
 
     /** La categorie regle-t-elle sa propre fenetre ? */
@@ -115,7 +153,9 @@ class PollCategory extends Model
      */
     public function acceptsBallots(): bool
     {
-        if (! $this->is_active || ! $this->poll->acceptsBallots()) {
+        // Echec en ferme : sans scrutin lisible, le vote est ferme. Une anomalie
+        // ne doit jamais ouvrir un droit de vote.
+        if (! $this->is_active || ! $this->resolvedPoll()?->acceptsBallots()) {
             return false;
         }
 
@@ -142,8 +182,10 @@ class PollCategory extends Model
             return 'Cette categorie n\'est pas ouverte au vote.';
         }
 
-        if (! $this->poll->acceptsBallots()) {
-            return $this->poll->hasLapsed()
+        $poll = $this->resolvedPoll();
+
+        if (! $poll?->acceptsBallots()) {
+            return $poll?->hasLapsed()
                 ? 'Les votes sont termines.'
                 : 'Les votes ne sont pas encore ouverts.';
         }
@@ -166,13 +208,21 @@ class PollCategory extends Model
 
     public function effectiveResultsVisibility(): ResultsVisibility
     {
-        return $this->results_visibility ?? $this->poll->results_visibility;
+        return $this->results_visibility ?? $this->resolvedPoll()->results_visibility;
     }
 
     /** Le public peut-il voir le classement de CETTE categorie, maintenant ? */
     public function showsPublicResults(): bool
     {
-        return $this->effectiveResultsVisibility()->isPublicFor($this->poll->displayStatus());
+        $poll = $this->resolvedPoll();
+
+        // Echec en ferme, comme `acceptsBallots` : sans scrutin lisible, le
+        // classement reste scelle. Un doute ne doit pas ouvrir un resultat.
+        if (! $poll) {
+            return false;
+        }
+
+        return $this->effectiveResultsVisibility()->isPublicFor($poll->displayStatus());
     }
 
     /*

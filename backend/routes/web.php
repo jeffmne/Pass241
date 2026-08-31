@@ -37,6 +37,7 @@ use App\Livewire\Public\EventPage;
 use App\Livewire\Public\InvitationPage;
 use App\Livewire\Public\MyTickets;
 use App\Livewire\Public\OrderStatus;
+use App\Livewire\Public\PollPage;
 use App\Livewire\Public\TicketPage;
 use Illuminate\Support\Facades\Route;
 
@@ -65,6 +66,19 @@ Route::get('/e/{slug}', EventPage::class)->name('events.public');
  * laissent la place au prefixe `/vote/` du module a venir (decision D-041).
  */
 Route::get('/collecte/{slug}', CampaignPage::class)->name('campaigns.public');
+
+/*
+ * Page publique d'un scrutin (section 86.4).
+ *
+ * Le prefixe `/vote/` que la decision D-041 avait reserve. Meme parti pris que
+ * l'evenement et la collecte : hors authentification, hors contexte
+ * d'organisation, isolee par un slug unique sur la plateforme.
+ *
+ * La limitation de debit du VOTE lui-meme vit dans le composant, pas ici : elle
+ * doit porter sur la categorie, pas sur la page — quelqu'un qui vote dans trois
+ * categories du meme concours ne doit pas etre bloque pour autant.
+ */
+Route::get('/vote/{slug}', PollPage::class)->name('polls.public');
 
 /*
  * Suivi d'une commande (sections 15.1, 21.1).

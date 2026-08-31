@@ -1,0 +1,267 @@
+<?php
+
+namespace App\Livewire\Public;
+
+use App\Actions\Voting\CastFreeBallot;
+use App\Models\Candidate;
+use App\Models\Poll;
+use App\Models\PollCategory;
+use App\Services\Voting\VoteQuotaLedger;
+use App\Services\Voting\VoterIdentity;
+use App\Services\Voting\VotingStatistics;
+use Illuminate\Support\Facades\RateLimiter;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+use RuntimeException;
+
+/**
+ * Page publique d'un scrutin (section 86.4).
+ *
+ * Rendue cote serveur, sans authentification : le votant n'a pas de compte,
+ * comme l'acheteur d'un billet (section 15). C'est la page que l'organisateur
+ * partage lui-meme — elle doit s'ouvrir vite sur un telephone et produire un bel
+ * apercu quand le lien est transfere dans un message.
+ *
+ * UN SEUL COMPOSANT POUR LE SCRUTIN ET SES CATEGORIES. Elles tiennent sur la
+ * meme page : un concours en a rarement plus de cinq, et faire naviguer le
+ * votant entre deux ecrans pour choisir sa categorie puis son candidat ajoute un
+ * clic sur le chemin qui compte — celui du vote.
+ */
+#[Layout('components.layouts.public')]
+class PollPage extends Component
+{
+    public Poll $poll;
+
+    /** Categorie ouverte dans le formulaire de vote, ou null. */
+    public ?int $votingCategory = null;
+
+    public ?int $selectedCandidate = null;
+
+    public int $quantity = 1;
+
+    public string $phone = '';
+
+    public string $confirmation = '';
+
+    public function mount(string $slug): void
+    {
+        // `publicBySlug` leve la portee par organisation — un visiteur n'est
+        // membre d'aucune — et exclut les brouillons, qui doivent renvoyer 404
+        // et non une page vide.
+        $this->poll = Poll::publicBySlug($slug) ?? abort(404);
+    }
+
+    /*
+     * -----------------------------------------------------------------------
+     * Vote
+     * -----------------------------------------------------------------------
+     */
+
+    public function choose(int $categoryId, int $candidateId): void
+    {
+        $candidate = $this->findCandidate($categoryId, $candidateId);
+
+        $this->votingCategory = $categoryId;
+        $this->selectedCandidate = $candidate->getKey();
+        $this->quantity = 1;
+        $this->confirmation = '';
+
+        $this->resetValidation();
+    }
+
+    public function cancelVote(): void
+    {
+        $this->reset('votingCategory', 'selectedCandidate', 'quantity', 'phone');
+        $this->resetValidation();
+    }
+
+    public function vote(CastFreeBallot $castBallot, VotingStatistics $statistics): void
+    {
+        if ($this->selectedCandidate === null || $this->votingCategory === null) {
+            return;
+        }
+
+        $candidate = $this->findCandidate($this->votingCategory, $this->selectedCandidate);
+
+        // `resolvedCategory` : le candidat vient d'une requete sur la relation,
+        // qui ne pose pas la relation inverse. Meme raison qu'ailleurs — un
+        // acces direct dependrait du chargement differe, interdit hors
+        // production et payant en production.
+        $category = $candidate->resolvedCategory();
+
+        if (! $category) {
+            $this->addError('vote', 'Cette categorie n\'existe plus.');
+
+            return;
+        }
+
+        /*
+         * Limitation de debit (section 86.5, point 6).
+         *
+         * Elle porte sur l'IP ET la categorie : quelqu'un qui vote legitimement
+         * dans trois categories du meme concours ne doit pas etre bloque parce
+         * qu'il a vote trois fois en une minute. Dix tentatives par minute
+         * laissent largement passer un usage normal — et rendent fastidieux
+         * l'enchainement de numeros.
+         */
+        $key = 'vote:'.request()->ip().':'.$category->getKey();
+
+        if (RateLimiter::tooManyAttempts($key, maxAttempts: 10)) {
+            $this->addError('vote', sprintf(
+                'Trop de tentatives. Reessayez dans %d secondes.',
+                RateLimiter::availableIn($key),
+            ));
+
+            return;
+        }
+
+        RateLimiter::hit($key, decaySeconds: 60);
+
+        if ($category->is_paid) {
+            // Le vote payant arrive au jalon 9.4 : il passe par la couche
+            // paiement, pas par cette action.
+            $this->addError('vote', 'Le vote payant n\'est pas encore disponible.');
+
+            return;
+        }
+
+        $rules = ['quantity' => ['required', 'integer', 'min:1']];
+        $messages = [];
+
+        if ($this->requiresPhone($category)) {
+            /*
+             * Le numero est exige des qu'un plafond existe : sans lui, la seule
+             * empreinte disponible serait celle de l'appareil, et deux personnes
+             * derriere le meme partage de connexion — frequent au Gabon —
+             * partageraient le meme plafond.
+             */
+            $rules['phone'] = ['required', 'string', 'min:8', 'max:20'];
+            $messages['phone.required'] = 'Indiquez votre numero pour que votre vote soit compte une seule fois.';
+        }
+
+        $this->validate($rules, $messages, ['quantity' => 'nombre de votes', 'phone' => 'numero']);
+
+        try {
+            $ballot = $castBallot->handle(
+                $candidate,
+                (int) $this->quantity,
+                $this->requiresPhone($category) ? $this->phone : null,
+                request(),
+            );
+        } catch (RuntimeException $e) {
+            $this->addError('vote', $e->getMessage());
+
+            return;
+        }
+
+        /*
+         * Le cache des totaux est vide immediatement : sans cela, le votant
+         * verrait son propre bulletin absent du classement pendant dix
+         * secondes, et croirait qu'il n'a pas ete pris en compte.
+         */
+        $statistics->forget($category);
+
+        $this->confirmation = sprintf(
+            'Votre vote pour %s est enregistre. Reference %s.',
+            $candidate->name,
+            $ballot->reference,
+        );
+
+        $this->reset('votingCategory', 'selectedCandidate', 'quantity', 'phone');
+    }
+
+    /*
+     * -----------------------------------------------------------------------
+     * Rendu
+     * -----------------------------------------------------------------------
+     */
+
+    public function render(VotingStatistics $statistics, VoteQuotaLedger $quotas, VoterIdentity $identity)
+    {
+        $categories = $this->poll->categories()
+            ->where('is_active', true)
+            ->with('candidates')
+            ->get();
+
+        /*
+         * Les relations REMONTANTES sont posees a la main, plutot que laissees
+         * au chargement differe.
+         *
+         * `with('candidates')` ne descend que d'un cran : chaque candidat
+         * ignore ensuite de quelle categorie il vient, et chaque categorie de
+         * quel scrutin. Or la vue appelle `acceptsBallots()` sur chaque
+         * candidat, qui remonte a sa categorie, qui remonte au scrutin.
+         *
+         * Laisser faire coutait deux requetes PAR CANDIDAT sur la page la plus
+         * consultee du module — et levait carrement une erreur la ou le
+         * chargement differe est interdit. Nous tenons deja les deux objets :
+         * ce sont les memes, il n'y a rien a relire.
+         */
+        $categories->each(function (PollCategory $category) {
+            $category->setRelation('poll', $this->poll);
+
+            $category->candidates->each(
+                fn (Candidate $candidate) => $candidate->setRelation('category', $category)
+            );
+        });
+
+        return view('livewire.public.poll-page', [
+            'categories' => $categories,
+
+            /*
+             * Le classement n'est prepare QUE pour les categories qui l'ouvrent
+             * au public. Le calculer pour les autres et le masquer a l'affichage
+             * ferait transiter dans le HTML un resultat annonce comme scelle —
+             * il suffirait d'ouvrir l'inspecteur pour le lire.
+             */
+            'standings' => $categories
+                ->filter(fn (PollCategory $category) => $category->showsPublicResults())
+                ->mapWithKeys(fn (PollCategory $category) => [
+                    $category->getKey() => $statistics->standings($category),
+                ]),
+
+            'totals' => $categories->mapWithKeys(fn (PollCategory $category) => [
+                $category->getKey() => $statistics->forCategory($category),
+            ]),
+
+            'requiresPhone' => $categories->mapWithKeys(fn (PollCategory $category) => [
+                $category->getKey() => $this->requiresPhone($category),
+            ]),
+        ]);
+    }
+
+    /*
+     * -----------------------------------------------------------------------
+     * Acces aux lignes — toujours par le scrutin
+     * -----------------------------------------------------------------------
+     */
+
+    /**
+     * Retrouve un candidat DE CE SCRUTIN.
+     *
+     * La recherche part de `$this->poll` : un identifiant force dans une requete
+     * Livewire ne peut donc pas atteindre le candidat d'un autre concours, et
+     * encore moins y deposer une voix. Chercher par `Candidate::find()`
+     * ouvrirait exactement ce trou.
+     */
+    private function findCandidate(int $categoryId, int $candidateId): Candidate
+    {
+        $category = $this->poll->categories()
+            ->where('is_active', true)
+            ->findOrFail($categoryId);
+
+        return $category->candidates()->findOrFail($candidateId);
+    }
+
+    /**
+     * Le numero est-il exige pour voter dans cette categorie ?
+     *
+     * Seulement quand un plafond existe : sans plafond, il n'y a rien a compter
+     * par personne, et demander un numero ne servirait qu'a collecter une donnee
+     * dont on n'a pas l'usage.
+     */
+    private function requiresPhone(PollCategory $category): bool
+    {
+        return $category->voteLimit() !== null;
+    }
+}

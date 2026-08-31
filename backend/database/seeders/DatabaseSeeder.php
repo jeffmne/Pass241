@@ -5,18 +5,27 @@ namespace Database\Seeders;
 use App\Actions\Donations\CreateDonation;
 use App\Actions\Organizations\CreateOrganization;
 use App\Actions\Payments\ConfirmPayment;
+use App\Actions\Polls\PublishPoll;
+use App\Actions\Polls\SaveCandidate;
+use App\Actions\Polls\SavePoll;
+use App\Actions\Polls\SavePollCategory;
+use App\Actions\Voting\CastFreeBallot;
+use App\Data\PollDraft;
 use App\Enums\CampaignStatus;
 use App\Enums\EventCategory;
 use App\Enums\EventStatus;
 use App\Enums\OrganizationType;
 use App\Enums\PaymentProvider;
+use App\Enums\ResultsVisibility;
 use App\Models\Campaign;
 use App\Models\Donation;
 use App\Models\Event;
+use App\Models\Poll;
 use App\Models\User;
 use App\Support\Tenancy\OrganizationContext;
 use Database\Seeders\Support\PosterPlaceholder;
 use Illuminate\Database\Seeder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class DatabaseSeeder extends Seeder
@@ -69,6 +78,7 @@ class DatabaseSeeder extends Seeder
 
         $this->seedDemoEvents();
         $this->seedDemoCampaign();
+        $this->seedDemoPoll();
 
         /*
          * Une soiree deja passee, avec ses entrees. Separee des deux
@@ -231,6 +241,148 @@ class DatabaseSeeder extends Seeder
         });
 
         $this->command?->info('Collecte de demonstration : /collecte/'.$slug);
+    }
+
+    /**
+     * Un scrutin publie, pour que la page de vote soit consultable des la
+     * premiere installation (sections 86.4, 86.5).
+     *
+     * TOUT PASSE PAR LES ACTIONS REELLES — `SavePoll`, `SavePollCategory`,
+     * `SaveCandidate`, `PublishPoll`, puis `CastFreeBallot` pour les voix. Meme
+     * parti pris que la collecte : ecrire les lignes a la main produirait des
+     * donnees qu'aucun chemin de l'application ne sait fabriquer, et masquerait
+     * le jour ou ce chemin casse.
+     *
+     * AUCUN TOTAL DE VOTES N'EST ECRIT, et il n'y aurait nulle part ou l'ecrire :
+     * le classement est la somme des bulletins confirmes, agregee en SQL. C'est
+     * la regle du module, et le seeder n'y fait pas exception.
+     *
+     * Deux categories volontairement dissemblables : l'une montre ses resultats
+     * en direct, l'autre les garde scelles jusqu'a la cloture. C'est ce qui
+     * permet de verifier a la main qu'un classement scelle ne transite pas dans
+     * la page.
+     *
+     * Rejouable : le scrutin n'est cree qu'une fois.
+     */
+    private function seedDemoPoll(): void
+    {
+        $slug = 'miss-estuaire-2026';
+
+        $owner = User::where('email', 'awa@pass241.test')->first();
+
+        if (! $owner?->current_organization_id) {
+            return;
+        }
+
+        if (Poll::query()->acrossOrganizations()->where('slug', $slug)->exists()) {
+            return;
+        }
+
+        app(OrganizationContext::class)->runFor($owner->currentOrganization, function () use ($owner, $slug) {
+            $tz = config('app.display_timezone');
+
+            $poll = app(SavePoll::class)->create(new PollDraft(
+                name: 'Miss Estuaire 2026',
+                startsAt: now($tz)->subDays(3)->utc(),
+                endsAt: now($tz)->addMonth()->setTime(23, 59)->utc(),
+                description: "Concours de demonstration, cree par le seeder local.\n\n"
+                    .'Il sert a verifier la page publique de vote, le plafond par votant, '
+                    .'et la difference entre un classement ouvert et un classement scelle.',
+                resultsVisibility: ResultsVisibility::AfterClose,
+            ), $owner);
+
+            // Le slug de fabrique suit le nom ; on le fige sur la valeur
+            // attendue pour que le lien annonce en console soit stable.
+            $poll->forceFill(['slug' => $slug])->save();
+
+            // Le modele exige une image pour publier : un scrutin de demo sans
+            // image serait un etat que l'application refuserait de produire.
+            $poll->forceFill([
+                'poster_path' => PosterPlaceholder::for($slug, 'Miss Estuaire 2026'),
+            ])->save();
+
+            $categories = app(SavePollCategory::class);
+            $candidates = app(SaveCandidate::class);
+
+            $miss = $categories->create($poll, [
+                'name' => 'Miss Estuaire',
+                'description' => 'Le titre principal. Un seul vote par personne.',
+                'is_paid' => false,
+                'unit_price' => 0,
+                'max_votes_per_voter' => 1,
+                'results_visibility' => ResultsVisibility::Live,
+                'is_active' => true,
+                'position' => 0,
+            ], $owner);
+
+            $public = $categories->create($poll, [
+                'name' => 'Prix du public',
+                'description' => 'Classement scelle jusqu\'a la cloture.',
+                'is_paid' => false,
+                'unit_price' => 0,
+                'max_votes_per_voter' => 3,
+                'results_visibility' => ResultsVisibility::AfterClose,
+                'is_active' => true,
+                'position' => 1,
+            ], $owner);
+
+            $names = ['Awa Ndong', 'Sylvie Mba', 'Grace Ondo', 'Laure Bekale'];
+
+            foreach ([$miss, $public] as $category) {
+                foreach ($names as $index => $name) {
+                    $candidates->create($category, [
+                        'name' => $name,
+                        'number' => (string) ($index + 1),
+                        'biography' => 'Candidate de demonstration.',
+                        'is_active' => true,
+                        'position' => $index,
+                    ], $owner);
+                }
+            }
+
+            app(PublishPoll::class)->publish($poll->refresh(), $owner);
+
+            $this->seedDemoBallots($poll->refresh());
+        });
+
+        $this->command?->info('Scrutin de demonstration : /vote/'.$slug);
+    }
+
+    /**
+     * Quelques voix, pour que le classement ne soit pas vide.
+     *
+     * Chaque votant est une empreinte differente — un numero different — parce
+     * que le plafond par personne est reel : reutiliser le meme numero ferait
+     * refuser les bulletins suivants, et c'est exactement ce qu'on veut qu'il
+     * fasse.
+     */
+    private function seedDemoBallots(Poll $poll): void
+    {
+        $cast = app(CastFreeBallot::class);
+
+        foreach ($poll->categories()->with('candidates')->get() as $category) {
+            $candidates = $category->candidates->values();
+
+            // Un nombre de voix decroissant, pour que le classement ait un ordre
+            // lisible plutot qu'une egalite generale.
+            foreach ($candidates as $rank => $candidate) {
+                $voices = max(1, 7 - ($rank * 2));
+
+                for ($i = 0; $i < $voices; $i++) {
+                    $request = Request::create('/vote/'.$poll->slug, 'POST', server: [
+                        'REMOTE_ADDR' => '41.158.'.$rank.'.'.$i,
+                        'HTTP_USER_AGENT' => 'Seeder',
+                    ]);
+
+                    $cast->handle(
+                        $candidate,
+                        1,
+                        sprintf('07%d%02d%02d%02d', $rank + 1, $i, $rank, $i),
+                        $request,
+                    );
+                }
+            }
+        }
     }
 
     /**

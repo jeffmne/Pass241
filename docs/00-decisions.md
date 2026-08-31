@@ -182,6 +182,38 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-051 — Un modèle du module Votes retrouve toujours son parent lui-même
+**2026-08-31**
+
+Jalon 9.3. `PollCategory::resolvedPoll()` et `Candidate::resolvedCategory()` remplacent les accès directs `$this->poll` et `$this->category` partout où ils sont atteignables depuis la page publique.
+
+**Raison** : les tests du jalon 9.3, écrits après le code, ont fait apparaître que **la page publique de vote répondait 500 pour tout visiteur réel** — et que le vote lui-même était impossible. Deux causes distinctes, qu'aucun test antérieur ne pouvait voir parce qu'aucun ne se plaçait hors contexte d'organisation.
+
+1. **`Poll` porte une portée par organisation, `PollCategory` non.** Un visiteur n'étant membre d'aucune organisation, `$category->poll` chargé en différé revenait `null`. Les sept méthodes de `PollCategory` qui s'en servent — dont `acceptsBallots()` — levaient « Attempt to read property on null ». C'est exactement le piège que le commentaire de `Poll::publicBySlug` annonçait, et qui s'était « déjà refermé plusieurs fois ».
+
+2. **Le chargement différé est interdit hors production.** `Candidate::acceptsBallots()` remontait à sa catégorie ; un candidat chargé par `with('candidates')` ignore d'où il vient. Erreur dure en développement, N+1 silencieux en production, sur la page la plus consultée du module.
+
+**Choix** : porter le repli sur le MODÈLE plutôt que sur chaque appelant, comme `TicketType::resolvedEvent()` le fait déjà pour la page d'un événement. Un appelant qui pose la relation n'en paie rien ; un appelant qui l'oublie obtient quand même une réponse juste. Les deux méthodes échouent en fermé — sans parent lisible, le vote est fermé et le classement reste scellé : une anomalie ne doit jamais ouvrir un droit.
+
+`resolvedPoll()` est publique, contrairement à son équivalent sur `TicketType` : `CastFreeBallot` en a besoin pour retrouver l'organisation à créditer depuis un chemin sans contexte.
+
+**Conséquence** : `CastFreeBallot` ne dépend plus de ce que l'appelant a pensé à pré-charger. C'est ce qui a permis au seeder d'emprunter l'action réelle.
+
+---
+
+## D-052 — Un bulletin remboursé garde sa date de confirmation
+**2026-08-31**
+
+La contrainte `ballots_confirmed_check` devient `(status IN ('CONFIRMED','REFUNDED')) = (confirmed_at IS NOT NULL)`.
+
+**Raison** : écrite `(status = 'CONFIRMED')`, elle rendait le statut `REFUNDED` **littéralement inatteignable**. Passer un bulletin confirmé au remboursement violait la contrainte, et l'effacer d'abord était interdit par le déclencheur d'immuabilité. Le remboursement d'un vote payé — attendu au jalon 9.5 — n'avait aucun chemin possible. Le commentaire du déclencheur, juste en dessous, annonçait pourtant la transition « PENDING → CONFIRMED → REFUNDED ».
+
+Un bulletin remboursé **a été** confirmé, sinon il n'y aurait rien eu à rembourser : sa date de confirmation reste vraie. C'est cohérent avec le comptage — `VotingStatistics` retient les voix des bulletins `CONFIRMED` et `REFUNDED`, et ne compte le revenu que des `CONFIRMED`. **Un remboursement rend l'argent, pas la voix.**
+
+Corrigé dans la migration d'origine plutôt que par une migration de rattrapage : le jalon 9.3 n'est pas encore livré.
+
+---
+
 ## D-050 — La coupure après inactivité est un middleware, pas un réglage de session
 **2026-08-28**
 
