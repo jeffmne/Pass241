@@ -156,15 +156,18 @@ it('affiche les frais au checkout avant le paiement', function () {
 
 it('applique le bareme de l\'operateur, et non celui du prestataire', function () {
     /*
-     * PVit ne prend pas le meme taux selon l'operateur : 3,5 % sur Airtel
+     * PVit ne prend pas le meme taux selon l'operateur : 3,525 % sur Airtel
      * Money, 2,5 % sur Moov Money. Un bareme unique par prestataire —
      * l'hypothese d'origine de ce service — surfacturerait les uns ou
      * sous-facturerait les autres, et la sous-facturation se paie en decouvert
      * sur le compte marchand.
      *
-     * Valeurs relevees sur l'API `get-fees` de PVit, pas supposees.
+     * Taux releves sur des CALLBACKS reels, seuls a porter les deux
+     * composantes de frais. L'API `get-fees`, elle, annonce 3,5 % sur Airtel
+     * et se trompe donc de 0,025 point — systematiquement dans le mauvais
+     * sens.
      */
-    expect($this->fees->feeFor(10_000, 'pvit', PaymentProvider::Airtel)->amount)->toBe(350)
+    expect($this->fees->feeFor(10_000, 'pvit', PaymentProvider::Airtel)->amount)->toBe(353)
         ->and($this->fees->feeFor(10_000, 'pvit', PaymentProvider::Moov)->amount)->toBe(250);
 });
 
@@ -179,13 +182,38 @@ it('arrondit au franc superieur, le franc CFA n\'ayant pas de subdivision', func
         ->and($this->fees->feeFor(1_500, 'pvit', PaymentProvider::Moov)->amount)->toBe(38);
 });
 
+it('ne facture JAMAIS moins que ce que PVit preleve reellement', function () {
+    /*
+     * Le test qui defend le compte marchand.
+     *
+     * Montants et frais reels releves sur des callbacks PVit le 2026-09-01 :
+     * un manque, meme d'un demi-franc, se comble transaction apres
+     * transaction. L'excedent, lui, est sans consequence — le payeur avance
+     * quelques centimes de plus que le prestataire ne prend.
+     */
+    $reels = [
+        [PaymentProvider::Airtel, 500, 17.625],
+        [PaymentProvider::Airtel, 1_000, 35.25],
+        [PaymentProvider::Airtel, 2_000, 70.5],
+        [PaymentProvider::Airtel, 5_000, 176.25],
+        [PaymentProvider::Airtel, 50_000, 1_762.5],
+        [PaymentProvider::Moov, 1_000, 25.0],
+        [PaymentProvider::Moov, 4_000, 100.0],
+    ];
+
+    foreach ($reels as [$operator, $subtotal, $preleve]) {
+        expect($this->fees->feeFor($subtotal, 'pvit', $operator)->amount)
+            ->toBeGreaterThanOrEqual((int) ceil($preleve));
+    }
+});
+
 it('retient le bareme le plus cher quand l\'operateur n\'est pas encore choisi', function () {
     /*
      * Un ecran affiche le total avant que l'acheteur n'ait choisi son
      * operateur. Annoncer moins que ce qui sera debite est la seule erreur qui
      * se voit sur le releve du client — on retient donc le plus penalisant.
      */
-    expect($this->fees->feeFor(10_000, 'pvit')->amount)->toBe(350);
+    expect($this->fees->feeFor(10_000, 'pvit')->amount)->toBe(353);
 });
 
 it('fige le bareme employe sur la transaction', function () {

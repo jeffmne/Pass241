@@ -123,18 +123,30 @@ return [
         |
         | CES TAUX SONT LE TOTAL DEBITE AU PAYEUR, part operateur comprise.
         |
-        | PVit facture en deux composantes : sa propre part, et celle de
-        | l'operateur. L'API `get-fees` rend la somme des deux ; l'API de
-        | statut, elle, ne montre que la part PVit — 2,5 % chez les deux
-        | operateurs. D'ou un ecart qui n'existe que sur Airtel :
+        | PVit facture en DEUX composantes : sa part (`fees`) et celle de
+        | l'operateur (`operatorFees`). Ni l'API de statut ni `get-fees` ne
+        | donnent le total exact — seul le CALLBACK porte les deux. Releve sur
+        | des transactions reelles le 2026-09-01 :
         |
-        |              get-fees   `fees` du statut   ecart
-        |   Airtel      3,5 %          2,5 %          1 point = part Airtel
-        |   Moov        2,5 %          2,5 %          aucun
+        |   operateur  sous-total   fees     operatorFees   taux reel
+        |   Airtel        500       12,5        5,125         3,525 %
+        |   Airtel      1 000       25         10,25          3,525 %
+        |   Airtel      2 000       50         20,5           3,525 %
+        |   Airtel      5 000      125         51,25          3,525 %
+        |   Moov        1 000       25          0             2,500 %
+        |   Moov        4 000      100          0             2,500 %
         |
-        | Verifie sur transactions reelles le 2026-08-31. C'est `get-fees` qui
-        | fait foi pour ce que le payeur voit partir de son telephone : lire le
-        | statut comme un total ferait conclure a tort que nous surfacturons.
+        | `GET-FEES` SE TROMPE LEGEREMENT SUR AIRTEL : il annonce 3,5 % la ou
+        | l'operateur en prend 3,525 %. L'ecart est infime par transaction —
+        | 1,25 F sur 5 000 — mais il est SYSTEMATIQUE et toujours dans le
+        | mauvais sens : c'est un decouvert sur le compte marchand, a combler
+        | transaction apres transaction. Le callback fait donc foi, pas
+        | `get-fees`.
+        |
+        | 353 points de base et non 352,5 : le bareme est entier, et arrondir
+        | au superieur est la seule direction qui ne cree jamais de manque. Le
+        | payeur avance quelques centimes de plus que le prestataire ne prend,
+        | ce qui est sans consequence — l'inverse ne l'est pas.
         |
         | PVit rend des frais FRACTIONNAIRES (52,5 F sur 1 500 F Airtel) alors
         | que le franc CFA n'a pas de subdivision. Notre calcul arrondit au
@@ -143,8 +155,8 @@ return [
         */
         'pvit' => [
             'operators' => [
-                'AIRTEL' => ['basis_points' => 350, 'fixed' => 0],
-                'MOOV' => ['basis_points' => 250, 'fixed' => 0],
+                'AIRTEL' => ['basis_points' => 353, 'fixed' => 0],  // 3,525 % arrondi au superieur
+                'MOOV' => ['basis_points' => 250, 'fixed' => 0],    // 2,5 %, sans part operateur
             ],
         ],
 

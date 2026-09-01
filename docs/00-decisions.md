@@ -182,8 +182,32 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-058 — Le callback fait foi sur les frais, pas `get-fees`
+**2026-09-01**
+
+**Corrige la décision D-057**, prise la veille avec une information incomplète.
+
+Une fois le callback PVit reçu pour de bon, les deux composantes de frais sont devenues lisibles ensemble — `fees` et `operatorFees`. Mesuré sur six transactions réelles :
+
+| Opérateur | `fees` | `operatorFees` | Taux réel |
+|---|---|---|---|
+| Airtel | 2,5 % | 1,025 % | **3,525 %** |
+| Moov | 2,5 % | 0 % | **2,500 %** |
+
+**`get-fees` annonce 3,5 % sur Airtel : il se trompe de 0,025 point.** L'écart est infime par transaction — 1,25 F sur 5 000 — mais systématique et toujours dans le même sens : un manque à combler sur le compte marchand.
+
+Airtel passe donc de 350 à **353** points de base. 352,5 n'est pas un entier, et arrondir au supérieur est la seule direction qui ne crée jamais de découvert : le payeur avance quelques centimes de plus que le prestataire ne prend, ce qui est sans conséquence — l'inverse ne l'est pas. Vérifié sur toute la plage mesurée, l'écart reste positif partout.
+
+Moov ne bouge pas : sans part opérateur, `get-fees` y était juste.
+
+**Ce que cette décision enseigne au-delà de PVit** : une API de devis n'est pas une source d'autorité sur ce qui sera réellement prélevé. Seule la transaction aboutie l'est. Un barème doit être relevé sur des callbacks réels, opérateur par opérateur, avant toute mise en production.
+
+`amountCredited` confirme au passage que l'organisateur reçoit exactement le sous-total annoncé, frais exclus — ce que promet la décision D-023.
+
+---
+
 ## D-057 — Le barème PVit dépend de l'opérateur, et `get-fees` fait foi
-**2026-08-31**
+**2026-08-31** — *taux Airtel corrigé le lendemain par la décision D-058 : le callback a montré une seconde composante de frais.*
 
 Branchement du driver PVit. Deux choses ont été mesurées sur le compte de test plutôt que supposées, et toutes deux contredisaient une hypothèse du code.
 

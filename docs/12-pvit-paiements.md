@@ -147,24 +147,42 @@ Réponse :
 
 ### Il y a deux composantes, et elles ne s'affichent pas au même endroit
 
-| | `get-fees` | `fees` du statut | écart |
-|---|---|---|---|
-| Airtel Money | **3,5 %** | 2,5 % | 1 point |
-| Moov Money | **2,5 %** | 2,5 % | aucun |
+PVit facture **deux composantes** : sa part (`fees`) et celle de l'opérateur (`operatorFees`). **Seul le callback porte les deux.** Ni l'API de statut ni `get-fees` ne donnent le total exact.
 
-PVit facture **sa part** et **celle de l'opérateur**. `get-fees` renvoie la somme ; l'API de statut ne montre que la sienne. Leur exemple de callback recompose les trois nombres : `amount 150 + fees 3,5 + operatorFees 1,5 = totalAmount 155`.
+Relevé sur des callbacks réels :
 
-**`get-fees` fait foi** pour ce que le payeur voit partir de son téléphone.
+| Opérateur | Sous-total | `fees` | `operatorFees` | Taux réel |
+|---|---|---|---|---|
+| Airtel | 500 | 12,5 | 5,125 | **3,525 %** |
+| Airtel | 1 000 | 25 | 10,25 | **3,525 %** |
+| Airtel | 2 000 | 50 | 20,5 | **3,525 %** |
+| Airtel | 5 000 | 125 | 51,25 | **3,525 %** |
+| Moov | 1 000 | 25 | 0 | **2,500 %** |
+| Moov | 4 000 | 100 | 0 | **2,500 %** |
 
-Ne jamais reconstituer un total par `amount + fees` depuis un statut : il manque la part opérateur, et l'on conclut à tort qu'on surfacture. Ne recomposer que si `totalAmount` est présent, ou si les deux composantes le sont — sinon **rendre `null`**, pour que l'appelant sache qu'il ne sait pas.
+> ### ⚠ `get-fees` se trompe sur Airtel
+>
+> Il annonce **3,5 %** là où l'opérateur prélève **3,525 %**. L'écart est infime
+> par transaction — 1,25 F sur 5 000 — mais il est **systématique** et toujours
+> dans le mauvais sens : un découvert sur le compte marchand, à combler
+> transaction après transaction.
+>
+> **Se fier au callback, pas à `get-fees`.** Et vérifier ce point pour chaque
+> opérateur : Moov n'a aucun frais opérateur, `get-fees` y est donc juste.
+
+Ne jamais reconstituer un total par `amount + fees` depuis un **statut** : il manque la part opérateur. Ne recomposer que si `totalAmount` est présent, ou si les deux composantes le sont — sinon **rendre `null`**, pour que l'appelant sache qu'il ne sait pas.
+
+`amountCredited` du callback confirme ce qui revient au marchand : exactement le montant envoyé, frais exclus.
 
 ### Le barème dépend de l'opérateur, pas du prestataire
 
-Un calculateur indexé par prestataire est une hypothèse à revoir. Sur un même compte PVit, Airtel et Moov n'ont pas le même taux.
+Un calculateur indexé par prestataire est une hypothèse à revoir. Sur un même compte PVit, Airtel prend 3,525 % et Moov 2,5 %.
+
+Les barèmes s'expriment en points de base entiers : 3,525 % devient **353** et non 352, pour la même raison que l'arrondi ci-dessous.
 
 ### Les frais sont fractionnaires, le franc CFA ne l'est pas
 
-`500 F Airtel → 17,5 F`. **Arrondir au franc SUPÉRIEUR.** L'asymétrie est réelle : un franc de frais en moins est un découvert sur le compte marchand, qu'il faut combler transaction après transaction.
+`500 F Airtel → 17,625 F`. **Arrondir au franc SUPÉRIEUR.** L'asymétrie est réelle : un franc de frais en moins est un découvert sur le compte marchand, qu'il faut combler transaction après transaction.
 
 ### Il existe un montant minimum
 
