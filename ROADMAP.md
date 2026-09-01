@@ -333,7 +333,11 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
     **PostgreSQL n'indexe pas les colonnes de clé étrangère** — 29 colonnes du schéma étaient dans ce cas. Mesuré sur 200 000 lignes : `order_items WHERE order_id = ?` faisait un parcours séquentiel complet (10,7 ms, 199 999 lignes écartées) contre 2,5 ms avec l'index. Cette requête s'exécute à chaque ouverture de commande, chaque confirmation de paiement et chaque émission de billets.
 
     **Ce que la mesure a démenti** : un index couvrant pour `StockLedger::sold()` gagnait un tiers du temps à 200 000 commandes, mais le planificateur l'abandonne à 500 000. Le levier est `random_page_cost` (encore réglé pour des disques à plateaux), pas l'index — consigné comme point ouvert plutôt que corrigé à moitié.
-  - [ ] Performance — reste : `random_page_cost` à 1.1 pour SSD (mesuré, non appliqué : réglage serveur), cache et pagination déjà en place
+  - [x] **`random_page_cost` à 1.1, fait le 2026-09-01 (décision D-065)** — posé sur le service `postgres` du `docker-compose.yml`
+
+    Le levier que la décision D-064 cherchait sans le nommer. Mesuré à 500 000 commandes, sans index supplémentaire : `StockLedger::sold()` passe de 31,7 ms à **13,7 ms** en basculant d'une jointure par fusion à une boucle imbriquée — et le gain croît avec le volume, la boucle suivant les ventes du type de billet là où la fusion suivait le total des commandes de la plateforme. Aucune régression sur les autres formes testées.
+
+    **Tout déploiement doit porter le même réglage** : une base managée revient à 4.0 par défaut et perd le gain en silence.
 - [x] **Déconnexion après inactivité, faite le 2026-08-28 (décision D-050)** — sortie de phase, demandée par Jeff : `ExpireInactiveSessions` sur le groupe `web`, `AUTH_IDLE_TIMEOUT` à 30 minutes, message nommant le délai, 419 pour Livewire. « Se souvenir de moi » passe à décoché par défaut — cochée, elle rendait l'expiration de session sans effet. 9 tests
 
 ### Phase 9 — Votes *(fonctionnalité future)*

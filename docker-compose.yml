@@ -42,6 +42,26 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: pass241-postgres
+    # random_page_cost : 4.0 par defaut, une valeur calibree pour des disques a
+    # plateaux, ou une lecture aleatoire coutait quatre fois une lecture
+    # sequentielle. Sur SSD l'ecart est marginal, et 1.1 est la valeur retenue
+    # partout ailleurs (decision D-065).
+    #
+    # Ce n'est pas un reglage cosmetique : il decide des PLANS. Mesure sur
+    # 500 000 commandes, la requete de stock de `StockLedger::sold()` — celle
+    # qui s'execute au rendu de chaque page publique d'evenement — passe d'une
+    # jointure par fusion parcourant tout l'index a une boucle imbriquee, soit
+    # 31,7 ms a 13,7 ms. Le gain croit avec le volume : la boucle imbriquee
+    # suit les ventes du type de billet, la fusion suivait le total des
+    # commandes de la plateforme.
+    #
+    # TOUT DEPLOIEMENT DOIT PORTER LE MEME REGLAGE. Un serveur gere ailleurs
+    # qu'ici (base managee, machine dediee) revient a 4.0 par defaut et perd
+    # silencieusement ce gain — rien ne casse, tout ralentit.
+    command:
+      - postgres
+      - -c
+      - random_page_cost=1.1
     environment:
       POSTGRES_DB: pass241
       POSTGRES_USER: pass241

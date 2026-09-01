@@ -182,6 +182,32 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-065 — `random_page_cost` à 1.1 : le réglage qui décide des plans
+**2026-09-01**
+
+PostgreSQL démarre avec `random_page_cost = 4.0`, une valeur calibrée pour des **disques à plateaux**, où une lecture aléatoire coûtait quatre fois une lecture séquentielle. Sur SSD l'écart est marginal, et 1.1 est la valeur retenue partout ailleurs. Elle est désormais posée sur le service `postgres` du `docker-compose.yml`.
+
+**Ce n'est pas un réglage cosmétique : il décide des plans d'exécution.** La décision D-064 s'était arrêtée sur un mur — un index couvrant pour `StockLedger::sold()` gagnait un tiers du temps à 200 000 commandes, puis le planificateur l'abandonnait à 500 000 au profit d'une jointure par fusion parcourant l'index entier. J'avais conclu que l'index n'était pas le levier, sans identifier lequel l'était.
+
+C'était celui-ci. Mesuré à 500 000 commandes, sans aucun index supplémentaire :
+
+| Requête | `4.0` | `1.1` |
+|---|---|---|
+| `StockLedger::sold()` | 31,7 ms (jointure par fusion) | **13,7 ms** (boucle imbriquée) |
+| `StockLedger::reserved()` | 0,122 ms | **0,045 ms** |
+| Articles d'une commande | 0,048 ms | 0,050 ms |
+| Comptage large d'une organisation | 21,7 ms | 21,2 ms |
+
+**Le gain croît avec le volume**, et c'est ce qui compte plus que le facteur 2,3 : la boucle imbriquée suit les ventes du type de billet, là où la jointure par fusion suivait le nombre total de commandes de la plateforme. `sold()` s'exécute au rendu de **chaque page publique d'événement**, une fois par catégorie de billet.
+
+Aucune régression sur les deux autres formes testées : un parcours large reste un parcours large, et une recherche déjà servie par un index ne change pas de plan.
+
+**Tout déploiement doit porter le même réglage.** Un serveur géré ailleurs que par ce `docker-compose` — base managée, machine dédiée — revient à 4.0 par défaut et perd silencieusement ce gain. Rien ne casse, tout ralentit : c'est la forme de régression la plus difficile à remarquer.
+
+**Pas de test.** Un réglage de serveur n'est pas un comportement de l'application ; un test qui lirait `SHOW random_page_cost` échouerait chez quiconque exécute la suite sur un PostgreSQL configuré autrement, sans qu'aucun code soit en cause.
+
+---
+
 ## D-064 — Index des chemins chauds, et ce que la mesure a démenti
 **2026-09-01**
 
