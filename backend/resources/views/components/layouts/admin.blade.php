@@ -26,6 +26,9 @@
         ['label' => 'Transactions', 'icon' => 'receipt', 'route' => 'admin.transactions', 'group' => 'Flux financiers'],
         ['label' => 'Organisations', 'icon' => 'building-2', 'route' => 'admin.organizations', 'match' => 'admin.organization*', 'group' => 'Plateforme'],
         ['label' => 'Journal', 'icon' => 'scroll-text', 'route' => 'admin.audit', 'group' => 'Plateforme'],
+        // Ce que la machine n'a pas fait — le journal, lui, dit ce que les gens
+        // ont fait (section 72).
+        ['label' => 'Supervision', 'icon' => 'activity', 'route' => 'admin.supervision', 'group' => 'Plateforme'],
         ['label' => 'Parametres', 'icon' => 'settings', 'route' => 'admin.settings', 'group' => 'Plateforme'],
     ];
 @endphp

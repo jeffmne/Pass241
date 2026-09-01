@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LogoutController;
 use App\Http\Controllers\Dev\SimulatePaymentController;
 use App\Http\Controllers\DonationReceiptController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\ReceiptController;
 use App\Livewire\Admin\AuditTrail as AdminAuditTrail;
 use App\Livewire\Admin\OrganizationDetail as AdminOrganizationDetail;
@@ -12,6 +13,7 @@ use App\Livewire\Admin\Organizations as AdminOrganizations;
 use App\Livewire\Admin\Overview as AdminOverview;
 use App\Livewire\Admin\Settings as AdminSettings;
 use App\Livewire\Admin\Settlements as AdminSettlements;
+use App\Livewire\Admin\Supervision as AdminSupervision;
 use App\Livewire\Admin\Transactions as AdminTransactions;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\Register;
@@ -45,6 +47,18 @@ use App\Livewire\Public\TicketPage;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
+
+/*
+ * Sonde de disponibilite, pour un moniteur externe (section 72).
+ *
+ * Sans authentification, comme `/up` : un moniteur n'a pas de session. Elle ne
+ * rend que des libelles et des etats — jamais un identifiant, une adresse de
+ * serveur ou un secret.
+ *
+ * Elle complete `/up` sans la remplacer : celle-ci dit que le processus est
+ * vivant, celle-la que le service peut travailler.
+ */
+Route::get('/sante', HealthController::class)->name('health');
 
 /*
  * Page publique d'un evenement (section 6).
@@ -232,6 +246,10 @@ Route::middleware('auth')->group(function () {
             ->name('admin.organization');
         Route::get('/transactions', AdminTransactions::class)->name('admin.transactions');
         Route::get('/journal', AdminAuditTrail::class)->name('admin.audit');
+
+        // Section 72 : ce qui est reste en chemin — callbacks non traites,
+        // traitements en echec, reversements en suspens. Lecture seule.
+        Route::get('/supervision', AdminSupervision::class)->name('admin.supervision');
 
         // Section 58 : reglages metier de la plateforme. Aucun secret n'y passe.
         Route::get('/parametres', AdminSettings::class)->name('admin.settings');

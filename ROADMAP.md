@@ -323,7 +323,12 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
   - [x] **Autorisations d'écran vérifiées à chaque requête, fait le 2026-09-01 (décision D-062)** — traits `RequiresPermission` et `SuperAdminOnly`, gardes déplacées de `mount` vers `booted`, `EnsureSuperAdmin` ajouté à la liste blanche persistante de Livewire. 16 tests
 
     **Deux failles, prouvées par des tests écrits avant la correction.** Une garde dans `mount` ne s'exécute qu'au premier chargement — Livewire ne le rappelle jamais ensuite. Un membre dont les droits venaient d'être retirés créait encore un tarif de billet et une catégorie de concours ; et sur la console d'administration, dont le middleware `super-admin` n'est pas rejoué par Livewire, un Super Admin rétrogradé modifiait encore **les taux de commission de la plateforme**.
-  - [ ] Monitoring, performance
+  - [x] **Monitoring, fait le 2026-09-01 (décision D-063)** — sonde `GET /sante` (PostgreSQL, cache, Redis, 503 et non 500), écran **Supervision** dans la console d'administration, `HealthCheck` et `SupervisionReport`. 13 tests
+
+    **La séparation décide de qui est réveillé la nuit.** La sonde répond à « le service peut-il travailler ? » et s'adresse à un moniteur externe ; l'écran répond à « qu'est-ce qui est resté en chemin ? » et s'adresse à un humain le matin. Ma première version comptait les jobs en échec dans la sonde — un email d'invitation non parti aurait fait sonner une alerte de panne. Un test tient désormais cette frontière.
+
+    **La panne la plus coûteuse qu'aucun écran ne montrait** : un callback de paiement reçu et jamais traité. L'argent a quitté le téléphone de l'acheteur, l'opérateur nous a prévenus, la commande est restée en attente — et il fallait que l'acheteur écrive pour qu'on l'apprenne.
+  - [ ] Performance
 - [x] **Déconnexion après inactivité, faite le 2026-08-28 (décision D-050)** — sortie de phase, demandée par Jeff : `ExpireInactiveSessions` sur le groupe `web`, `AUTH_IDLE_TIMEOUT` à 30 minutes, message nommant le délai, 419 pour Livewire. « Se souvenir de moi » passe à décoché par défaut — cochée, elle rendait l'expiration de session sans effet. 9 tests
 
 ### Phase 9 — Votes *(fonctionnalité future)*

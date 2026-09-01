@@ -182,6 +182,27 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-063 — Deux surveillances distinctes : la sonde réveille, l'écran renseigne
+**2026-09-01**
+
+La supervision de la plateforme (section 72) se sépare en deux, et cette séparation décide de **qui est réveillé la nuit**.
+
+`GET /sante` répond à « le service peut-il travailler ? ». Elle vérifie PostgreSQL, le cache et Redis par un aller-retour **réel** — lire une variable de configuration ne prouve rien, elle est renseignée que le service réponde ou non. Elle rend 200 ou **503**, jamais 500 : le code doit dire « indisponible, revenez » et non « cette page a un bug », les deux se traitant différemment en supervision comme derrière un répartiteur de charge.
+
+Elle complète `/up` sans la remplacer. Celle de Laravel dit que le **processus** est vivant — c'est ce qu'un orchestrateur interroge pour redémarrer un conteneur, et elle doit rester légère. Une application qui démarre parfaitement mais ne joint plus PostgreSQL répond 200 sur la première et 503 sur la seconde.
+
+L'écran **Supervision** de la console d'administration répond à « qu'est-ce qui est resté en chemin ? » : callbacks de paiement reçus et jamais traités, traitements en échec, reversements dans un état indécidable.
+
+**Ce qui a tranché le découpage.** Ma première version comptait les jobs en échec dans la sonde de santé. Un email d'invitation qui ne part pas aurait alors fait sonner une alerte de panne — pour quelque chose qui n'empêche personne d'acheter un billet. Une alerte qui se déclenche pour rien finit par ne plus être lue, et c'est alors la vraie panne qu'on rate. Un test tient désormais cette frontière : un job en échec laisse `/sante` à 200 et apparaît sur l'écran.
+
+**La panne la plus coûteuse est la première listée** : un callback reçu et jamais traité. L'argent a quitté le téléphone de l'acheteur, l'opérateur nous a prévenus, et la commande est restée en attente. Rien dans le produit ne le signalait — il fallait que l'acheteur écrive pour qu'on l'apprenne. Cinq minutes de grâce laissent à la file le temps de faire son travail avant de crier.
+
+**Aucune action sur cet écran, volontairement.** Rejouer un callback risque d'encaisser deux fois ; marquer un incident réglé sans l'avoir réglé ne fait que le rendre invisible. Ces gestes se font à la main, en connaissance de cause.
+
+**Aucun cache non plus** : la valeur du rapport tient à sa fraîcheur, et un compteur d'incidents en retard de cinq minutes est un compteur en qui on cesse de croire.
+
+---
+
 ## D-062 — Les gardes d'écran s'exécutent à chaque requête, plus seulement au montage
 **2026-09-01**
 
