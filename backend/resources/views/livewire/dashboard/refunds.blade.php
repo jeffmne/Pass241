@@ -6,6 +6,16 @@
 --}}
 <div class="space-y-5">
 
+    {{-- La sous-navigation des finances AU-DESSUS DU TITRE, et non dans les
+         actions de l'en-tete.
+
+         Elle y voisinait les onglets de filtre, en pilules identiques et
+         collees : les deux groupes se lisaient comme un seul controle de six
+         entrees, dont trois changeaient de page et trois non. Au-dessus du
+         titre, elle se lit pour ce qu'elle est — on est dans « Finances », et
+         voici la page courante. --}}
+    <x-finance-nav />
+
     <x-ui.page-header
         title="Remboursements"
         :description="$pendingCount > 0
@@ -13,11 +23,6 @@
             : 'Aucune demande en attente.'">
 
         <x-slot:actions>
-            {{-- La sous-navigation des finances d'abord : elle dit ou l'on est
-                 dans la section, avant de proposer de filtrer ce qu'on y
-                 regarde. --}}
-            <x-finance-nav />
-
             {{-- Trois onglets plutot qu'un menu deroulant : l'organisateur voit
                  d'un coup ce qui existe, et change de vue en un geste au lieu
                  de trois. Sur telephone le groupe defile plutot que de passer

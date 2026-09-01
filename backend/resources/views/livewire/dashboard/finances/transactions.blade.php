@@ -26,13 +26,16 @@
 --}}
 <div class="space-y-5">
 
+    {{-- La sous-navigation au-dessus du titre : elle dit dans quelle section on
+         se trouve, avant que le titre ne dise quelle page. La mettre dans les
+         actions de l'en-tete la collait aux onglets de filtre de l'ecran
+         voisin, en pilules identiques — les deux groupes se lisaient alors
+         comme un seul. --}}
+    <x-finance-nav />
+
     <x-ui.page-header
         title="Finances"
-        description="Ce qui a ete encaisse, ce que Pass241 a retenu, et ce qui vous revient.">
-        <x-slot:actions>
-            <x-finance-nav />
-        </x-slot:actions>
-    </x-ui.page-header>
+        description="Ce qui a ete encaisse, ce que Pass241 a retenu, et ce qui vous revient." />
 
     {{-- ----------------------------------------------------------------
          Filtres
