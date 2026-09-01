@@ -17,6 +17,25 @@
         'jobs' => 'circle-slash',
         'settlements' => 'wallet',
     ];
+
+    /*
+     * LA GRAVITE SE VOIT, elle ne se deduit pas de la lecture.
+     *
+     * Les trois incidents ne coutent pas la meme chose. Un callback non traite
+     * veut dire qu'un acheteur a paye et n'a rien recu ; un reversement bloque,
+     * qu'un organisateur attend son argent. Un email qui n'est pas parti est
+     * ennuyeux, et c'est tout — le billet reste consultable en ligne
+     * (section 15.1).
+     *
+     * Les afficher a l'identique obligeait a lire les trois descriptions pour
+     * savoir par ou commencer. Sur un ecran dont le seul travail est de trier,
+     * c'etait le travail non fait.
+     */
+    $severities = [
+        'webhooks' => 'danger',
+        'settlements' => 'danger',
+        'jobs' => 'warning',
+    ];
 @endphp
 
 {{--
@@ -67,7 +86,7 @@
             @endforeach
         </div>
 
-        <p class="mt-3 text-xs text-grey-500">
+        <p class="mt-4 text-xs text-grey-500">
             Ces memes controles repondent sur <span class="tabular">/sante</span>,
             sans authentification, pour un moniteur externe. Une panne y donne un
             code 503 — « indisponible », et non « cette page a un bug ».
@@ -94,11 +113,21 @@
                 @foreach ($incidents as $key => $incident)
                     @continue ($incident['count'] === 0)
 
+                    @php $tone = $severities[$key] ?? 'warning'; @endphp
+
                     <div wire:key="incident-{{ $key }}"
-                         class="surface flex flex-wrap items-start gap-4 border-warning/40 p-4 sm:p-5">
+                         @class([
+                             'surface flex flex-wrap items-start gap-4 p-4 sm:p-5',
+                             'border-danger/40' => $tone === 'danger',
+                             'border-warning/40' => $tone === 'warning',
+                         ])>
 
                         <x-dynamic-component :component="'lucide-' . $icons[$key]"
-                                             class="mt-0.5 size-5 shrink-0 text-warning"
+                                             @class([
+                                                 'mt-0.5 size-5 shrink-0',
+                                                 'text-danger' => $tone === 'danger',
+                                                 'text-warning' => $tone === 'warning',
+                                             ])
                                              stroke-width="1.75"
                                              aria-hidden="true" />
 
@@ -114,7 +143,15 @@
                             @endif
                         </div>
 
-                        <p class="shrink-0 font-display text-3xl leading-none font-extrabold text-ink tabular">
+                        {{-- Le compte porte la meme teinte que le reste de la
+                             carte : c'est le chiffre qu'on regarde en premier,
+                             et le laisser a l'encre neutre aurait annule la
+                             distinction que le cadre vient d'etablir. --}}
+                        <p @class([
+                            'shrink-0 font-display text-3xl leading-none font-extrabold tabular',
+                            'text-danger' => $tone === 'danger',
+                            'text-ink' => $tone !== 'danger',
+                        ])>
                             {{ $incident['count'] }}
                         </p>
                     </div>
