@@ -182,6 +182,25 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-064 — Index des chemins chauds, et ce que la mesure a démenti
+**2026-09-01**
+
+**PostgreSQL n'indexe pas les colonnes de clé étrangère.** Il crée un index sur la colonne *référencée* — une clé primaire, déjà indexée — et rien du tout sur celle qui référence. Vingt-neuf colonnes du schéma étaient dans ce cas. La plupart sans conséquence ; quatre sur les requêtes les plus fréquentes du produit.
+
+**Le défaut est invisible en développement**, et c'est ce qui le rend dangereux : sur cent lignes le planificateur préfère de toute façon un parcours séquentiel, et tous les tests passent. Il n'apparaît qu'en production, progressivement, sur les requêtes les plus fréquentes — au pire endroit et au pire moment.
+
+**Mesuré sur 200 000 lignes synthétiques.** `SELECT * FROM order_items WHERE order_id = ?` faisait un **parcours séquentiel complet** : 10,7 ms, 199 999 lignes écartées par le filtre. Avec l'index : 2,5 ms, et surtout un coût qui cesse de croître avec le nombre total de commandes de la plateforme. Cette requête s'exécute à l'ouverture de chaque commande, à chaque confirmation de paiement (`guardPaymentConfirmation` parcourt les articles), à chaque émission de billets et sur l'export des commandes.
+
+Trois autres index l'accompagnent : `tickets (organization_id, status)` — sans lui, le tableau de bord d'un organisateur parcourt les billets de *toute* la plateforme pour n'en garder que les siens ; `invitations (order_id)` ; et un index **partiel** sur `payment_webhooks … WHERE processed_at IS NULL`, dont la table est en ajout seul et ne cesse jamais de grandir — l'index, lui, reste minuscule à jamais.
+
+**Ce que la mesure a démenti, et qui n'est donc pas livré.** `StockLedger::sold()` joint les articles aux commandes pour ne compter que celles qui sont payées. À 200 000 commandes, un index couvrant `orders (id) INCLUDE (status)` faisait basculer le plan en boucle imbriquée et gagnait un tiers du temps — 33 ms à 22 ms. **À 500 000 commandes, le planificateur l'abandonne** : il repasse à une jointure par fusion qui parcourt l'index en entier, et le gain se réduit à presque rien.
+
+L'index n'est donc pas le levier ; le coût du parcours aléatoire dans le modèle de coûts de PostgreSQL l'est — `random_page_cost` vaut encore 4.0, une valeur calibrée pour des disques à plateaux, là où un SSD justifie 1.1. Livrer cet index aurait donné l'illusion d'avoir traité le sujet. Il reste consigné comme point ouvert plutôt qu'à moitié corrigé.
+
+**Un test relit le schéma** et signale toute nouvelle clé étrangère ajoutée sans index sur une table chaude, avec une liste d'exceptions assumées et motivées. Sans lui, le même défaut se reproduirait à la prochaine migration, avec la même discrétion.
+
+---
+
 ## D-063 — Deux surveillances distinctes : la sonde réveille, l'écran renseigne
 **2026-09-01**
 

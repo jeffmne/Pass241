@@ -328,7 +328,12 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
     **La séparation décide de qui est réveillé la nuit.** La sonde répond à « le service peut-il travailler ? » et s'adresse à un moniteur externe ; l'écran répond à « qu'est-ce qui est resté en chemin ? » et s'adresse à un humain le matin. Ma première version comptait les jobs en échec dans la sonde — un email d'invitation non parti aurait fait sonner une alerte de panne. Un test tient désormais cette frontière.
 
     **La panne la plus coûteuse qu'aucun écran ne montrait** : un callback de paiement reçu et jamais traité. L'argent a quitté le téléphone de l'acheteur, l'opérateur nous a prévenus, la commande est restée en attente — et il fallait que l'acheteur écrive pour qu'on l'apprenne.
-  - [ ] Performance
+  - [x] **Audit d'index, fait le 2026-09-01 (décision D-064)** — quatre index manquants sur les chemins chauds, dont un partiel ; test de couverture qui relit le schéma. 5 tests
+
+    **PostgreSQL n'indexe pas les colonnes de clé étrangère** — 29 colonnes du schéma étaient dans ce cas. Mesuré sur 200 000 lignes : `order_items WHERE order_id = ?` faisait un parcours séquentiel complet (10,7 ms, 199 999 lignes écartées) contre 2,5 ms avec l'index. Cette requête s'exécute à chaque ouverture de commande, chaque confirmation de paiement et chaque émission de billets.
+
+    **Ce que la mesure a démenti** : un index couvrant pour `StockLedger::sold()` gagnait un tiers du temps à 200 000 commandes, mais le planificateur l'abandonne à 500 000. Le levier est `random_page_cost` (encore réglé pour des disques à plateaux), pas l'index — consigné comme point ouvert plutôt que corrigé à moitié.
+  - [ ] Performance — reste : `random_page_cost` à 1.1 pour SSD (mesuré, non appliqué : réglage serveur), cache et pagination déjà en place
 - [x] **Déconnexion après inactivité, faite le 2026-08-28 (décision D-050)** — sortie de phase, demandée par Jeff : `ExpireInactiveSessions` sur le groupe `web`, `AUTH_IDLE_TIMEOUT` à 30 minutes, message nommant le délai, 419 pour Livewire. « Se souvenir de moi » passe à décoché par défaut — cochée, elle rendait l'expiration de session sans effet. 9 tests
 
 ### Phase 9 — Votes *(fonctionnalité future)*
