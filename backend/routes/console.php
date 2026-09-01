@@ -87,3 +87,23 @@ Schedule::command('pass241:expire-campaigns')
     ->timezone($timezone)
     ->withoutOverlapping()
     ->runInBackground();
+
+/*
+ * Cloture des scrutins arrives a leur date de fin, et figeage de leurs
+ * resultats (sections 86.4, 86.5).
+ *
+ * Meme propriete que les taches precedentes : le scrutin refuse deja les votes
+ * hors delai, `PollCategory::acceptsBallots()` verifiant les dates et non le
+ * statut. Un retard de cette tache ne laisse donc passer aucun bulletin — il
+ * laisse seulement une etiquette en retard, et un classement pas encore fige.
+ *
+ * Toutes les heures et non chaque nuit : un concours annonce se termine
+ * souvent a une heure precise, et le public vient lire le resultat dans la
+ * foulee. Attendre le lendemain afficherait « votes en cours » sur un scrutin
+ * termine.
+ */
+Schedule::command('pass241:close-polls')
+    ->hourly()
+    ->timezone($timezone)
+    ->withoutOverlapping()
+    ->runInBackground();

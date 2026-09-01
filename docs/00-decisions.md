@@ -182,6 +182,27 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-059 — Un classement proclamé se fige, le reste se calcule
+**2026-09-01**
+
+Jalon 9.5. `poll_results` est **la seule table du module Votes qui stocke un nombre de voix**, et c'est une exception assumée à la règle qui l'interdit partout ailleurs.
+
+**Pourquoi l'exception.** Pendant le scrutin, aucun total n'existe en base : tout est agrégé en SQL sur les bulletins, précisément pour qu'il n'y ait rien à falsifier (section 86.5). Mais un classement **publié** doit cesser de bouger. Un remboursement arrivé après la clôture retire de l'argent, et un recalcul ferait alors varier un revenu déjà annoncé — voire, si un bulletin changeait de statut, un rang déjà proclamé. Un concours dont le gagnant change trois jours après l'annonce n'est plus un concours.
+
+L'instantané ne remplace donc pas le calcul, il le **conserve**. Avant la clôture le classement se calcule ; après, il se lit.
+
+**En ajout seul**, comme les commissions : deux déclencheurs PostgreSQL refusent toute modification et toute suppression, y compris depuis une commande artisan ou psql.
+
+**Le nom du candidat est recopié** dans l'instantané. Si l'organisateur corrige une orthographe après la clôture, le rapport archivé garde le nom sous lequel le public a voté.
+
+**Les candidats désactivés y figurent**, à leur rang. Les retirer ferait mentir les totaux et donnerait le moyen d'effacer un candidat gênant après coup.
+
+**L'écran ne confond jamais les deux états** : bandeau « classement en cours, n'annoncez pas de gagnant » tant que rien n'est figé, bandeau « définitif » ensuite. Le rapport exporté porte la même distinction dans une colonne — un fichier téléchargé pendant le vote ne doit pas circuler comme s'il était le résultat.
+
+La tâche `pass241:close-polls` tourne à l'heure, et non chaque nuit : un concours se termine souvent à une heure précise, et le public vient lire le résultat dans la foulée. Elle est rejouable — l'unicité en base fait qu'une seconde exécution n'écrit rien — et balaye tous les scrutins clos, y compris ceux clos à la main.
+
+---
+
 ## D-058 — Le callback fait foi sur les frais, pas `get-fees`
 **2026-09-01**
 

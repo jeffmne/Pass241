@@ -7,15 +7,18 @@ use App\Enums\ExportFormat;
 use App\Enums\PermissionName;
 use App\Models\Campaign;
 use App\Models\Event;
+use App\Models\Poll;
 use App\Services\Audit\AuditLogger;
 use App\Services\Export\Exportable;
 use App\Services\Export\Exports\CampaignsExport;
 use App\Services\Export\Exports\DonationsExport;
 use App\Services\Export\Exports\OrdersExport;
 use App\Services\Export\Exports\ParticipantsExport;
+use App\Services\Export\Exports\PollResultsExport;
 use App\Services\Export\Exports\ScansExport;
 use App\Services\Export\ExportWriter;
 use App\Services\Fundraising\CampaignProgress;
+use App\Services\Voting\VotingStatistics;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -69,6 +72,18 @@ class ExportController extends Controller
     public function campaigns(string $format, CampaignProgress $progress): StreamedResponse
     {
         return $this->download(new CampaignsExport($progress), $format);
+    }
+
+    /**
+     * Rapport final d'un scrutin (section 86.4).
+     *
+     * `VotingStatistics` est injecte plutot que resolu dans l'export : celui-ci
+     * ne s'en sert que pour les categories PAS ENCORE figees, et le laisser le
+     * chercher lui-meme cacherait cette dependance.
+     */
+    public function pollResults(Poll $poll, string $format, VotingStatistics $statistics): StreamedResponse
+    {
+        return $this->download(new PollResultsExport($poll, $statistics), $format);
     }
 
     private function download(Exportable $export, string $format): StreamedResponse

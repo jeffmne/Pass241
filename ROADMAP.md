@@ -336,7 +336,9 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
   4. Le statut `REFUNDED` était **inatteignable** — le remboursement d'un vote payé n'avait aucun chemin (D-052)
   5. La vue écrasait sa collection de totaux dans la boucle : cassait **à partir de deux catégories**, la forme normale d'un scrutin
 - [ ] Jalon 9.4 — Vote payant : `Ballot` comme `Payable`, `PayableResolver`, commission, webhooks
-- [ ] Jalon 9.5 — Résultats, clôture, rapport : `VotingStatistics`, `poll_results` figés, tâche `ClosePolls`, écran exportable
+- [x] **Jalon 9.5 — Résultats, clôture, rapport, fait le 2026-09-01 (décision D-059)** : `poll_results` en ajout seul, `PollResultsFreezer`, tâche `ClosePolls` horaire, écran de résultats et rapport final exportable (CSV/Excel). 14 tests
+
+  **Le point de la conception** : pendant le scrutin rien n'est stocké — tout est agrégé sur les bulletins, pour qu'il n'y ait rien à falsifier. À la clôture ce calcul est **conservé**, parce qu'un classement proclamé doit cesser de bouger : un remboursement arrivé ensuite retire de l'argent, mais ne peut plus déplacer un rang déjà annoncé. L'écran et le rapport disent toujours lequel des deux ils montrent.
 
 **Reste ouvert, non bloquant :**
 - [x] ~~`Poll::publicUrl()` référence la route `polls.public`, qui n'existe qu'au jalon 9.3~~ — la route existe depuis le jalon 9.3

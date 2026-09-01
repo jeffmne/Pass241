@@ -112,6 +112,15 @@
                             </a>
                         @endif
 
+                        {{-- Les resultats des que le vote a commence : avant
+                             l'ouverture il n'y a rien a lire, et l'entree
+                             n'aurait qu'a decevoir. --}}
+                        @if ($poll->hasStarted())
+                            <a href="{{ route('polls.results', $poll) }}" wire:navigate class="btn btn-secondary">
+                                Resultats
+                            </a>
+                        @endif
+
                         @if ($canManage)
                             <a href="{{ route('polls.categories', $poll) }}" wire:navigate class="btn btn-secondary">
                                 Categories

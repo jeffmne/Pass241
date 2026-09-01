@@ -21,6 +21,7 @@ use App\Livewire\Dashboard\Campaigns\Index as CampaignIndex;
 use App\Livewire\Dashboard\Polls\Categories as PollCategories;
 use App\Livewire\Dashboard\Polls\Form as PollForm;
 use App\Livewire\Dashboard\Polls\Index as PollIndex;
+use App\Livewire\Dashboard\Polls\Results as PollResults;
 use App\Livewire\Dashboard\Events\AccessControl as EventAccessControl;
 use App\Livewire\Dashboard\Events\Entries as EventEntries;
 use App\Livewire\Dashboard\Events\Form as EventForm;
@@ -286,6 +287,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/votes/{poll}/categories', PollCategories::class)
             ->name('polls.categories');
 
+        /*
+         * Resultats d'un scrutin (sections 86.4, 87).
+         *
+         * `votes.view` suffit — l'ecran lui-meme le verifie : consulter un
+         * classement n'est pas gerer un concours, et c'est souvent le
+         * co-organisateur qui l'annonce.
+         */
+        Route::get('/votes/{poll}/resultats', PollResults::class)
+            ->name('polls.results');
+
         // Section 24.1 : le client demande, l'organisateur decide.
         Route::get('/remboursements', DashboardRefunds::class)->name('refunds.index');
 
@@ -308,6 +319,8 @@ Route::middleware('auth')->group(function () {
                 ->name('donations');
             Route::get('/collectes/{format}', [ExportController::class, 'campaigns'])
                 ->name('campaigns');
+            Route::get('/votes/{poll}/resultats/{format}', [ExportController::class, 'pollResults'])
+                ->name('poll-results');
         })->whereIn('format', ExportFormat::values());
     });
 });
