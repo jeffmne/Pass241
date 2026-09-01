@@ -127,15 +127,19 @@ class ProcessPaymentWebhook implements ShouldQueue
          * l'operateur, soit une tentative de manipulation. Dans les deux cas,
          * confirmer serait pire que ne rien faire : le message est conserve et
          * signale, la transaction reste en attente.
+         *
+         * DEUX NIVEAUX, parce que tous les prestataires ne donnent pas la meme
+         * chose. Le total debite est ce qu'on prefere comparer ; certains ne
+         * l'exposent pas — PVit facture en deux composantes et n'en publie
+         * qu'une sur son API de statut. On compare alors le SOUS-TOTAL qu'il a
+         * enregistre a celui qu'on lui a envoye. C'est moins, mais ce n'est pas
+         * rien : sans ce repli, la verification sautait entierement, en
+         * silence, sur le chemin de l'argent.
          */
-        $amount = $payload['amount'] ?? null;
+        $verification = $this->verifyAmount($payable, $payload);
 
-        if (is_numeric($amount) && (int) $amount !== $payable->paymentAmount()) {
-            $webhook->markProcessed(sprintf(
-                'Montant incoherent : %s recu, %s attendu.',
-                (int) $amount,
-                $payable->paymentAmount(),
-            ));
+        if ($verification !== null) {
+            $webhook->markProcessed($verification);
 
             return;
         }
@@ -146,7 +150,19 @@ class ProcessPaymentWebhook implements ShouldQueue
                 is_string($payload['provider_reference'] ?? null) ? $payload['provider_reference'] : null,
             );
 
-            $webhook->markProcessed('Paiement confirme.');
+            /*
+             * L'absence de verification est DITE, et non passee sous silence.
+             *
+             * Un prestataire qui ne rend ni total ni sous-total nous fait
+             * confirmer sans rien pouvoir comparer. C'est peut-etre acceptable,
+             * mais cela doit se voir dans le journal — c'est exactement le
+             * genre de trou qui ne se remarque pas avant qu'il ne coute.
+             */
+            $webhook->markProcessed(
+                $this->amountWasComparable($payload)
+                    ? 'Paiement confirme.'
+                    : 'Paiement confirme (montant non verifiable).'
+            );
         } catch (RuntimeException $e) {
             /*
              * Section 17.1 : le stock ne suffit plus. L'argent est encaisse,
@@ -158,5 +174,52 @@ class ProcessPaymentWebhook implements ShouldQueue
              */
             $webhook->markProcessed('A rembourser — '.$e->getMessage());
         }
+    }
+
+    /**
+     * Compare ce que le prestataire a enregistre a ce que nous attendions.
+     *
+     * Rend le motif du refus, ou null si rien ne s'oppose a la confirmation —
+     * y compris quand aucune comparaison n'etait possible. Ne pas pouvoir
+     * verifier n'est pas une raison de refuser : l'argent est parti, et laisser
+     * la transaction en attente indefiniment serait pire que de la confirmer.
+     * C'est en revanche une raison de le DIRE, ce que fait l'appelant.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function verifyAmount(Payable&Model $payable, array $payload): ?string
+    {
+        $amount = $payload['amount'] ?? null;
+
+        if (is_numeric($amount)) {
+            return (int) $amount === $payable->paymentAmount()
+                ? null
+                : sprintf(
+                    'Montant incoherent : %s recu, %s attendu.',
+                    (int) $amount,
+                    $payable->paymentAmount(),
+                );
+        }
+
+        $subtotal = $payload['subtotal'] ?? null;
+
+        if (is_numeric($subtotal)) {
+            return (int) $subtotal === $payable->commissionBase()
+                ? null
+                : sprintf(
+                    'Sous-total incoherent : %s enregistre chez le prestataire, %s attendu.',
+                    (int) $subtotal,
+                    $payable->commissionBase(),
+                );
+        }
+
+        return null;
+    }
+
+    /** Le prestataire a-t-il donne de quoi verifier quoi que ce soit ? */
+    private function amountWasComparable(array $payload): bool
+    {
+        return is_numeric($payload['amount'] ?? null)
+            || is_numeric($payload['subtotal'] ?? null);
     }
 }

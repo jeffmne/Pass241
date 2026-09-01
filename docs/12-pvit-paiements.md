@@ -252,6 +252,14 @@ Ne jamais coder `200` en dur. La documentation est explicite : sans cet écho, l
 
 ---
 
+### La vérification de montant n'est pas gratuite avec PVit
+
+L'API de statut ne publie **que la part PVit** des frais : le total débité n'est pas reconstituable. Une vérification du type « le montant reçu correspond-il au total attendu » **saute donc entièrement**, en silence, sur ce prestataire.
+
+Ce qui reste comparable, et qu'il faut comparer : **le sous-total enregistré chez PVit** (`amount` de la réponse de statut) contre celui qu'on lui a envoyé. C'est moins que la vérification du total, mais cela attrape un montant enregistré de travers.
+
+Et quand aucune comparaison n'est possible, **le dire dans le journal** plutôt que de confirmer silencieusement — ne pas pouvoir vérifier n'est pas une raison de refuser un paiement déjà encaissé, c'en est une de le signaler.
+
 ### Ne jamais dépendre du callback seul
 
 Mesuré : une transaction traitée par PVit — statut définitif disponible sur leur API — **sans qu'aucune notification ne soit envoyée**. Le repli par interrogation du statut n'est pas un confort, c'est ce qui fait que le paiement se dénoue quand même.

@@ -115,6 +115,9 @@ class PaymentWebhookController extends Controller
                     'order_reference' => $result->orderReference,
                     'provider_reference' => $result->providerReference,
                     'amount' => $result->amount,
+                    // Repli de verification quand le prestataire ne permet pas
+                    // de reconstituer le total debite.
+                    'subtotal' => $result->subtotal,
                     'failure_reason' => $result->failureReason,
                 ]],
                 'ip_address' => $request->ip(),

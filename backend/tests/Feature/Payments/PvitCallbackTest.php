@@ -244,3 +244,67 @@ it('construit l\'accuse depuis la requete, et non depuis nos donnees', function 
     expect(app(PvitProvider::class)->callbackAcknowledgement($requete))
         ->toBe(['transactionId' => 'PAY999', 'responseCode' => 418]);
 });
+
+/*
+ * ---------------------------------------------------------------------------
+ * La verification de montant
+ * ---------------------------------------------------------------------------
+ */
+
+it('refuse de confirmer quand PVit a enregistre un autre sous-total', function () {
+    /*
+     * PVit ne publie pas le total debite sur son API de statut — il facture en
+     * deux composantes et n'en montre qu'une. La verification de montant
+     * sautait donc entierement sur ce chemin, EN SILENCE : un paiement etait
+     * confirme sans que rien ne soit compare.
+     *
+     * Le repli compare ce qui est comparable : le sous-total enregistre chez le
+     * prestataire doit etre celui qu'on lui a envoye.
+     */
+    Http::fake([
+        '*renew-secret*' => Http::response(['secret' => 'sk_test_x', 'expires_in' => 3600]),
+        '*status*' => Http::response([
+            'status' => 'SUCCESS',
+            // 200 la ou le bulletin en vaut 1 000.
+            'amount' => 200,
+            'fees' => 5,
+            'merchant_reference_id' => 'VTTEST001',
+        ]),
+    ]);
+
+    $this->postJson('/api/webhooks/payments/pvit', ($this->notification)())->assertOk();
+
+    expect($this->ballot->fresh()->status)->toBe(BallotStatus::Pending);
+
+    expect(PaymentWebhook::query()->where('provider', 'pvit')->latest('id')->first()->outcome)
+        ->toContain('Sous-total incoherent');
+});
+
+it('confirme quand le sous-total enregistre correspond au notre', function () {
+    ($this->pvitRepond)('SUCCESS');
+
+    $this->postJson('/api/webhooks/payments/pvit', ($this->notification)())->assertOk();
+
+    expect($this->ballot->fresh()->status)->toBe(BallotStatus::Confirmed)
+        ->and(PaymentWebhook::query()->where('provider', 'pvit')->latest('id')->first()->outcome)
+        ->toBe('Paiement confirme.');
+});
+
+it('signale au journal quand aucun montant n\'etait verifiable', function () {
+    /*
+     * Un prestataire qui ne rend ni total ni sous-total nous fait confirmer
+     * sans rien pouvoir comparer. Ce n'est pas une raison de refuser — l'argent
+     * est parti — mais cela doit se VOIR : c'est le genre de trou qui ne se
+     * remarque pas avant qu'il ne coute.
+     */
+    Http::fake([
+        '*renew-secret*' => Http::response(['secret' => 'sk_test_x', 'expires_in' => 3600]),
+        '*status*' => Http::response(['status' => 'SUCCESS', 'merchant_reference_id' => 'VTTEST001']),
+    ]);
+
+    $this->postJson('/api/webhooks/payments/pvit', ($this->notification)())->assertOk();
+
+    expect($this->ballot->fresh()->status)->toBe(BallotStatus::Confirmed)
+        ->and(PaymentWebhook::query()->where('provider', 'pvit')->latest('id')->first()->outcome)
+        ->toContain('non verifiable');
+});

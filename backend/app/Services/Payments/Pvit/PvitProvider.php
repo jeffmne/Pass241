@@ -187,7 +187,38 @@ class PvitProvider implements AcknowledgesCallbacks, CollectionProvider
             failureReason: $this->failureFrom($payload),
             amount: $this->debitedAmount($payload),
             raw: $payload,
+            // Ce que PVit a enregistre hors frais. C'est le montant que nous lui
+            // avons envoye : le comparer au notre attrape un montant enregistre
+            // de travers, la ou le total n'est pas reconstituable.
+            subtotal: $this->recordedSubtotal($payload),
         );
+    }
+
+    /**
+     * Sous-total tel que PVit l'a enregistre, hors frais.
+     *
+     * PVit renvoie sous `amount` le montant que NOUS lui avons envoye —
+     * verifie sur transactions reelles : envoye 2 000, `amount` 2 000, frais a
+     * cote. C'est donc une valeur comparable a notre `commissionBase()`, et la
+     * seule que ce prestataire rende de facon fiable.
+     *
+     * Elle vaut moins que la verification du total debite, puisqu'elle ne dit
+     * rien des frais. Mais elle attrape ce qui compte : un montant enregistre
+     * de travers chez le prestataire. Sans elle, aucune verification de montant
+     * n'avait lieu du tout sur ce chemin.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function recordedSubtotal(array $payload): ?int
+    {
+        if (! isset($payload['amount'])) {
+            return null;
+        }
+
+        // Les montants arrivent en flottants alors que le franc CFA n'a pas de
+        // subdivision : un sous-total est toujours entier, l'arrondi ne fait
+        // que retirer une decimale de representation.
+        return (int) round((float) $payload['amount']);
     }
 
     /**
@@ -328,6 +359,9 @@ class PvitProvider implements AcknowledgesCallbacks, CollectionProvider
             // celle qui a fait foi. En cas de litige, l'ecart entre les deux
             // est precisement ce qu'on voudra regarder.
             raw: ['callback' => (array) $request->all(), 'verified' => $verified],
+            // Lu sur la reponse VERIFIEE, jamais sur le corps du callback : un
+            // montant tire d'un message non signe ne verifierait rien.
+            subtotal: $this->recordedSubtotal($verified),
         );
     }
 
