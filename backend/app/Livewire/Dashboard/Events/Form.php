@@ -8,6 +8,7 @@ use App\Data\EventDraft;
 use App\Enums\EventCategory;
 use App\Enums\EventVisibility;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Event;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
@@ -26,6 +27,7 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class Form extends Component
 {
+    use RequiresPermission;
     use WithFileUploads;
 
     public ?Event $event = null;
@@ -65,10 +67,13 @@ class Form extends Component
 
     public $cover = null;
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::EventsManage;
+    }
+
     public function mount(?Event $event = null): void
     {
-        abort_unless(auth()->user()->can(PermissionName::EventsManage->value), 403);
-
         if (! $event?->exists) {
             return;
         }

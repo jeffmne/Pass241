@@ -6,6 +6,7 @@ use App\Actions\Campaigns\PublishCampaign;
 use App\Actions\Campaigns\SaveCampaign;
 use App\Data\CampaignDraft;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Campaign;
 use App\Services\Fundraising\CampaignProgress;
 use Illuminate\Support\Carbon;
@@ -29,6 +30,7 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class Form extends Component
 {
+    use RequiresPermission;
     use WithFileUploads;
 
     public ?Campaign $campaign = null;
@@ -60,10 +62,13 @@ class Form extends Component
 
     public bool $confirmingCancellation = false;
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::CampaignsManage;
+    }
+
     public function mount(?Campaign $campaign = null): void
     {
-        abort_unless(auth()->user()->can(PermissionName::CampaignsManage->value), 403);
-
         if (! $campaign?->exists) {
             return;
         }

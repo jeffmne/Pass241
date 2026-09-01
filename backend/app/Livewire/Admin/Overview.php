@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Livewire\Concerns\SuperAdminOnly;
 use App\Models\AuditLog;
 use App\Services\Statistics\PlatformStatistics;
 use Livewire\Attributes\Layout;
@@ -20,6 +21,8 @@ use Livewire\Component;
 #[Layout('components.layouts.admin')]
 class Overview extends Component
 {
+    use SuperAdminOnly;
+
     public function render()
     {
         $statistics = app(PlatformStatistics::class);

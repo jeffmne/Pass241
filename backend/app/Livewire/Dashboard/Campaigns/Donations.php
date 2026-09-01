@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard\Campaigns;
 
 use App\Actions\Donations\RefundDonation;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Campaign;
 use App\Models\Donation;
 use App\Services\Fundraising\CampaignProgress;
@@ -36,6 +37,7 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class Donations extends Component
 {
+    use RequiresPermission;
     use WithPagination;
 
     public Campaign $campaign;
@@ -48,10 +50,13 @@ class Donations extends Component
 
     public string $refundReason = '';
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::CampaignsView;
+    }
+
     public function mount(Campaign $campaign): void
     {
-        abort_unless(auth()->user()->can(PermissionName::CampaignsView->value), 403);
-
         $this->campaign = $campaign;
     }
 

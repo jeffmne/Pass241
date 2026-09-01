@@ -5,6 +5,7 @@ namespace App\Livewire\Dashboard\Events;
 use App\Actions\Access\AssignAgent;
 use App\Enums\AuditAction;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\AccessScan;
 use App\Models\EntryPoint;
 use App\Models\Event;
@@ -34,6 +35,8 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class AccessControl extends Component
 {
+    use RequiresPermission;
+
     public Event $event;
 
     /* Point d'entree */
@@ -57,10 +60,13 @@ class AccessControl extends Component
     /** Identifiants a transmettre, affiches une seule fois. */
     public ?array $newAgentCredentials = null;
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::AccessControlManage;
+    }
+
     public function mount(Event $event): void
     {
-        abort_unless(auth()->user()->can(PermissionName::AccessControlManage->value), 403);
-
         $this->event = $event;
     }
 

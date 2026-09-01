@@ -8,6 +8,7 @@ use App\Enums\AuditAction;
 use App\Enums\InvitationStatus;
 use App\Enums\PermissionName;
 use App\Jobs\SendInvitationEmail;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Event;
 use App\Models\Invitation;
 use App\Models\TicketType;
@@ -36,6 +37,8 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class Invitations extends Component
 {
+    use RequiresPermission;
+
     public Event $event;
 
     public bool $showForm = false;
@@ -59,10 +62,13 @@ class Invitations extends Component
     /** Lien affiche apres creation, a copier et transmettre. */
     public ?array $lastCreated = null;
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::InvitationsManage;
+    }
+
     public function mount(Event $event): void
     {
-        abort_unless(auth()->user()->can(PermissionName::InvitationsManage->value), 403);
-
         $this->event = $event;
         $this->expiresAt = $this->defaultExpiry()->format('Y-m-d\TH:i');
     }

@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\PayoutState;
+use App\Livewire\Concerns\SuperAdminOnly;
 use App\Models\Settlement;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -28,6 +29,8 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.admin')]
 class Settlements extends Component
 {
+    use SuperAdminOnly;
+
     use WithPagination;
 
     public string $filter = 'all';

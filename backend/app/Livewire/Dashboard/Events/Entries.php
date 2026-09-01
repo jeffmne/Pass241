@@ -5,6 +5,7 @@ namespace App\Livewire\Dashboard\Events;
 use App\Enums\PermissionName;
 use App\Enums\ScanResult;
 use App\Enums\TicketStatus;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\AccessScan;
 use App\Models\EntryPoint;
 use App\Models\Event;
@@ -39,6 +40,7 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.app')]
 class Entries extends Component
 {
+    use RequiresPermission;
     use WithPagination;
 
     public Event $event;
@@ -54,6 +56,11 @@ class Entries extends Component
     #[Url(as: 'q')]
     public string $search = '';
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::AttendeesView;
+    }
+
     public function mount(Event $event): void
     {
         /*
@@ -61,7 +68,6 @@ class Entries extends Component
          * personnes. Gerer les portes et lire la liste de ceux qui sont entres
          * sont deux droits differents, et c'est le second qui est en jeu ici.
          */
-        abort_unless(auth()->user()->can(PermissionName::AttendeesView->value), 403);
 
         $this->event = $event;
     }

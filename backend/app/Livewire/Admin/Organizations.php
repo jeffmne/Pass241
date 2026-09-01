@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\TicketStatus;
+use App\Livewire\Concerns\SuperAdminOnly;
 use App\Models\Organization;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Layout;
@@ -20,6 +21,8 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.admin')]
 class Organizations extends Component
 {
+    use SuperAdminOnly;
+
     use WithPagination;
 
     public string $search = '';

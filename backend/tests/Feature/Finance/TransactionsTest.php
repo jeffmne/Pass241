@@ -310,8 +310,14 @@ it('n\'offre aucun chemin d\'ecriture', function () {
         ->map(fn (ReflectionMethod $method) => $method->getName())
         ->reject(fn (string $name) => in_array($name, $inherited, true));
 
+    /*
+     * Plus de `mount` : la garde `finances.view` a rejoint le trait
+     * `RequiresPermission`, qui la rejoue a CHAQUE requete au lieu du seul
+     * montage. Il ne reste donc ici que deux reactions de filtre et le rendu —
+     * aucune ne peut ecrire.
+     */
     expect($actions->all())
-        ->toEqualCanonicalizing(['mount', 'updatingModule', 'updatingPeriod', 'render']);
+        ->toEqualCanonicalizing(['updatingModule', 'updatingPeriod', 'render']);
 });
 
 /*

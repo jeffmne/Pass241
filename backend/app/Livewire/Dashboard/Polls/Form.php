@@ -7,6 +7,7 @@ use App\Actions\Polls\SavePoll;
 use App\Data\PollDraft;
 use App\Enums\PermissionName;
 use App\Enums\ResultsVisibility;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Poll;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\Layout;
@@ -29,6 +30,7 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class Form extends Component
 {
+    use RequiresPermission;
     use WithFileUploads;
 
     public ?Poll $poll = null;
@@ -56,10 +58,13 @@ class Form extends Component
 
     public bool $confirmingCancellation = false;
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::VotesManage;
+    }
+
     public function mount(?Poll $poll = null): void
     {
-        abort_unless(auth()->user()->can(PermissionName::VotesManage->value), 403);
-
         if (! $poll?->exists) {
             // Une fenetre par defaut plutot que deux champs vides : la plupart
             // des concours durent une a deux semaines, et l'organisateur

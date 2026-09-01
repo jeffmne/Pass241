@@ -182,6 +182,25 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-062 — Les gardes d'écran s'exécutent à chaque requête, plus seulement au montage
+**2026-09-01**
+
+Toutes les autorisations d'écran passent des traits `RequiresPermission` (dashboard) et `SuperAdminOnly` (console d'administration), qui posent leur garde dans le hook Livewire `booted` au lieu de `mount`.
+
+**Le défaut.** `mount` ne s'exécute qu'au premier chargement d'une page. Livewire ne le rappelle jamais ensuite : un clic poste sur `/livewire/update`, qui réhydrate le composant depuis son instantané et appelle directement la méthode demandée. Une garde posée dans `mount` ne protège donc que l'ouverture de l'écran, jamais sa durée de vie.
+
+Tant qu'un écran ne fait que lire, la conséquence est mince. Mais ces écrans **écrivent**, et leurs méthodes d'écriture ne portaient pour la plupart aucune garde propre — elles s'appuyaient entièrement sur celle du montage. Deux tests l'ont établi avant toute correction : un membre dont l'organisateur venait de retirer les droits créait encore un **tarif de billet** et une **catégorie de concours**, tant que son onglet restait ouvert.
+
+**Le même défaut, en pire, sur la console d'administration.** Elle est protégée par le middleware `EnsureSuperAdmin` sur ses routes — or Livewire ne rejoue sur `/livewire/update` qu'une liste blanche de middlewares, dont celui-ci ne fait pas partie. Et aucun des sept écrans ne se gardait lui-même. Quelqu'un dont le statut de Super Admin venait d'être retiré gardait donc la main sur toute la console, **y compris sur l'écran qui fixe les taux de commission de la plateforme** (section 58). Un test le reproduisait : rétrogradation après montage, puis `save()` sur le taux billetterie — accepté.
+
+**Une règle d'autorisation qui dépend de la durée de vie d'un onglet n'en est pas une.** C'est ce qui a tranché, et non la probabilité du scénario.
+
+**Deux protections qui se recouvrent, volontairement.** `EnsureSuperAdmin` rejoint la liste blanche persistante de Livewire — il couvre la requête ; le trait couvre le composant. Un futur écran d'administration ajouté hors du groupe de routes resterait couvert par le second.
+
+**Ce qui n'a pas changé** : les gardes plus strictes propres à une opération restent à leur place. Consulter les remboursements demande `finances.view`, en trancher un demande en plus `finances.refund` (section 24.1). Les traits posent le plancher, ils ne remplacent pas ces vérifications.
+
+---
+
 ## D-061 — Le grand livre des transactions, et la règle de signe des remboursements
 **2026-09-01**
 

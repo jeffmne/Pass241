@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard\Events;
 
 use App\Enums\AuditAction;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Event;
 use App\Models\TicketType;
 use App\Services\Audit\AuditLogger;
@@ -21,6 +22,8 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class TicketTypes extends Component
 {
+    use RequiresPermission;
+
     public Event $event;
 
     public ?int $editingId = null;
@@ -45,10 +48,13 @@ class TicketTypes extends Component
 
     public bool $isActive = true;
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::TicketingManage;
+    }
+
     public function mount(Event $event): void
     {
-        abort_unless(auth()->user()->can(PermissionName::TicketingManage->value), 403);
-
         $this->event = $event;
     }
 

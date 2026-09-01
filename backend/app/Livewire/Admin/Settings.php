@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\CommissionType;
+use App\Livewire\Concerns\SuperAdminOnly;
 use App\Services\Platform\PlatformSettings;
 use InvalidArgumentException;
 use Livewire\Attributes\Layout;
@@ -32,6 +33,8 @@ use Livewire\Component;
 #[Layout('components.layouts.admin')]
 class Settings extends Component
 {
+    use SuperAdminOnly;
+
     /** Taux en POURCENTAGE a l'ecran, en points de base en base. */
     public string $ticketingRate = '';
 

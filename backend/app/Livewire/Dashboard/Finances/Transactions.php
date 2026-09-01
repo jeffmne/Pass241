@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard\Finances;
 
 use App\Enums\CommissionType;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Services\Finance\TransactionLedger;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -39,7 +40,7 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.app')]
 class Transactions extends Component
 {
-    use WithPagination;
+    use RequiresPermission, WithPagination;
 
     /**
      * Filtres portes par l'URL.
@@ -55,13 +56,9 @@ class Transactions extends Component
     #[Url]
     public string $period = TransactionLedger::DEFAULT_PERIOD;
 
-    public function mount(): void
+    protected function requiredPermission(): PermissionName
     {
-        abort_unless(
-            auth()->user()?->can(PermissionName::FinancesView->value),
-            403,
-            'Vous n\'avez pas acces aux finances de cette organisation.'
-        );
+        return PermissionName::FinancesView;
     }
 
     public function updatingModule(): void

@@ -7,6 +7,7 @@ use App\Enums\DonationStatus;
 use App\Enums\PayoutState;
 use App\Enums\RefundStatus;
 use App\Enums\TicketStatus;
+use App\Livewire\Concerns\SuperAdminOnly;
 use App\Models\AuditLog;
 use App\Models\Campaign;
 use App\Models\Event;
@@ -39,6 +40,8 @@ use RuntimeException;
 #[Layout('components.layouts.admin')]
 class OrganizationDetail extends Component
 {
+    use SuperAdminOnly;
+
     public Organization $organization;
 
     public bool $confirming = false;

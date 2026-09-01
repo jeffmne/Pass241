@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard\Polls;
 
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Poll;
 use App\Models\PollResult;
 use App\Services\Voting\PollResultsFreezer;
@@ -31,7 +32,14 @@ use Livewire\Component;
 #[Layout('components.layouts.app')]
 class Results extends Component
 {
+    use RequiresPermission;
+
     public Poll $poll;
+
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::VotesView;
+    }
 
     public function mount(Poll $poll): void
     {
@@ -45,7 +53,6 @@ class Results extends Component
          * dans le groupe de routes, comme partout ailleurs : un scrutin d'une
          * autre organisation n'arrive jamais jusqu'ici.
          */
-        abort_unless(auth()->user()->can(PermissionName::VotesView->value), 403);
 
         $this->poll = $poll;
     }

@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard\Events;
 
 use App\Enums\EventStatus;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Event;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -21,6 +22,7 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.app')]
 class Index extends Component
 {
+    use RequiresPermission;
     use WithPagination;
 
     #[Url(as: 'statut', except: '')]
@@ -29,9 +31,13 @@ class Index extends Component
     #[Url(as: 'q', except: '')]
     public string $search = '';
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::EventsView;
+    }
+
     public function mount(): void
     {
-        abort_unless(auth()->user()->can(PermissionName::EventsView->value), 403);
     }
 
     public function updatedSearch(): void

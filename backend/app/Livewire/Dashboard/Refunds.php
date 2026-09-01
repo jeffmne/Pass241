@@ -5,6 +5,7 @@ namespace App\Livewire\Dashboard;
 use App\Actions\Refunds\DecideRefund;
 use App\Enums\PermissionName;
 use App\Enums\RefundStatus;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\RefundRequest;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -24,7 +25,7 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class Refunds extends Component
 {
-    use WithPagination;
+    use RequiresPermission, WithPagination;
 
     public string $filter = 'pending';
 
@@ -32,24 +33,18 @@ class Refunds extends Component
     public array $reasons = [];
 
     /**
-     * L'ECRAN GARDE SON PROPRE ACCES, comme partout ailleurs (section 9).
+     * `finances.view` pour entrer, `finances.refund` pour trancher.
      *
-     * La route ne porte aucune permission, et le menu ne montre l'entree
-     * « Finances » qu'a qui a le droit — mais un menu qui cache n'est pas un
-     * verrou : l'adresse restait atteignable en la tapant. Un co-organisateur,
-     * qui gere l'operationnel sans acces aux finances (section 10), lisait ici
-     * des montants et des numeros de telephone d'acheteurs.
-     *
-     * `finances.view` pour entrer, `finances.refund` pour trancher : la seconde
-     * etait deja verifiee, la premiere manquait.
+     * La seconde etait deja verifiee, la premiere manquait : la route ne porte
+     * aucune permission, et le menu ne montre l'entree « Finances » qu'a qui a
+     * le droit — mais un menu qui cache n'est pas un verrou. L'adresse restait
+     * atteignable en la tapant, et un co-organisateur, qui gere l'operationnel
+     * sans acces aux finances (section 10), lisait ici des montants et des
+     * numeros de telephone d'acheteurs.
      */
-    public function mount(): void
+    protected function requiredPermission(): PermissionName
     {
-        abort_unless(
-            auth()->user()?->can(PermissionName::FinancesView->value),
-            403,
-            'Vous n\'avez pas acces aux finances de cette organisation.'
-        );
+        return PermissionName::FinancesView;
     }
 
     public function updatingFilter(): void

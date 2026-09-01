@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard\Campaigns;
 
 use App\Enums\CampaignStatus;
 use App\Enums\PermissionName;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Campaign;
 use App\Services\Fundraising\CampaignProgress;
 use Livewire\Attributes\Layout;
@@ -22,6 +23,7 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.app')]
 class Index extends Component
 {
+    use RequiresPermission;
     use WithPagination;
 
     #[Url(as: 'statut', except: '')]
@@ -30,9 +32,13 @@ class Index extends Component
     #[Url(as: 'q', except: '')]
     public string $search = '';
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::CampaignsView;
+    }
+
     public function mount(): void
     {
-        abort_unless(auth()->user()->can(PermissionName::CampaignsView->value), 403);
     }
 
     public function updatedSearch(): void

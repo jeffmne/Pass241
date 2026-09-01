@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\OrderStatus;
+use App\Livewire\Concerns\SuperAdminOnly;
 use App\Models\Order;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -23,6 +24,8 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.admin')]
 class Transactions extends Component
 {
+    use SuperAdminOnly;
+
     use WithPagination;
 
     public string $search = '';

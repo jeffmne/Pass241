@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\AuditAction;
+use App\Livewire\Concerns\SuperAdminOnly;
 use App\Models\AuditLog;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -28,6 +29,8 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.admin')]
 class AuditTrail extends Component
 {
+    use SuperAdminOnly;
+
     use WithPagination;
 
     public string $action = '';

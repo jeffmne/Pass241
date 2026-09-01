@@ -6,6 +6,7 @@ use App\Actions\Polls\SaveCandidate;
 use App\Actions\Polls\SavePollCategory;
 use App\Enums\PermissionName;
 use App\Enums\ResultsVisibility;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Ballot;
 use App\Models\Candidate;
 use App\Models\Poll;
@@ -32,6 +33,7 @@ use RuntimeException;
 #[Layout('components.layouts.app')]
 class Categories extends Component
 {
+    use RequiresPermission;
     use WithFileUploads;
 
     public Poll $poll;
@@ -80,10 +82,13 @@ class Categories extends Component
 
     public $candidatePhoto = null;
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::VotesManage;
+    }
+
     public function mount(Poll $poll): void
     {
-        abort_unless(auth()->user()->can(PermissionName::VotesManage->value), 403);
-
         $this->poll = $poll;
     }
 

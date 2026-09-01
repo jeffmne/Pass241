@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Http\Middleware\EnsureOrganizationContext;
+use App\Http\Middleware\EnsureSuperAdmin;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -59,6 +60,26 @@ class AppServiceProvider extends ServiceProvider
          */
         Livewire::addPersistentMiddleware([
             EnsureOrganizationContext::class,
+
+            /*
+             * MEME PIEGE, CONSEQUENCE PLUS GRAVE.
+             *
+             * La console d'administration est protegee par `EnsureSuperAdmin`
+             * sur ses routes. Ce middleware n'etant pas dans la liste blanche
+             * de Livewire, il ne s'executait qu'au chargement de la page : les
+             * clics suivants passaient sans lui. Quelqu'un dont le statut de
+             * Super Admin venait d'etre retire gardait donc la main sur la
+             * console tant que son onglet restait ouvert — y compris sur
+             * l'ecran qui fixe les taux de commission de la plateforme
+             * (section 58).
+             *
+             * Les composants portent en plus le trait `SuperAdminOnly`, qui
+             * garde le composant lui-meme. Le recouvrement est voulu : celui-ci
+             * couvre la requete, l'autre couvre l'ecran — et un futur ecran
+             * d'administration ajoute hors de ce groupe de routes resterait
+             * couvert par le second.
+             */
+            EnsureSuperAdmin::class,
         ]);
     }
 }

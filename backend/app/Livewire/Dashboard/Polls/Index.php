@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard\Polls;
 
 use App\Enums\PermissionName;
 use App\Enums\PollStatus;
+use App\Livewire\Concerns\RequiresPermission;
 use App\Models\Poll;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -21,6 +22,7 @@ use Livewire\WithPagination;
 #[Layout('components.layouts.app')]
 class Index extends Component
 {
+    use RequiresPermission;
     use WithPagination;
 
     #[Url(as: 'statut', except: '')]
@@ -29,9 +31,13 @@ class Index extends Component
     #[Url(as: 'q', except: '')]
     public string $search = '';
 
+    protected function requiredPermission(): PermissionName
+    {
+        return PermissionName::VotesView;
+    }
+
     public function mount(): void
     {
-        abort_unless(auth()->user()->can(PermissionName::VotesView->value), 403);
     }
 
     public function updatedSearch(): void
