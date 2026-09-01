@@ -6,6 +6,7 @@ use App\Actions\Polls\SaveCandidate;
 use App\Actions\Polls\SavePollCategory;
 use App\Enums\PermissionName;
 use App\Enums\ResultsVisibility;
+use App\Models\Ballot;
 use App\Models\Candidate;
 use App\Models\Poll;
 use App\Models\PollCategory;
@@ -339,10 +340,24 @@ class Categories extends Component
         return view('livewire.dashboard.polls.categories', [
             'categories' => $this->poll->categories()->with('candidates')->get(),
             'visibilities' => ResultsVisibility::cases(),
-            // Termes economiques figes une fois le vote ouvert : quelqu'un qui a
-            // paye son vote l'a fait sous les regles annoncees.
-            'termsEditable' => ! $this->poll->displayStatus()->acceptsBallots()
-                && ! $this->poll->status->isClosed(),
+            /*
+             * Termes economiques modifiables tant qu'AUCUN BULLETIN n'existe
+             * dans la categorie en cours d'edition — et non tant que le vote
+             * n'est pas ouvert (decision D-060).
+             *
+             * Meme seuil que la billetterie, ou un tarif reste modifiable tant
+             * que rien n'est vendu, meme sur un evenement publie : ce qui
+             * engage n'est pas l'annonce, c'est l'acte. Des le premier
+             * bulletin, ils se figent — quelqu'un qui a paye son vote l'a fait
+             * sous ces regles.
+             *
+             * Une NOUVELLE categorie est toujours modifiable : elle n'a par
+             * construction aucun bulletin.
+             */
+            'termsEditable' => ! $this->poll->status->isClosed()
+                && ($this->editingCategory === 0
+                    || ! Ballot::query()->acrossOrganizations()
+                        ->where('poll_category_id', $this->editingCategory)->exists()),
             'isPublished' => $this->poll->isPublished(),
             'blockers' => $this->poll->publicationBlockers(),
         ]);

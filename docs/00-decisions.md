@@ -182,6 +182,21 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-060 — Les termes d'une catégorie se figent au premier bulletin, pas à l'ouverture
+**2026-09-01**
+
+Point laissé ouvert au jalon 9.2, refermé maintenant. Gratuité, prix unitaire, plafond, fenêtre et visibilité d'une catégorie restaient modifiables jusqu'à l'ouverture du vote ; ils le restent désormais **tant qu'aucun bulletin n'existe dans cette catégorie**.
+
+**Pourquoi l'ancien seuil était trop large.** Un organisateur qui ouvre son concours, s'aperçoit que le prix du vote comporte un zéro de trop et n'a encore aucun votant devait annuler tout le scrutin et le recréer — en perdant le lien déjà partagé. Le coût était réel, le bénéfice nul.
+
+**Le seuil retenu suit le précédent de la billetterie**, où un type de billet reste modifiable et supprimable tant que rien n'a été vendu, même sur un événement publié. C'est ce précédent qui a tranché, plutôt qu'un arbitrage neuf : ce qui engage n'est pas l'annonce, c'est l'acte. Tant que personne n'a voté, personne n'a rien décidé sur la foi de ces termes. Dès le premier bulletin ils se figent — quelqu'un qui a payé 500 francs son vote l'a fait sous ces règles-là.
+
+**Par catégorie, et non par scrutin.** Les catégories sont indépendantes (section 86.4) : un vote dans le prix du public n'a aucune raison de verrouiller le tarif du titre principal.
+
+Le bandeau de l'écran dit désormais la vraie raison — « des votes ont été exprimés dans cette catégorie » — au lieu de « le vote est ouvert », qui était devenu faux.
+
+---
+
 ## D-059 — Un classement proclamé se fige, le reste se calcule
 **2026-09-01**
 

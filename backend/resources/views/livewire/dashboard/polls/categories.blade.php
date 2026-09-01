@@ -75,14 +75,15 @@
                 </x-ui.field>
 
                 @unless ($termsEditable)
-                    {{-- Gratuite, prix et plafond ne bougent plus une fois le
-                         vote ouvert : quelqu'un qui a paye 500 francs son vote
-                         l'a fait sous ces regles. --}}
+                    {{-- Gratuite, prix et plafond ne bougent plus des qu'un
+                         bulletin existe : quelqu'un qui a vote l'a fait sous
+                         ces regles. Tant que personne n'a vote, ils restent
+                         modifiables — meme vote ouvert (decision D-060). --}}
                     <div class="flex items-start gap-2.5 rounded-[var(--radius-md)] border border-grey-200 bg-surface-muted px-4 py-3 text-sm text-grey-500">
                         <x-lucide-lock class="mt-0.5 size-4 shrink-0 text-grey-400" stroke-width="1.75" aria-hidden="true" />
                         <span>
-                            Le vote est ouvert : le prix, le plafond et les dates de cette categorie
-                            ne changent plus.
+                            Des votes ont ete exprimes dans cette categorie : le prix, le plafond
+                            et les dates ne changent plus.
                         </span>
                     </div>
                 @endunless

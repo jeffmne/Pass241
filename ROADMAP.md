@@ -335,11 +335,15 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
   3. N+1 sur chaque candidat, erreur dure là où le chargement différé est interdit (D-051)
   4. Le statut `REFUNDED` était **inatteignable** — le remboursement d'un vote payé n'avait aucun chemin (D-052)
   5. La vue écrasait sa collection de totaux dans la boucle : cassait **à partir de deux catégories**, la forme normale d'un scrutin
-- [ ] Jalon 9.4 — Vote payant : `Ballot` comme `Payable`, `PayableResolver`, commission, webhooks
+- [x] **Jalon 9.4 — Vote payant, fait le 2026-08-31 (décisions D-051 à D-058)** : `Ballot` implémente `Payable`, inscrit au `PayableResolver`, commission `VOTING` à 5 %, `CreatePaidBallot`, `ExpireBallotIfUnpaid`, page de suivi sur lien signé. Le mur de la décision D-041 était tombé — `Payable` avait été extrait en phase 7, il a suffi d'**une ligne** dans le résolveur. 18 tests
+
+  Un bulletin payant **naît en attente et ne compte pas** : la voix n'existe qu'à la confirmation du PSP. Elle est pourtant **réservée dès la création**, sinon deux personnes pourraient payer la même dernière voix ; l'échec la rend, ce qu'une commande n'a pas à faire puisque son stock est calculé, pas stocké.
+
+  **Driver PVit branché et éprouvé sur transactions réelles** (décisions D-057, D-058, procédure dans [docs/12-pvit-paiements.md](docs/12-pvit-paiements.md)) : barème par opérateur — leur API de devis se trompe de 0,025 point sur Airtel, seul le callback fait foi — et callback jamais cru sur parole, PVit ne signant rien.
 - [x] **Jalon 9.5 — Résultats, clôture, rapport, fait le 2026-09-01 (décision D-059)** : `poll_results` en ajout seul, `PollResultsFreezer`, tâche `ClosePolls` horaire, écran de résultats et rapport final exportable (CSV/Excel). 14 tests
 
   **Le point de la conception** : pendant le scrutin rien n'est stocké — tout est agrégé sur les bulletins, pour qu'il n'y ait rien à falsifier. À la clôture ce calcul est **conservé**, parce qu'un classement proclamé doit cesser de bouger : un remboursement arrivé ensuite retire de l'argent, mais ne peut plus déplacer un rang déjà annoncé. L'écran et le rapport disent toujours lequel des deux ils montrent.
 
 **Reste ouvert, non bloquant :**
 - [x] ~~`Poll::publicUrl()` référence la route `polls.public`, qui n'existe qu'au jalon 9.3~~ — la route existe depuis le jalon 9.3
-- [ ] Le gel des termes économiques se déclenche à l'ouverture du vote. Le jalon 9.3 pourra l'affiner en regardant s'il existe réellement un bulletin
+- [x] ~~Le gel des termes économiques se déclenche à l'ouverture du vote~~ — affiné le 2026-09-01 (décision D-060) : il se déclenche au **premier bulletin**, catégorie par catégorie, comme la billetterie se verrouille sur la vente réelle

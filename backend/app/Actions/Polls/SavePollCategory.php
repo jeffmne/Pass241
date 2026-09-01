@@ -4,6 +4,7 @@ namespace App\Actions\Polls;
 
 use App\Enums\AuditAction;
 use App\Enums\ResultsVisibility;
+use App\Models\Ballot;
 use App\Models\Poll;
 use App\Models\PollCategory;
 use App\Models\User;
@@ -14,11 +15,16 @@ use RuntimeException;
 /**
  * Categories d'un scrutin (section 86.4).
  *
- * LES TERMES ECONOMIQUES SE FIGENT A L'OUVERTURE DU VOTE. Gratuite, prix
- * unitaire et plafond par votant ne bougent plus des que le scrutin est actif :
- * ce sont les regles du jeu, et quelqu'un qui a paye 500 francs son vote l'a
- * fait sous ces regles. Les changer en cours de partie creerait deux categories
- * de votants dans un meme scrutin.
+ * LES TERMES ECONOMIQUES SE FIGENT AU PREMIER BULLETIN. Gratuite, prix unitaire
+ * et plafond par votant ne bougent plus des qu'un vote a ete exprime dans la
+ * categorie : ce sont les regles du jeu, et quelqu'un qui a paye 500 francs son
+ * vote l'a fait sous ces regles. Les changer ensuite creerait deux categories de
+ * votants dans un meme scrutin.
+ *
+ * Tant que personne n'a vote, ils restent modifiables — meme vote ouvert. Ce qui
+ * engage n'est pas l'annonce, c'est l'acte, et c'est deja le seuil de la
+ * billetterie, ou un tarif se corrige tant que rien n'est vendu (decision
+ * D-060).
  *
  * Le nom, la description et l'ordre restent modifiables : corriger une faute de
  * frappe ou reordonner l'affichage ne change ce que personne a paye.
@@ -85,7 +91,7 @@ class SavePollCategory
         return DB::transaction(function () use ($category, $poll, $attributes, $actor) {
             $clean = $this->sanitize($attributes);
 
-            if ($this->termsAreFrozen($poll)) {
+            if ($this->termsAreFrozen($poll, $category)) {
                 /*
                  * Retire des attributs plutot que lever une exception.
                  *
@@ -151,16 +157,37 @@ class SavePollCategory
     }
 
     /**
-     * Les termes economiques sont-ils figes ?
+     * Les termes economiques de CETTE categorie sont-ils figes ?
      *
-     * Des que le vote est ouvert. Le jalon 9.3 pourra affiner en regardant s'il
-     * existe reellement un bulletin — mais l'ouverture est le bon seuil par
-     * defaut : c'est le moment ou les regles ont ete annoncees publiquement,
-     * meme si personne n'a encore vote.
+     * DES QU'UN BULLETIN EXISTE, et non des l'ouverture du vote.
+     *
+     * L'ouverture etait le seuil retenu au jalon 9.2, faute de bulletins a
+     * consulter. Il etait trop large : un organisateur qui ouvre son concours,
+     * s'apercoit que le prix du vote comporte un zero de trop et n'a encore
+     * aucun votant devait annuler tout le scrutin et le recreer — en perdant le
+     * lien deja partage.
+     *
+     * LE SEUIL SUIT LE PRECEDENT DE LA BILLETTERIE, ou un type de billet reste
+     * modifiable et supprimable tant que rien n'a ete vendu, meme sur un
+     * evenement publie. Ce qui engage n'est pas l'annonce, c'est l'acte : tant
+     * que personne n'a vote, personne n'a rien decide sur la foi de ces termes.
+     * Des le premier bulletin, ils se figent — quelqu'un qui a paye 500 francs
+     * son vote l'a fait sous ces regles-la.
+     *
+     * PAR CATEGORIE, et non par scrutin : les categories sont independantes
+     * (section 86.4), et un vote dans le prix du public n'a aucune raison de
+     * verrouiller le tarif du titre principal.
      */
-    private function termsAreFrozen(Poll $poll): bool
+    private function termsAreFrozen(Poll $poll, PollCategory $category): bool
     {
-        return $poll->displayStatus()->acceptsBallots() || $poll->status->isClosed();
+        if ($poll->status->isClosed()) {
+            return true;
+        }
+
+        return Ballot::query()
+            ->acrossOrganizations()
+            ->where('poll_category_id', $category->getKey())
+            ->exists();
     }
 
     /**

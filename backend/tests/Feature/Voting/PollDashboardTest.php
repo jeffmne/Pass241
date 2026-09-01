@@ -4,8 +4,10 @@ use App\Actions\Polls\PublishPoll;
 use App\Actions\Polls\SaveCandidate;
 use App\Actions\Polls\SavePoll;
 use App\Actions\Polls\SavePollCategory;
+use App\Actions\Voting\CreatePaidBallot;
 use App\Data\PollDraft;
 use App\Enums\AuditAction;
+use App\Enums\PaymentProvider;
 use App\Enums\PollStatus;
 use App\Enums\ResultsVisibility;
 use App\Enums\RoleName;
@@ -13,9 +15,11 @@ use App\Livewire\Dashboard\Polls\Categories as PollCategories;
 use App\Livewire\Dashboard\Polls\Form as PollForm;
 use App\Livewire\Dashboard\Polls\Index as PollIndex;
 use App\Models\AuditLog;
+use App\Models\Candidate;
 use App\Models\Poll;
 use App\Models\PollCategory;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\Request;
 use Livewire\Livewire;
 
 /*
@@ -193,23 +197,64 @@ it('refuse toute modification d\'un vote clos', function () {
     app(SavePoll::class)->update($poll, ($this->draft)(), $this->owner);
 })->throws(RuntimeException::class);
 
-it('fige le prix d\'une categorie une fois le vote ouvert', function () {
-    // Quelqu'un qui a paye 500 francs son vote l'a fait sous ces regles.
-    $poll = ($this->makeReadyPoll)(['startsAt' => now()->subHour()]);
+/**
+ * Monte une categorie payante sur un scrutin ouvert, prete a recevoir des votes.
+ *
+ * Deux candidats : sans eux, la publication serait refusee pour une raison qui
+ * n'a rien a voir avec ce que ces tests verifient.
+ *
+ * @return array{0: Poll, 1: PollCategory, 2: Candidate}
+ */
+function openPaidCategory(object $test): array
+{
+    $poll = ($test->makeReadyPoll)(['startsAt' => now()->subHour()]);
 
     $category = app(SavePollCategory::class)->create(
         $poll,
         ['name' => 'Prix du public', 'is_paid' => true, 'unit_price' => 500],
+        $test->owner,
+    );
+
+    $candidates = [];
+
+    foreach (['Artiste A', 'Artiste B'] as $name) {
+        $candidates[] = app(SaveCandidate::class)->create($category, ['name' => $name], $test->owner);
+    }
+
+    app(PublishPoll::class)->publish($poll->refresh(), $test->owner);
+
+    return [$poll->refresh(), $category->refresh(), $candidates[0]];
+}
+
+it('laisse corriger le prix tant que personne n\'a vote, meme vote ouvert', function () {
+    /*
+     * Decision D-060. L'ancien seuil figeait les termes des l'ouverture : un
+     * organisateur qui s'apercevait d'un zero de trop dans son prix devait
+     * annuler tout le scrutin et le recreer, en perdant le lien deja partage.
+     *
+     * Le seuil suit desormais celui de la billetterie — un tarif reste
+     * modifiable tant que rien n'est vendu, meme sur un evenement publie. Ce
+     * qui engage n'est pas l'annonce, c'est l'acte.
+     */
+    [, $category] = openPaidCategory($this);
+
+    $category = app(SavePollCategory::class)->update(
+        $category,
+        ['name' => 'Prix du public', 'is_paid' => true, 'unit_price' => 2_000],
         $this->owner,
     );
 
-    // Deux candidats : sans eux, la publication serait refusee pour une raison
-    // qui n'a rien a voir avec ce que ce test verifie.
-    foreach (['Artiste A', 'Artiste B'] as $name) {
-        app(SaveCandidate::class)->create($category, ['name' => $name], $this->owner);
-    }
+    expect($category->unit_price)->toBe(2_000);
+});
 
-    app(PublishPoll::class)->publish($poll->refresh(), $this->owner);
+it('fige le prix d\'une categorie des le premier bulletin', function () {
+    // Quelqu'un qui a paye 500 francs son vote l'a fait sous ces regles.
+    [, $category, $candidate] = openPaidCategory($this);
+
+    forOrganization($this->organization, fn () => app(CreatePaidBallot::class)->handle(
+        $candidate, 1, PaymentProvider::Airtel, '074000000',
+        Request::create('/v', 'POST', server: ['REMOTE_ADDR' => '41.158.0.1']),
+    ));
 
     $category = app(SavePollCategory::class)->update(
         $category->refresh(),
@@ -218,6 +263,32 @@ it('fige le prix d\'une categorie une fois le vote ouvert', function () {
     );
 
     expect($category->unit_price)->toBe(500);
+});
+
+it('ne verrouille pas une categorie parce qu\'une autre a recu un vote', function () {
+    // Les categories sont independantes (section 86.4) : un vote dans le prix
+    // du public n'a aucune raison de figer le tarif du titre principal.
+    [$poll, $votee, $candidate] = openPaidCategory($this);
+
+    $autre = app(SavePollCategory::class)->create(
+        $poll,
+        ['name' => 'Titre principal', 'is_paid' => true, 'unit_price' => 1_000],
+        $this->owner,
+    );
+
+    forOrganization($this->organization, fn () => app(CreatePaidBallot::class)->handle(
+        $candidate, 1, PaymentProvider::Airtel, '074000000',
+        Request::create('/v', 'POST', server: ['REMOTE_ADDR' => '41.158.0.2']),
+    ));
+
+    $autre = app(SavePollCategory::class)->update(
+        $autre->refresh(),
+        ['name' => 'Titre principal', 'is_paid' => true, 'unit_price' => 3_000],
+        $this->owner,
+    );
+
+    expect($autre->unit_price)->toBe(3_000)
+        ->and($votee->refresh()->unit_price)->toBe(500);
 });
 
 it('laisse renommer une categorie d\'un vote ouvert', function () {
