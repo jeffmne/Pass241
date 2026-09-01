@@ -3,6 +3,7 @@
 namespace App\Services\Payments\Pvit;
 
 use App\Enums\PaymentState;
+use App\Services\Payments\AcknowledgesCallbacks;
 use App\Services\Payments\CollectionProvider;
 use App\Services\Payments\Payable;
 use App\Services\Payments\PaymentCapabilities;
@@ -47,9 +48,39 @@ use Throwable;
  * `SettlementProvider`, et `refund()` echoue bruyamment plutot que de faire
  * croire a un remboursement qui n'aura pas lieu (section 21.2, decision D-024).
  */
-class PvitProvider implements CollectionProvider
+class PvitProvider implements AcknowledgesCallbacks, CollectionProvider
 {
     public function __construct(private readonly PvitSecret $secret) {}
+
+    /**
+     * Accuse de reception attendu par PVit, EN ECHO DYNAMIQUE.
+     *
+     * PVit exige une reponse 200 portant un objet JSON qui reprend
+     * `transactionId` et `code` TELS QU'IL LES A ENVOYES. Leur documentation
+     * insiste sur ce point : ne jamais coder la valeur en dur, la relire dans
+     * la charge utile entrante. Sans cet echo, la transaction est marquee
+     * « echec de notification » de leur cote, et — plus genant — l'integration
+     * n'est pas validee en recette, meme si tous les paiements aboutissent.
+     *
+     * D'ou la lecture directe de la requete, sans passer par notre resultat
+     * normalise : un accuse de reception atteste de CE QU'ON A RECU. Le
+     * construire depuis nos propres donnees le rendrait faux le jour ou notre
+     * lecture differerait de leur envoi, ce qui est exactement le cas que cet
+     * echo sert a detecter.
+     *
+     * `code` n'est PAS force a 200 : la documentation previent qu'il peut
+     * changer selon le contexte et les evolutions de leur API.
+     *
+     * @return array<string, mixed>
+     */
+    public function callbackAcknowledgement(Request $request): array
+    {
+        return [
+            'transactionId' => $request->input('transactionId')
+                ?? $request->input('transaction_id'),
+            'responseCode' => $request->input('code'),
+        ];
+    }
 
     public function name(): string
     {

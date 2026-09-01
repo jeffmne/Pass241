@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Payments\ConfirmPayment;
+use App\Enums\PaymentState;
 use App\Models\PaymentWebhook;
 use App\Services\Payments\Payable;
 use App\Services\Payments\PayableResolver;
@@ -39,7 +40,25 @@ class ProcessPaymentWebhook implements ShouldQueue
         }
 
         $payload = $webhook->payload ?? [];
-        $reference = $payload['order_reference'] ?? null;
+
+        /*
+         * LECTURE NORMALISEE, posee par le controleur depuis le `PaymentResult`
+         * du driver.
+         *
+         * Ce job ne connait donc AUCUN dialecte de prestataire. Il en
+         * connaissait un — celui du provider de simulation, avec ses
+         * `order_reference` et ses `SUCCEEDED` — et cela ne se voyait pas tant
+         * qu'il n'y en avait qu'un. Un second prestataire, qui parle de
+         * `merchantReferenceId` et de `SUCCESS`, aurait echoue en silence :
+         * aucune reference trouvee, message marque traite, paiement jamais
+         * confirme.
+         *
+         * Le repli sur les cles d'origine couvre les messages enregistres avant
+         * cette normalisation. Il peut disparaitre une fois la table purgee.
+         */
+        $normalized = is_array($payload['_normalized'] ?? null) ? $payload['_normalized'] : [];
+
+        $reference = $normalized['order_reference'] ?? $payload['order_reference'] ?? null;
 
         if (! is_string($reference) || $reference === '') {
             $webhook->markProcessed('Message sans reference de transaction.');
@@ -62,20 +81,28 @@ class ProcessPaymentWebhook implements ShouldQueue
             'payable_id' => $payable->getKey(),
         ])->save();
 
-        $status = $payload['status'] ?? null;
+        /*
+         * L'etat vient du `PaymentState` normalise, et non d'une chaine du
+         * prestataire. Un `AMBIGUOUS` de PVit y arrive en `UNKNOWN`, et tombera
+         * donc dans le cas « etat non definitif » ci-dessous — ce qui est le
+         * seul traitement juste : ni confirmer un paiement dont le prestataire
+         * doute lui-meme, ni le refuser alors que l'argent est peut-etre parti.
+         */
+        $state = $normalized['state'] ?? $payload['status'] ?? null;
 
-        if ($status === 'SUCCEEDED') {
-            $this->confirm($webhook, $payable, $confirmPayment, $payload);
+        if ($state === PaymentState::Succeeded->value || $state === 'SUCCEEDED') {
+            $this->confirm($webhook, $payable, $confirmPayment, $normalized ?: $payload);
 
             return;
         }
 
-        if ($status === 'FAILED') {
-            $reason = is_string($payload['failure_reason'] ?? null)
-                ? $payload['failure_reason']
-                : 'Paiement refuse par l\'operateur.';
+        if ($state === PaymentState::Failed->value || $state === 'FAILED') {
+            $reason = $normalized['failure_reason'] ?? $payload['failure_reason'] ?? null;
 
-            $confirmPayment->markFailed($payable, $reason);
+            $confirmPayment->markFailed(
+                $payable,
+                is_string($reason) && $reason !== '' ? $reason : 'Paiement refuse par l\'operateur.',
+            );
             $webhook->markProcessed('Paiement refuse.');
 
             return;
@@ -83,7 +110,7 @@ class ProcessPaymentWebhook implements ShouldQueue
 
         // Etat intermediaire : rien a faire, mais le message est marque traite
         // pour ne pas etre repris indefiniment.
-        $webhook->markProcessed('Etat non definitif : '.(is_string($status) ? $status : 'inconnu'));
+        $webhook->markProcessed('Etat non definitif : '.(is_string($state) ? $state : 'inconnu'));
     }
 
     /** @param  array<string, mixed>  $payload */

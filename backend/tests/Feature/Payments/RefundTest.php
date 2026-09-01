@@ -1,7 +1,7 @@
 <?php
 
-use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Organizations\SetPayoutDestination;
+use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Refunds\DecideRefund;
 use App\Actions\Refunds\RequestRefund;
 use App\Actions\Settlements\SettleFunds;

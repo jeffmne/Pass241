@@ -2,7 +2,6 @@
 
 use App\Enums\PaymentProvider;
 use App\Enums\PayoutState;
-use App\Models\Order;
 use App\Services\Payments\CollectionProvider;
 use App\Services\Payments\FakeProvider;
 use App\Services\Payments\Payable;

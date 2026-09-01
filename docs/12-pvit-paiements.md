@@ -192,6 +192,22 @@ Le callback sert uniquement à désigner *une* transaction. L'état est ensuite 
 
 L'allowlist d'IP vient en défense **secondaire** — demander à PVit depuis quelles adresses leurs callbacks partent.
 
+### L'URL à enregistrer, et le piège qui va avec
+
+Le code de callback (`<code_callback>`) **désigne une URL déjà enregistrée** dans l'espace marchand. Enregistrer la racine du tunnel ne suffit pas : il faut **le chemin complet** de la route qui reçoit, par exemple
+
+```
+https://<tunnel>/api/webhooks/payments/pvit
+```
+
+Symptôme si le chemin est faux : les paiements aboutissent, l'API de statut répond correctement, et **aucun callback n'arrive jamais**. Rien ne le signale — c'est un échec silencieux, à vérifier explicitement en comptant les notifications reçues après une transaction.
+
+### La référence revient compactée — le résolveur doit le savoir
+
+PVit renvoie dans `merchantReferenceId` la référence **telle qu'on la lui a envoyée**, donc sans tirets. Si la recherche en base se fait sur une égalité stricte, elle échoue : `VTUBT7YY5` ne trouvera pas `VT-UBT7-YY5`.
+
+Prévoir un rattrapage — comparer sur la référence débarrassée de ses séparateurs, **après** l'échec de la recherche exacte. Sans lui, le message est classé « transaction introuvable » et **le paiement n'est jamais confirmé alors que l'argent est parti**. C'est le pire cas possible sur le chemin de l'argent, et il est silencieux.
+
 ### L'accusé de réception est contractuel
 
 Répondre **200** avec un écho **dynamique** des valeurs reçues :
@@ -215,6 +231,14 @@ Ne jamais coder `200` en dur. La documentation est explicite : sans cet écho, l
   "code": 200, "accountOperationCode": "ACC_…"
 }
 ```
+
+---
+
+### Ne jamais dépendre du callback seul
+
+Mesuré : une transaction traitée par PVit — statut définitif disponible sur leur API — **sans qu'aucune notification ne soit envoyée**. Le repli par interrogation du statut n'est pas un confort, c'est ce qui fait que le paiement se dénoue quand même.
+
+Le prévoir dès le départ : une page de suivi qui interroge tant que la transaction est en attente, et une tâche d'expiration qui tranche au bout du délai.
 
 ---
 

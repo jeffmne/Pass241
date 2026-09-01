@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessPaymentWebhook;
 use App\Models\PaymentWebhook;
+use App\Services\Payments\AcknowledgesCallbacks;
 use App\Services\Payments\PaymentManager;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +40,20 @@ class PaymentWebhookController extends Controller
             return response()->json(['status' => 'ignored'], 202);
         }
 
+        /*
+         * Accuse de reception attendu par CE prestataire.
+         *
+         * Calcule des maintenant, et employe sur TOUS les chemins de sortie —
+         * message ignore, doublon, message accepte. Un prestataire qui verifie
+         * le corps de la reponse ne fait pas la difference entre nos cas
+         * internes : il constate seulement qu'il n'a pas recu ce qu'il
+         * attendait, et marque la notification en echec. PVit va plus loin et
+         * refuse de valider l'integration tant que l'accuse n'est pas conforme.
+         */
+        $acknowledgement = $driver instanceof AcknowledgesCallbacks
+            ? $driver->callbackAcknowledgement($request)
+            : null;
+
         $result = $driver->processCallback($request);
 
         // Signature invalide. Le message est conserve — c'est ce qui permet de
@@ -55,9 +70,15 @@ class PaymentWebhookController extends Controller
                 'ip_address' => $request->ip(),
             ]);
 
-            // 202 et non 401 : repondre differemment selon la validite de la
-            // signature indiquerait a un attaquant quand il approche.
-            return response()->json(['status' => 'ignored'], 202);
+            /*
+             * 202 et non 401 : repondre differemment selon la validite de la
+             * signature indiquerait a un attaquant quand il approche.
+             *
+             * L'accuse de reception part quand meme. Le message a bien ete
+             * RECU — c'est tout ce qu'il atteste — et le refuser ferait relivrer
+             * en boucle un message qu'on ne traitera de toute facon jamais.
+             */
+            return response()->json($acknowledgement ?? ['status' => 'ignored'], 202);
         }
 
         try {
@@ -75,7 +96,27 @@ class PaymentWebhookController extends Controller
                 'provider' => $provider,
                 'event_id' => $result->eventId,
                 'signature_valid' => true,
-                'payload' => $result->raw,
+                /*
+                 * La charge utile d'origine EST conservee — c'est ce qu'on
+                 * relira en cas de litige — mais la lecture normalisee est
+                 * rangee a cote, sous une cle reservee.
+                 *
+                 * Sans elle, le traitement en file d'attente devrait rouvrir la
+                 * charge utile et en connaitre le dialecte : `order_reference`
+                 * et `SUCCEEDED` chez l'un, `merchantReferenceId` et `SUCCESS`
+                 * chez l'autre. C'est precisement ce que `PaymentResult` existe
+                 * pour empecher — « rien au-dela de cette classe ne doit
+                 * connaitre le format de reponse d'Airtel ou de Moov ». Le
+                 * driver a deja fait la traduction ici ; la refaire ailleurs la
+                 * ferait diverger.
+                 */
+                'payload' => $result->raw + ['_normalized' => [
+                    'state' => $result->state->value,
+                    'order_reference' => $result->orderReference,
+                    'provider_reference' => $result->providerReference,
+                    'amount' => $result->amount,
+                    'failure_reason' => $result->failureReason,
+                ]],
                 'ip_address' => $request->ip(),
             ]));
         } catch (UniqueConstraintViolationException) {
@@ -89,11 +130,11 @@ class PaymentWebhookController extends Controller
              * Reponse 200 : du point de vue de l'operateur, le message est bien
              * arrive. Un code d'erreur relancerait des relivraisons inutiles.
              */
-            return response()->json(['status' => 'duplicate'], 200);
+            return response()->json($acknowledgement ?? ['status' => 'duplicate'], 200);
         }
 
         ProcessPaymentWebhook::dispatch($webhook->getKey());
 
-        return response()->json(['status' => 'accepted'], 200);
+        return response()->json($acknowledgement ?? ['status' => 'accepted'], 200);
     }
 }
