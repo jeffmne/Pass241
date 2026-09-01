@@ -109,6 +109,21 @@ it('exporte les collectes avec leur progression calculee', function () {
         ->and($csv)->toContain('40000');
 });
 
+it('exporte les statistiques de billetterie, categorie par categorie', function () {
+    $csv = ($this->csv)(route('exports.ticketing-statistics', 'csv'));
+
+    /*
+     * Section 59, huitieme et dernier export annonce. Les chiffres viennent de
+     * `TicketingStatistics`, le meme point de calcul que la vue generale : le
+     * fichier ne peut donc pas contredire l'ecran d'ou on l'a demande.
+     */
+    expect($csv)->toContain('Categorie de billet')
+        ->and($csv)->toContain('Part des ventes')
+        ->and($csv)->toContain('Standard')
+        // Un billet emis sur une commande payee de 10 000 F.
+        ->and($csv)->toContain('10000');
+});
+
 it('produit un fichier Excel lisible', function () {
     $response = $this->get(route('exports.donations', [$this->campaign, 'xlsx']));
 
@@ -171,6 +186,20 @@ it('refuse l export a qui n a pas le droit d exporter', function () {
      * des donnees est un geste a part — un fichier ne se reprend pas.
      */
     $this->get(route('exports.participants', [$this->event, 'csv']))->assertForbidden();
+});
+
+it('refuse les statistiques de billetterie a qui n a pas acces aux finances', function () {
+    /*
+     * Ce fichier porte une colonne de recette. La vue generale masque deja les
+     * montants au co-organisateur (section 10) ; l'export doit appliquer la
+     * meme regle, sinon il devient le contournement de l'ecran.
+     */
+    $member = addMemberTo($this->organization, RoleName::CoOrganizer);
+
+    actAsOrganization($this->organization);
+    $this->actingAs($member);
+
+    $this->get(route('exports.ticketing-statistics', 'csv'))->assertForbidden();
 });
 
 it('refuse un export financier a qui ne voit pas les finances', function () {

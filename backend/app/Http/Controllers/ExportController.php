@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\AuditAction;
+use App\Enums\CommissionType;
 use App\Enums\ExportFormat;
 use App\Enums\PermissionName;
 use App\Models\Campaign;
@@ -16,9 +17,15 @@ use App\Services\Export\Exports\OrdersExport;
 use App\Services\Export\Exports\ParticipantsExport;
 use App\Services\Export\Exports\PollResultsExport;
 use App\Services\Export\Exports\ScansExport;
+use App\Services\Export\Exports\TicketingStatisticsExport;
+use App\Services\Export\Exports\TransactionsExport;
 use App\Services\Export\ExportWriter;
+use App\Services\Finance\TransactionLedger;
 use App\Services\Fundraising\CampaignProgress;
+use App\Services\Statistics\TicketingStatistics;
 use App\Services\Voting\VotingStatistics;
+use App\Support\Tenancy\OrganizationContext;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -84,6 +91,51 @@ class ExportController extends Controller
     public function pollResults(Poll $poll, string $format, VotingStatistics $statistics): StreamedResponse
     {
         return $this->download(new PollResultsExport($poll, $statistics), $format);
+    }
+
+    /**
+     * Grand livre des transactions (sections 56, 59).
+     *
+     * Les deux filtres viennent de l'URL, donc de n'importe ou : un module
+     * inconnu retombe sur « tous » et une periode inconnue sur celle par
+     * defaut. Aucun des deux ne peut elargir la portee — l'isolation vient du
+     * modele, pas de ces parametres (regle 80.4).
+     */
+    public function transactions(
+        Request $request,
+        string $format,
+        TransactionLedger $ledger,
+    ): StreamedResponse {
+        return $this->download(
+            new TransactionsExport(
+                $ledger,
+                CommissionType::tryFrom((string) $request->query('module')),
+                $ledger->normalizePeriod($request->query('period')),
+            ),
+            $format,
+        );
+    }
+
+    /**
+     * Statistiques de billetterie (sections 56, 59).
+     *
+     * L'organisation vient du contexte, jamais d'un parametre : c'est la meme
+     * regle que partout ailleurs, et la seule qui tienne (regle 80.4).
+     */
+    public function ticketingStatistics(
+        string $format,
+        TicketingStatistics $statistics,
+        OrganizationContext $context,
+    ): StreamedResponse {
+        // Le groupe de routes garantit deja le contexte ; le `abort` couvre le
+        // jour ou cette route en sortirait par megarde, plutot que de laisser
+        // passer un export sans portee.
+        $organization = $context->current() ?? abort(403);
+
+        return $this->download(
+            new TicketingStatisticsExport($statistics, $organization),
+            $format,
+        );
     }
 
     private function download(Exportable $export, string $format): StreamedResponse

@@ -312,6 +312,23 @@
     ================================================================= --}}
     @if ($byType->isNotEmpty())
         <x-ui.panel title="Ventes par categorie" description="Toutes vos categories de billets">
+            {{-- L'export est propose LA OU LES CHIFFRES SONT LUS, et non dans
+                 un ecran « Rapports » separe : c'est en regardant ce panneau
+                 qu'on decide de l'emporter. Il porte une colonne de recette,
+                 d'ou la meme condition que les montants ci-dessous. --}}
+            @if ($canSeeMoney && $canExport)
+                <x-slot:actions>
+                    <a href="{{ route('exports.ticketing-statistics', 'csv') }}" class="btn btn-ghost btn-pill text-sm">
+                        <x-lucide-download class="size-4" stroke-width="1.75" aria-hidden="true" />
+                        CSV
+                    </a>
+                    <a href="{{ route('exports.ticketing-statistics', 'xlsx') }}" class="btn btn-ghost btn-pill text-sm">
+                        <x-lucide-download class="size-4" stroke-width="1.75" aria-hidden="true" />
+                        Excel
+                    </a>
+                </x-slot:actions>
+            @endif
+
             <div class="space-y-4">
                 @foreach ($byType as $type)
                     <div>

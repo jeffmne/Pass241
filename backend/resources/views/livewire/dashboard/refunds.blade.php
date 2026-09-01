@@ -13,6 +13,11 @@
             : 'Aucune demande en attente.'">
 
         <x-slot:actions>
+            {{-- La sous-navigation des finances d'abord : elle dit ou l'on est
+                 dans la section, avant de proposer de filtrer ce qu'on y
+                 regarde. --}}
+            <x-finance-nav />
+
             {{-- Trois onglets plutot qu'un menu deroulant : l'organisateur voit
                  d'un coup ce qui existe, et change de vue en un geste au lieu
                  de trois. Sur telephone le groupe defile plutot que de passer

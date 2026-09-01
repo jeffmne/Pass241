@@ -313,7 +313,11 @@ Décisions prises : frais PSP à la charge de l'acheteur et affichés séparéme
 - [ ] Vue consolidée des collectes au tableau de bord général (l'entrée de menu mène à la liste, pas à des chiffres agrégés)
 
 ### Phase 8 — Optimisation
-- [ ] Exports, analytics
+- [x] **Exports et analytics, faits le 2026-09-01 (décision D-061)** : écran **Finances → Transactions** réunissant billetterie, collectes et votes dans un seul journal, `TransactionLedger`, `TransactionsExport`, `TicketingStatisticsExport`, sous-navigation des finances. Les huit exports annoncés par la section 59 existent désormais. 19 tests
+
+  **Le point de la conception** : `commissions` est en ajout seul, un remboursement y ajoute une ligne d'ajustement **positive** — un `SUM` naïf compte donc l'encaissement puis le remboursement comme deux recettes, et double le chiffre d'affaires. L'erreur ne casse rien, elle ment, et précisément le jour où quelqu'un vérifie pourquoi il a reçu moins. La règle « origines moins ajustements » est écrite une seule fois, et l'écran comme le fichier la lisent au même endroit.
+
+  **Faille refermée au passage** : l'écran des remboursements ne vérifiait que le droit de *trancher*, jamais celui de *regarder*. Le menu masquait l'entrée, mais l'adresse restait atteignable — un co-organisateur y lisait montants et numéros de téléphone d'acheteurs (section 10).
 - [ ] Notifications
 - [ ] Monitoring, sécurité, performance
 - [x] **Déconnexion après inactivité, faite le 2026-08-28 (décision D-050)** — sortie de phase, demandée par Jeff : `ExpireInactiveSessions` sur le groupe `web`, `AUTH_IDLE_TIMEOUT` à 30 minutes, message nommant le délai, 419 pour Livewire. « Se souvenir de moi » passe à décoché par défaut — cochée, elle rendait l'expiration de session sans effet. 9 tests

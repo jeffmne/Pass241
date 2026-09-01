@@ -70,6 +70,13 @@ class Overview extends Component
              * incapable de faire son travail.
              */
             'canSeeMoney' => $canSeeMoney,
+            /*
+             * Sortir des donnees de la plateforme est un geste a part de celui
+             * de les consulter (section 59) : un fichier ne se reprend pas et
+             * survit a la revocation de l'acces de celui qui l'a telecharge. Le
+             * bouton d'export des statistiques exige donc les deux droits.
+             */
+            'canExport' => $user->can(PermissionName::ExportsGenerate->value),
             'organization' => $organization,
             /*
              * Les trois evenements les plus proches, avec leur remplissage.

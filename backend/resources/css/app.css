@@ -1597,15 +1597,22 @@
     }
 
     /*
-     * Trois attributs pour un seul aspect, parce que le meme dessin sert trois
-     * roles differents : `aria-selected` pour une serie d'onglets,
-     * `aria-checked` pour un choix exclusif, `aria-pressed` pour une bascule.
-     * Le composant se plie au role attendu par le lecteur d'ecran au lieu de
-     * forcer le balisage a se plier au composant.
+     * Quatre attributs pour un seul aspect, parce que le meme dessin sert
+     * quatre roles differents : `aria-selected` pour une serie d'onglets,
+     * `aria-checked` pour un choix exclusif, `aria-pressed` pour une bascule,
+     * `aria-current` quand les onglets sont de vrais liens vers de vraies
+     * pages. Le composant se plie au role attendu par le lecteur d'ecran au
+     * lieu de forcer le balisage a se plier au composant.
+     *
+     * Le dernier n'est pas une variante cosmetique du premier : `aria-selected`
+     * n'a aucun sens sur un lien, et un lecteur d'ecran l'ignore. Une
+     * sous-navigation qui change d'adresse doit dire « page courante », pas
+     * « onglet selectionne ».
      */
     .seg-item[aria-selected='true'],
     .seg-item[aria-checked='true'],
-    .seg-item[aria-pressed='true'] {
+    .seg-item[aria-pressed='true'],
+    .seg-item[aria-current='page'] {
         background-color: var(--surface);
         color: var(--azure-700);
         box-shadow: 0 1px 3px rgba(0, 79, 158, 0.1);
@@ -1613,7 +1620,8 @@
 
     [data-theme='dark'] .seg-item[aria-selected='true'],
     [data-theme='dark'] .seg-item[aria-checked='true'],
-    [data-theme='dark'] .seg-item[aria-pressed='true'] {
+    [data-theme='dark'] .seg-item[aria-pressed='true'],
+    [data-theme='dark'] .seg-item[aria-current='page'] {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 

@@ -182,6 +182,25 @@ La bannière est intégrée en `data:` URI plutôt que référencée par URL : l
 
 ---
 
+## D-061 — Le grand livre des transactions, et la règle de signe des remboursements
+**2026-09-01**
+
+L'organisateur a désormais un écran **Finances → Transactions** qui réunit les trois modules — billetterie, collectes, votes — dans un seul journal, avec l'export correspondant (`TransactionsExport`). Aucune nouvelle table : la table `commissions` porte déjà les trois par une relation polymorphe (décision D-041), il n'y avait qu'à la lire dans l'ordre du temps.
+
+**Le problème que ce travail a mis au jour.** `commissions` est en ajout seul (section 46) : un remboursement n'y corrige pas la ligne d'origine, il ajoute une ligne d'ajustement — et cette ligne porte un montant **positif**, parce qu'elle décrit un mouvement de retour, pas un solde. Un `SUM` naïf compte donc l'encaissement puis le remboursement comme deux recettes. Un organisateur ayant encaissé 10 000 F et remboursé la totalité lirait 20 000 F de chiffre d'affaires. Le scope `originals()` évite l'erreur inverse — ne jamais déduire les remboursements — mais aucun des deux ne donne le chiffre juste à lui seul.
+
+C'est une erreur **silencieuse** : elle ne casse rien, elle ment, et elle ment précisément le jour où quelqu'un vient vérifier pourquoi il a reçu moins que prévu.
+
+**La règle juste — origines moins ajustements — est donc écrite une seule fois**, dans `TransactionLedger`, sous forme d'un `CASE` SQL d'un seul tenant. L'écran et l'export la lisent au même endroit ; les laisser recalculer chacun de leur côté aurait produit tôt ou tard un export qui contredit l'écran, et c'est l'export qu'on garde.
+
+**Dans le fichier, les ajustements sortent en négatif** alors qu'ils sont positifs en base. Quelqu'un va sélectionner la colonne « Net » dans un tableur et lire le total en bas de son écran : ce total doit être le bon sans qu'il ait à savoir qu'il y avait quelque chose à soustraire. La colonne « Nature » dit lequel des deux on lit, pour que le signe ne soit jamais à interpréter.
+
+**Faille refermée au passage.** L'écran des remboursements ne vérifiait que le droit de *trancher* (`finances.refund`), jamais celui de *regarder*. La route ne porte aucune permission et le menu masquait l'entrée — mais un menu qui cache n'est pas un verrou : l'adresse restait atteignable en la tapant, et un co-organisateur y lisait des montants et les numéros de téléphone des acheteurs (section 10). `finances.view` est désormais exigée au montage, comme sur tous les autres écrans.
+
+**Écarté** : une entrée « Rapports » séparée. L'export se propose là où les chiffres sont lus — c'est en regardant un panneau qu'on décide de l'emporter, pas en se rendant dans un écran dédié qu'il faut d'abord penser à ouvrir.
+
+---
+
 ## D-060 — Les termes d'une catégorie se figent au premier bulletin, pas à l'ouverture
 **2026-09-01**
 

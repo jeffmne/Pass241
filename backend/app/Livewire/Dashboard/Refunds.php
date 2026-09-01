@@ -31,6 +31,27 @@ class Refunds extends Component
     /** Motif de refus, par demande. */
     public array $reasons = [];
 
+    /**
+     * L'ECRAN GARDE SON PROPRE ACCES, comme partout ailleurs (section 9).
+     *
+     * La route ne porte aucune permission, et le menu ne montre l'entree
+     * « Finances » qu'a qui a le droit — mais un menu qui cache n'est pas un
+     * verrou : l'adresse restait atteignable en la tapant. Un co-organisateur,
+     * qui gere l'operationnel sans acces aux finances (section 10), lisait ici
+     * des montants et des numeros de telephone d'acheteurs.
+     *
+     * `finances.view` pour entrer, `finances.refund` pour trancher : la seconde
+     * etait deja verifiee, la premiere manquait.
+     */
+    public function mount(): void
+    {
+        abort_unless(
+            auth()->user()?->can(PermissionName::FinancesView->value),
+            403,
+            'Vous n\'avez pas acces aux finances de cette organisation.'
+        );
+    }
+
     public function updatingFilter(): void
     {
         $this->resetPage();

@@ -18,6 +18,7 @@ use App\Livewire\Auth\Register;
 use App\Livewire\Dashboard\Campaigns\Donations as CampaignDonations;
 use App\Livewire\Dashboard\Campaigns\Form as CampaignForm;
 use App\Livewire\Dashboard\Campaigns\Index as CampaignIndex;
+use App\Livewire\Dashboard\Finances\Transactions as FinanceTransactions;
 use App\Livewire\Dashboard\Polls\Categories as PollCategories;
 use App\Livewire\Dashboard\Polls\Form as PollForm;
 use App\Livewire\Dashboard\Polls\Index as PollIndex;
@@ -297,6 +298,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/votes/{poll}/resultats', PollResults::class)
             ->name('polls.results');
 
+        /*
+         * Le grand livre des transactions (sections 56, 59).
+         *
+         * Les trois modules dans un seul ecran : c'est la ligne de commission
+         * qui les reunit, pas une jointure inventee ici. `finances.view` est
+         * verifiee par l'ecran lui-meme, comme partout ailleurs.
+         */
+        Route::get('/finances/transactions', FinanceTransactions::class)
+            ->name('finances.transactions');
+
         // Section 24.1 : le client demande, l'organisateur decide.
         Route::get('/remboursements', DashboardRefunds::class)->name('refunds.index');
 
@@ -321,6 +332,22 @@ Route::middleware('auth')->group(function () {
                 ->name('campaigns');
             Route::get('/votes/{poll}/resultats/{format}', [ExportController::class, 'pollResults'])
                 ->name('poll-results');
+
+            /*
+             * Grand livre des transactions (sections 56, 59).
+             *
+             * Module et periode passent en parametres de requete, pas en
+             * segments : ce sont des FILTRES, pas des ressources. Un lien
+             * d'export se construit alors en ajoutant les filtres de l'ecran,
+             * sans que la route ait a connaitre leur nombre.
+             */
+            Route::get('/transactions/{format}', [ExportController::class, 'transactions'])
+                ->name('transactions');
+
+            // Le huitieme et dernier export annonce par la section 59 : ce qui
+            // s'est vendu, categorie par categorie.
+            Route::get('/statistiques-billetterie/{format}', [ExportController::class, 'ticketingStatistics'])
+                ->name('ticketing-statistics');
         })->whereIn('format', ExportFormat::values());
     });
 });

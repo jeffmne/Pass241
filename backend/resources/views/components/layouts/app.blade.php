@@ -32,10 +32,13 @@
         ['label' => 'Evenements', 'icon' => 'calendar-days', 'route' => 'events.index', 'match' => 'events.*', 'permission' => PermissionName::EventsView->value],
         ['label' => 'Collectes', 'icon' => 'hand-coins', 'route' => 'campaigns.index', 'match' => 'campaigns.*', 'permission' => PermissionName::CampaignsView->value],
         ['label' => 'Votes', 'icon' => 'vote', 'route' => 'polls.index', 'match' => 'polls.*', 'permission' => PermissionName::VotesView->value],
-        // Remboursements : le seul ecran financier transverse. Les reversements,
-        // eux, s'affichent sur la vue generale — l'organisateur n'a rien a y
+        // Finances : le grand livre des transactions d'abord — c'est ce qu'on
+        // vient lire, alors qu'un remboursement se traite quand il arrive. Les
+        // deux ecrans partagent une sous-navigation (`x-finance-nav`), d'ou le
+        // `match` sur les deux familles de routes. Les reversements, eux,
+        // s'affichent sur la vue generale : l'organisateur n'a rien a y
         // decider (section 21.2).
-        ['label' => 'Finances', 'icon' => 'wallet', 'route' => 'refunds.index', 'match' => 'refunds.*', 'permission' => PermissionName::FinancesView->value],
+        ['label' => 'Finances', 'icon' => 'wallet', 'route' => 'finances.transactions', 'match' => ['finances.*', 'refunds.*'], 'permission' => PermissionName::FinancesView->value],
         ['label' => 'Parametres', 'icon' => 'settings', 'route' => 'organization.settings'],
     ], fn (array $item) => ! isset($item['permission']) || auth()->user()?->can($item['permission'])));
 @endphp
