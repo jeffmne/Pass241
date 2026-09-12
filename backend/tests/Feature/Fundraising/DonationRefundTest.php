@@ -13,6 +13,7 @@ use App\Models\DonationRefund;
 use App\Services\Fundraising\CampaignProgress;
 use App\Services\Fundraising\CampaignStatistics;
 use App\Support\Tenancy\OrganizationContext;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -248,7 +249,7 @@ it('refuse d atteindre le don d une autre collecte', function () {
         ->call('startRefund', $this->donation->id)
         ->set('refundReason', 'Tentative')
         ->call('refund'))
-        ->toThrow(Illuminate\Database\Eloquent\ModelNotFoundException::class);
+        ->toThrow(ModelNotFoundException::class);
 
     expect($this->donation->fresh()->netAmount())->toBe(100_000);
 });

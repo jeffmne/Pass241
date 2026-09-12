@@ -2745,14 +2745,33 @@
      */
     .lp-mosaic {
         display: grid;
-        grid-template-columns: 1fr;
-        gap: 2rem 1rem;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(16.5rem, 82vw);
+        gap: 1rem;
         align-items: start;
+        overflow-x: auto;
+        margin-inline: -1.25rem;
+        padding: 0.25rem 1.25rem 1.25rem;
+        scroll-padding-inline: 1.25rem;
+        scroll-snap-type: x mandatory;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .lp-mosaic-item {
+        scroll-snap-align: start;
     }
 
     @media (min-width: 40rem) {
         .lp-mosaic {
+            grid-auto-flow: row;
+            grid-auto-columns: auto;
             grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 2rem 1rem;
+            overflow: visible;
+            margin-inline: 0;
+            padding: 0;
+            scroll-snap-type: none;
         }
     }
 
@@ -2791,7 +2810,13 @@
        mosaique. Toutes a la meme hauteur, les trois colonnes redeviendraient un
        tableau. */
     .lp-tile-tall {
-        aspect-ratio: 3 / 5;
+        aspect-ratio: 4 / 5;
+    }
+
+    @media (min-width: 40rem) {
+        .lp-tile-tall {
+            aspect-ratio: 3 / 5;
+        }
     }
 
     [data-theme='dark'] .lp-tile {
@@ -2813,6 +2838,30 @@
         zoom: 0.66;
     }
 
+    /* Sur telephone, l'action secondaire reste facile a toucher mais cesse de
+       rivaliser avec l'inscription. Elle ne consomme plus une seconde grande
+       pilule dans le premier ecran. */
+    @media (max-width: 39.999rem) {
+        .lp-hero-secondary {
+            width: auto;
+            min-height: 2.75rem;
+            border-color: transparent;
+            background: transparent;
+            box-shadow: none;
+            padding-inline: 0.75rem;
+            text-decoration: underline;
+            text-decoration-color: color-mix(in srgb, var(--azure-500) 32%, transparent);
+            text-underline-offset: 0.28em;
+        }
+
+        .lp-hero-secondary:hover,
+        .lp-hero-secondary:active {
+            border-color: transparent;
+            background: transparent;
+            box-shadow: none;
+        }
+    }
+
     @media (min-width: 64rem) {
         .lp-ticket-solo {
             zoom: 0.7;
@@ -2827,6 +2876,16 @@
     @media (min-width: 80rem) {
         .lp-ticket-solo {
             margin-right: 10rem;
+        }
+    }
+
+    /* Les portables larges ont souvent moins de 750 px de hauteur utile. La
+       preuve (affiche, categorie et QR) doit rester dans le premier ecran : sa
+       taille de vitrine s'adapte donc aussi a la hauteur du navigateur. */
+    @media (min-width: 64rem) and (max-height: 47rem) {
+        .lp-ticket-solo {
+            zoom: 0.48;
+            margin-right: 7rem;
         }
     }
 

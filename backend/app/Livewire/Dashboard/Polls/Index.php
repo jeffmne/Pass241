@@ -36,9 +36,7 @@ class Index extends Component
         return PermissionName::VotesView;
     }
 
-    public function mount(): void
-    {
-    }
+    public function mount(): void {}
 
     public function updatedSearch(): void
     {

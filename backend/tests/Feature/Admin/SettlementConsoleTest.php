@@ -1,7 +1,7 @@
 <?php
 
-use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Organizations\SetPayoutDestination;
+use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Settlements\SettleFunds;
 use App\Enums\PaymentProvider;
 use App\Enums\PayoutState;

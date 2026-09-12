@@ -25,7 +25,6 @@ use Livewire\WithPagination;
 class Transactions extends Component
 {
     use SuperAdminOnly;
-
     use WithPagination;
 
     public string $search = '';

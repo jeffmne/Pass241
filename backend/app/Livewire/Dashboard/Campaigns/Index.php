@@ -37,9 +37,7 @@ class Index extends Component
         return PermissionName::CampaignsView;
     }
 
-    public function mount(): void
-    {
-    }
+    public function mount(): void {}
 
     public function updatedSearch(): void
     {

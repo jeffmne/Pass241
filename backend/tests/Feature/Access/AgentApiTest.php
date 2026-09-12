@@ -138,6 +138,15 @@ it('remplace le jeton precedent du meme appareil', function () {
     expect($this->agent->fresh()->tokens()->count())->toBe(1);
 });
 
+it('fait expirer le jeton d appareil', function () {
+    ($this->login)()->assertOk();
+
+    $token = PersonalAccessToken::firstOrFail();
+
+    expect($token->expires_at)->not->toBeNull()
+        ->and(now()->diffInMinutes($token->expires_at))->toBeGreaterThanOrEqual(1439);
+});
+
 it('limite les tentatives par couple compte et appareil', function () {
     for ($i = 0; $i < 5; $i++) {
         $this->postJson('/api/agent/connexion', [
@@ -283,6 +292,25 @@ it('accepte un lot de scans et rend le verdict de chacun', function () {
         ->and($response->json('results.0.label'))->toBe('Billet valide')
         ->and($response->json('results.0.instruction'))->toBe('Entree autorisee')
         ->and($response->json('results.0.holder_name'))->not->toBeNull();
+});
+
+it('refuse d attribuer un lot au mauvais appareil', function () {
+    $ticket = ($this->issue)()->first();
+    $token = ($this->login)(device: 'device-A')->json('token');
+
+    $this->withToken($token)->postJson(
+        '/api/agent/evenements/'.$this->event->id.'/scans',
+        [
+            'device_id' => 'device-B',
+            'scans' => [[
+                'token' => $ticket->qrToken(),
+                'scanned_at' => now()->toIso8601String(),
+            ]],
+        ]
+    )->assertForbidden();
+
+    expect(AccessScan::query()->acrossOrganizations()->count())->toBe(0)
+        ->and($ticket->fresh()->status)->toBe(TicketStatus::Active);
 });
 
 it('rend le meme verdict quand un lot est retransmis', function () {

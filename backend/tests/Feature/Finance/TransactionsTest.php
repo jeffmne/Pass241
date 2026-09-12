@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Payments\ConfirmPayment;
+use App\Actions\Voting\CreatePaidBallot;
 use App\Enums\AuditAction;
 use App\Enums\CommissionType;
 use App\Enums\PaymentProvider;
@@ -18,6 +20,7 @@ use App\Models\PollCategory;
 use App\Services\Commission\CommissionCalculator;
 use App\Services\Finance\TransactionLedger;
 use App\Support\Money;
+use Illuminate\Http\Request;
 use Livewire\Livewire;
 
 /*
@@ -145,12 +148,12 @@ it('reunit les trois modules dans un seul livre', function () {
         $category = PollCategory::factory()->for($poll)->paid(500)->unlimited()->create();
         $candidate = Candidate::factory()->for($category, 'category')->create(['name' => 'Awa Ndong']);
 
-        $ballot = app(\App\Actions\Voting\CreatePaidBallot::class)->handle(
+        $ballot = app(CreatePaidBallot::class)->handle(
             $candidate, 4, PaymentProvider::Airtel, '074000000',
-            Illuminate\Http\Request::create('/v', 'POST', server: ['REMOTE_ADDR' => '41.158.1.1']),
+            Request::create('/v', 'POST', server: ['REMOTE_ADDR' => '41.158.1.1']),
         );
 
-        app(\App\Actions\Payments\ConfirmPayment::class)->handle($ballot, 'REF-VOTE-1');
+        app(ConfirmPayment::class)->handle($ballot, 'REF-VOTE-1');
 
         return $ballot;
     });

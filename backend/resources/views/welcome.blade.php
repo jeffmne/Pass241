@@ -60,7 +60,11 @@
         <a href="{{ route('home') }}"
            class="flex shrink-0 items-center gap-2 font-display text-xl font-extrabold tracking-tight">
             <x-brand-mark class="h-8 w-auto" />
-            <x-brand-word />
+            {{-- A 320 px, le mot-symbole, les trois actions et leurs zones
+                 tactiles ne tiennent pas honnêtement sur une ligne. Le
+                 pictogramme reste la marque visible; le nom revient dès que
+                 352 px sont disponibles. --}}
+            <x-brand-word class="hidden min-[22rem]:inline" />
         </a>
 
         {{-- Navigation en clair a partir de md. Sous cette largeur elle vit
@@ -163,7 +167,7 @@
             <div class="lp-glow lp-glow-b top-20 -right-40 size-[34rem]"></div>
         </div>
 
-        <div class="mx-auto grid w-full max-w-6xl gap-12 px-5 pt-10 pb-8 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-10 lg:pt-20 lg:pb-16">
+        <div class="mx-auto grid w-full max-w-6xl gap-8 px-5 pt-7 pb-6 sm:gap-12 sm:px-6 sm:pt-14 sm:pb-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-10 lg:pt-16 lg:pb-12">
 
             <div class="text-center lg:text-left">
                 {{-- L'accroche. Reprise de la section Tarifs plus bas : elle y
@@ -193,23 +197,23 @@
                     </span>
                 </p>
 
-                <p class="lp-enter lp-enter-3 mx-auto mt-6 max-w-xl text-base leading-relaxed text-grey-500 sm:text-lg lg:mx-0">
+                <p class="lp-enter lp-enter-3 mx-auto mt-5 max-w-xl text-base leading-relaxed text-grey-500 sm:mt-6 sm:text-lg lg:mx-0">
                     Creez votre evenement, partagez son lien sur WhatsApp. Vos participants paient
                     par Airtel Money ou Moov Money et recoivent leur billet dans la seconde.
                     Vos agents scannent a l'entree, meme sans reseau.
                 </p>
 
-                <div class="lp-enter lp-enter-4 mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                <div class="lp-enter lp-enter-4 mt-6 flex flex-col items-center justify-center gap-2.5 sm:mt-8 sm:flex-row sm:gap-3 lg:justify-start">
                     <a href="{{ route('register') }}" class="btn btn-primary btn-pill btn-lg w-full sm:w-auto">
                         Creer ma billetterie
                         <x-lucide-arrow-right class="size-4" stroke-width="2" aria-hidden="true" />
                     </a>
-                    <a href="#parcours" class="btn btn-secondary btn-pill btn-lg w-full sm:w-auto">
+                    <a href="#parcours" class="lp-hero-secondary btn btn-secondary btn-pill btn-lg w-full sm:w-auto">
                         Voir comment ca marche
                     </a>
                 </div>
 
-                <p class="lp-enter lp-enter-4 mt-6 flex items-center justify-center gap-2 text-sm text-grey-500 lg:justify-start">
+                <p class="lp-enter lp-enter-4 mt-4 flex items-center justify-center gap-2 text-sm text-grey-500 sm:mt-6 lg:justify-start">
                     <x-lucide-shield-check class="size-4 shrink-0 text-azure-500" stroke-width="2" aria-hidden="true" />
                     Inscription libre. La verification n'intervient qu'au moment d'etre paye.
                 </p>
@@ -258,7 +262,7 @@
 
         {{-- L'invitation a scanner porte sur le QR du billet : elle doit rester
              a cote de lui, pas ailleurs dans la page. --}}
-        <p class="mx-auto flex w-full max-w-6xl justify-center px-5 pb-10 sm:px-6 lg:justify-end lg:pb-16">
+        <p class="mx-auto flex w-full max-w-6xl justify-center px-5 pb-8 sm:px-6 sm:pb-10 lg:justify-end lg:pb-14">
             <span class="glass-inset inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-azure-700">
                 <x-lucide-scan-line class="size-4 shrink-0" stroke-width="2" aria-hidden="true" />
                 Ce QR Code fonctionne vraiment. Scannez-le.

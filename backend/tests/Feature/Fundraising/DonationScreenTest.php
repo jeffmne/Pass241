@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CampaignStatus;
 use App\Enums\DonationStatus;
 use App\Enums\PaymentState;
 use App\Livewire\Public\CampaignPage;
@@ -95,7 +96,7 @@ it('ouvre le don sur la page publique d une collecte en cours', function () {
 
 it('ne propose pas de donner sur une collecte suspendue', function () {
     forOrganization($this->organization, fn () => $this->campaign->forceFill([
-        'status' => App\Enums\CampaignStatus::Paused,
+        'status' => CampaignStatus::Paused,
     ])->save());
 
     Livewire::test(CampaignPage::class, ['slug' => $this->campaign->slug])

@@ -3,12 +3,15 @@
 use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Refunds\DecideRefund;
 use App\Actions\Refunds\RequestRefund;
+use App\Enums\PayoutState;
 use App\Enums\PermissionName;
 use App\Enums\RoleName;
 use App\Enums\TicketStatus;
 use App\Livewire\Dashboard\Overview;
+use App\Models\Campaign;
 use App\Models\Event;
 use App\Models\Order;
+use App\Models\Settlement;
 use App\Models\Ticket;
 use App\Models\TicketType;
 use App\Models\User;
@@ -343,7 +346,7 @@ it('affiche les derniers reversements, quel que soit leur objet', function () {
     $event = $this->event;
 
     [$settlement, $campaign] = forOrganization($this->organization, function () use ($event) {
-        $settlement = App\Models\Settlement::create([
+        $settlement = Settlement::create([
             'settlable_type' => $event->getMorphClass(),
             'settlable_id' => $event->getKey(),
             'reference' => 'RV-TEST-100',
@@ -352,13 +355,13 @@ it('affiche les derniers reversements, quel que soit leur objet', function () {
             'net_amount' => 19_000,
             'recipient_phone' => '074000000',
             'recipient_operator' => 'AIRTEL',
-            'status' => App\Enums\PayoutState::Succeeded->value,
+            'status' => PayoutState::Succeeded->value,
             'idempotency_key' => 'test-overview-1',
         ]);
 
-        $campaign = App\Models\Campaign::factory()->published()->create(['name' => 'Collecte reversee']);
+        $campaign = Campaign::factory()->published()->create(['name' => 'Collecte reversee']);
 
-        App\Models\Settlement::create([
+        Settlement::create([
             'settlable_type' => $campaign->getMorphClass(),
             'settlable_id' => $campaign->getKey(),
             'reference' => 'RV-TEST-101',
@@ -367,7 +370,7 @@ it('affiche les derniers reversements, quel que soit leur objet', function () {
             'net_amount' => 48_750,
             'recipient_phone' => '074000000',
             'recipient_operator' => 'AIRTEL',
-            'status' => App\Enums\PayoutState::Succeeded->value,
+            'status' => PayoutState::Succeeded->value,
             'idempotency_key' => 'test-overview-2',
         ]);
 

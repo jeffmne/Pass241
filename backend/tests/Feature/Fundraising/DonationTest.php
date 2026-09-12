@@ -3,6 +3,7 @@
 use App\Actions\Donations\CreateDonation;
 use App\Actions\Payments\ConfirmPayment;
 use App\Enums\AuditAction;
+use App\Enums\CampaignStatus;
 use App\Enums\CommissionType;
 use App\Enums\DonationStatus;
 use App\Enums\PaymentProvider;
@@ -13,6 +14,7 @@ use App\Models\Campaign;
 use App\Models\Commission;
 use App\Models\Donation;
 use App\Models\PaymentWebhook;
+use App\Services\Audit\AuditLogger;
 use App\Services\Fundraising\CampaignProgress;
 use App\Services\Payments\FakeProvider;
 use App\Services\Payments\PayableResolver;
@@ -313,7 +315,7 @@ it('fait echouer un don reste impaye, sans toucher au total', function () {
 
     $donation->forceFill(['expires_at' => now()->subMinute()])->save();
 
-    (new ExpireDonationIfUnpaid($donation->getKey()))->handle(app(App\Services\Audit\AuditLogger::class));
+    (new ExpireDonationIfUnpaid($donation->getKey()))->handle(app(AuditLogger::class));
 
     expect($donation->fresh()->status)->toBe(DonationStatus::Failed)
         ->and(($this->progress)()['collected'])->toBe(0);
@@ -327,7 +329,7 @@ it('fait echouer un don reste impaye, sans toucher au total', function () {
 
 it('refuse un don sur une collecte fermee', function () {
     forOrganization($this->organization, fn () => $this->campaign->forceFill([
-        'status' => App\Enums\CampaignStatus::Paused,
+        'status' => CampaignStatus::Paused,
     ])->save());
 
     expect(fn () => ($this->give)(10_000))->toThrow(RuntimeException::class);

@@ -1,7 +1,10 @@
 <?php
 
+use App\Actions\Campaigns\PublishCampaign;
+use App\Actions\Campaigns\SaveCampaign;
 use App\Actions\Donations\CreateDonation;
 use App\Actions\Payments\ConfirmPayment;
+use App\Data\CampaignDraft;
 use App\Enums\AuditAction;
 use App\Enums\DonationStatus;
 use App\Enums\PaymentProvider;
@@ -301,8 +304,8 @@ it('journalise tout le cycle de vie d une collecte', function () {
     // Par les actions reelles, du premier au dernier geste : une campagne posee
     // par une factory ne passerait par aucun journal, et ce test ne prouverait
     // rien.
-    $campaign = app(App\Actions\Campaigns\SaveCampaign::class)->create(
-        new App\Data\CampaignDraft(
+    $campaign = app(SaveCampaign::class)->create(
+        new CampaignDraft(
             name: 'Collecte journalisee',
             goalAmount: 500_000,
             beneficiaryLabel: 'Ecole publique',
@@ -313,7 +316,7 @@ it('journalise tout le cycle de vie d une collecte', function () {
 
     $campaign->forceFill(['poster_path' => 'campaigns/demo/image.jpg'])->save();
 
-    $campaigns = app(App\Actions\Campaigns\PublishCampaign::class);
+    $campaigns = app(PublishCampaign::class);
     $campaigns->publish($campaign->fresh(), $this->owner);
     $campaigns->pause($campaign->fresh(), $this->owner);
     $campaigns->resume($campaign->fresh(), $this->owner);

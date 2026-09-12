@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\Campaign;
 use App\Services\Fundraising\CampaignProgress;
 use App\Support\Tenancy\OrganizationContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 
 /*
@@ -89,7 +90,7 @@ it('refuse en base un objectif nul ou negatif', function () {
     // La contrainte vit en base et non dans le code : c'est la seule facon
     // qu'elle tienne aussi pour un import ou une correction manuelle.
     expect(fn () => Campaign::factory()->create(['goal_amount' => 0]))
-        ->toThrow(Illuminate\Database\QueryException::class);
+        ->toThrow(QueryException::class);
 });
 
 /*
