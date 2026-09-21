@@ -53,6 +53,10 @@ type RequestOptions = {
 export async function request<T>(options: RequestOptions): Promise<T> {
   const { method = 'GET', path, token, body, query } = options;
 
+  if (!__DEV__ && !apiBaseUrl.startsWith('https://')) {
+    throw new ApiError(0, 'La connexion securisee au serveur n\'est pas configuree.');
+  }
+
   /*
    * Chaine de requete assemblee a la main, et non avec `URL.searchParams`.
    *
@@ -68,6 +72,7 @@ export async function request<T>(options: RequestOptions): Promise<T> {
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   let response: Response;
+  let text: string;
 
   try {
     response = await fetch(url, {
@@ -80,6 +85,8 @@ export async function request<T>(options: RequestOptions): Promise<T> {
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    // Le delai couvre aussi un corps interrompu apres reception des en-tetes.
+    text = await response.text();
   } catch {
     // Coupure, DNS, abandon : dans tous les cas le serveur n'a rien dit.
     throw new NetworkError();
@@ -87,11 +94,14 @@ export async function request<T>(options: RequestOptions): Promise<T> {
     clearTimeout(timer);
   }
 
-  const text = await response.text();
   const payload = text ? safeParse(text) : null;
 
   if (!response.ok) {
     throw new ApiError(response.status, messageFor(response.status, payload), payload);
+  }
+
+  if (text && payload === null) {
+    throw new NetworkError('Reponse incomplete du serveur. Reessayez.');
   }
 
   return payload as T;

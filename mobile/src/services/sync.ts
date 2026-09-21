@@ -33,6 +33,11 @@ export type SyncReport = {
 };
 
 const sinceKey = (eventId: number) => `tickets.since.${eventId}`;
+const checkpointKey = (eventId: number) => `tickets.checkpoint.${eventId}`;
+const downloads = new Map<number, Promise<number>>();
+const lastDownload = new Map<number, number>();
+
+type DownloadCheckpoint = { since?: string; cursor: number; syncedAt: string };
 
 /**
  * Telecharge les billets modifies depuis la derniere fois.
@@ -46,11 +51,41 @@ export async function downloadTickets(
   eventId: number,
   onProgress?: (received: number) => void,
 ): Promise<number> {
-  const since = (await readMeta(sinceKey(eventId))) ?? undefined;
+  const existing = downloads.get(eventId);
+  if (existing) return existing;
 
-  let cursor: number | undefined;
+  const task = resumeDownload(token, eventId, onProgress);
+  downloads.set(eventId, task);
+  try {
+    const received = await task;
+    lastDownload.set(eventId, Date.now());
+    return received;
+  } finally {
+    downloads.delete(eventId);
+  }
+}
+
+async function resumeDownload(
+  token: string,
+  eventId: number,
+  onProgress?: (received: number) => void,
+): Promise<number> {
+  const since = (await readMeta(sinceKey(eventId))) ?? undefined;
+  const saved = await readMeta(checkpointKey(eventId));
+  let checkpoint: DownloadCheckpoint | null = null;
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved) as DownloadCheckpoint;
+      if (parsed?.since === since && Number.isSafeInteger(parsed.cursor) && parsed.cursor > 0
+        && typeof parsed.syncedAt === 'string' && Number.isFinite(Date.parse(parsed.syncedAt))) {
+        checkpoint = parsed;
+      }
+    } catch { /* Un ancien point de reprise invalide impose une relecture. */ }
+  }
+
+  let cursor: number | undefined = checkpoint?.cursor;
   let received = 0;
-  let syncedAt: string | null = null;
+  let syncedAt: string | null = checkpoint?.syncedAt ?? null;
 
   for (;;) {
     const page = await fetchTickets(token, eventId, { since, cursor });
@@ -58,18 +93,26 @@ export async function downloadTickets(
     await upsertTickets(eventId, page.tickets);
 
     received += page.tickets.length;
-    syncedAt = page.synced_at;
+    // Toujours la premiere borne, jamais celle de la derniere page.
+    syncedAt ??= page.synced_at;
     onProgress?.(received);
 
     if (!page.has_more || page.next_cursor === null) {
       break;
     }
 
+    if (page.next_cursor <= (cursor ?? 0)) {
+      throw new NetworkError('Synchronisation interrompue. Reessayez.');
+    }
+
     cursor = page.next_cursor;
+    // Ecrit APRES les billets : un arret brutal peut rejouer une page, pas la perdre.
+    await writeMeta(checkpointKey(eventId), JSON.stringify({ since, cursor, syncedAt }));
   }
 
   if (syncedAt) {
     await writeMeta(sinceKey(eventId), syncedAt);
+    await writeMeta(checkpointKey(eventId), '');
   }
 
   return received;
@@ -148,7 +191,11 @@ export async function synchronise(
 ): Promise<SyncReport> {
   try {
     const { uploaded, overturned } = await uploadPending(token, eventId, deviceId, clockOffsetSeconds);
-    const downloaded = await downloadTickets(token, eventId);
+    // Chaque scan remonte aussitot ; les billets ne sont relus qu'au rythme
+    // de fond. Sinon une file rapide telechargerait un delta a chaque entree.
+    const downloaded = Date.now() - (lastDownload.get(eventId) ?? 0) >= 30_000
+      ? await downloadTickets(token, eventId)
+      : 0;
 
     return { uploaded, overturned, downloaded, offline: false };
   } catch (error) {

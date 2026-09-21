@@ -63,6 +63,14 @@ it('cree une commande en attente sans aucun compte', function () {
         ->and($order->expires_at)->not->toBeNull();
 });
 
+it('refuse un tarif cache meme si son identifiant est connu', function () {
+    forOrganization($this->organization, fn () => $this->standard->update(['is_visible' => false]));
+
+    expect(fn () => ($this->place)([$this->standard->id => 1]))
+        ->toThrow(RuntimeException::class, 'Ce billet n\'existe pas');
+    expect(Order::query()->acrossOrganizations()->count())->toBe(0);
+});
+
 it('calcule le montant depuis les prix en base, jamais depuis le client', function () {
     $order = ($this->place)([
         $this->standard->id => 2,

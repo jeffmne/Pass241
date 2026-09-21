@@ -164,7 +164,7 @@ class Event extends Model implements Settlable
      */
     public function publicTicketTypes()
     {
-        return $this->ticketTypes()
+        $types = $this->ticketTypes()
             ->acrossOrganizations()
             ->publiclyListed()
             ->get()
@@ -172,6 +172,10 @@ class Event extends Model implements Settlable
             // type de billet le recharge par une requete scopee, qui ne
             // renverrait rien hors contexte — et le rendrait invendable.
             ->each(fn (TicketType $ticketType) => $ticketType->setRelation('event', $this));
+
+        app(\App\Services\Ticketing\StockLedger::class)->loadDisplayCounts($types);
+
+        return $types;
     }
 
     /*

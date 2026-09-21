@@ -17,6 +17,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class TicketType extends Model
 {
+    private ?array $displayStock = null;
+
+    public function setDisplayStock(int $sold, int $reserved): void
+    {
+        $this->displayStock = compact('sold', 'reserved');
+    }
+
     /** @use HasFactory<TicketTypeFactory> */
     use BelongsToOrganization, HasFactory;
 
@@ -80,7 +87,7 @@ class TicketType extends Model
      */
     public function soldCount(): int
     {
-        return app(StockLedger::class)->sold($this);
+        return $this->displayStock['sold'] ?? app(StockLedger::class)->sold($this);
     }
 
     /**
@@ -91,13 +98,15 @@ class TicketType extends Model
      */
     public function reservedCount(): int
     {
-        return app(StockLedger::class)->reserved($this);
+        return $this->displayStock['reserved'] ?? app(StockLedger::class)->reserved($this);
     }
 
     /** Ce qu'un acheteur peut encore prendre, maintenant. */
     public function availableStock(): int
     {
-        return app(StockLedger::class)->available($this);
+        return $this->displayStock === null
+            ? app(StockLedger::class)->available($this)
+            : max(0, $this->quantity - $this->displayStock['sold'] - $this->displayStock['reserved']);
     }
 
     public function isSoldOut(): bool
@@ -127,12 +136,12 @@ class TicketType extends Model
      * Quatre conditions, toutes necessaires : l'evenement est en vente, le type
      * est actif, la periode de vente court, et il reste du stock.
      */
-    public function isPurchasable(): bool
+    public function isPurchasable(?int $availableStock = null): bool
     {
         return $this->is_active
             && $this->salesHaveStarted()
             && ! $this->salesHaveEnded()
-            && ! $this->isSoldOut()
+            && ($availableStock ?? $this->availableStock()) > 0
             && (bool) $this->resolvedEvent()?->allowsPurchase();
     }
 

@@ -2,9 +2,8 @@
 
 namespace App\Livewire\Public;
 
-use App\Actions\Payments\ConfirmPayment;
 use App\Actions\Refunds\RequestRefund;
-use App\Enums\PaymentState;
+use App\Jobs\CheckOrderPayment;
 use App\Models\Order;
 use App\Services\Payments\PaymentManager;
 use App\Services\Refunds\RefundPolicy;
@@ -49,7 +48,7 @@ class OrderStatus extends Component
      * lorsque la commande a deja un etat definitif : inutile de solliciter
      * l'operateur pour une transaction close.
      */
-    public function refreshStatus(PaymentManager $payments, ConfirmPayment $confirmPayment): void
+    public function refreshStatus(): void
     {
         $this->order->refresh();
 
@@ -57,26 +56,7 @@ class OrderStatus extends Component
             return;
         }
 
-        $result = $payments->driver()->checkPaymentStatus($this->order);
-
-        if ($result->state === PaymentState::Succeeded) {
-            try {
-                $this->order = $confirmPayment->handle($this->order, $result->providerReference);
-            } catch (RuntimeException $e) {
-                // Le stock ne suffit plus : l'argent est encaisse, la commande
-                // devra etre remboursee. On ne masque pas la situation.
-                $this->addError('payment', $e->getMessage());
-            }
-
-            return;
-        }
-
-        if ($result->state === PaymentState::Failed) {
-            $this->order = $confirmPayment->markFailed(
-                $this->order,
-                $result->failureReason ?? 'Paiement refuse par l\'operateur.'
-            );
-        }
+        CheckOrderPayment::dispatch($this->order->getKey());
     }
 
     /**

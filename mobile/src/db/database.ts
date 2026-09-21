@@ -25,19 +25,46 @@ import * as SQLite from 'expo-sqlite';
 const DATABASE_NAME = 'pass241-agent.db';
 
 let instance: SQLite.SQLiteDatabase | null = null;
+let opening: Promise<SQLite.SQLiteDatabase> | null = null;
+let writes: Promise<unknown> = Promise.resolve();
 
 export async function database(): Promise<SQLite.SQLiteDatabase> {
   if (instance) {
     return instance;
   }
 
-  const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+  opening ??= (async () => {
+    const db = await SQLite.openDatabaseAsync(DATABASE_NAME);
+    try {
+      await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
+      await migrate(db);
+      instance = db;
+      return db;
+    } catch (error) {
+      await db.closeAsync();
+      throw error;
+    }
+  })();
 
-  await migrate(db);
+  try {
+    return await opening;
+  } finally {
+    opening = null;
+  }
+}
 
-  instance = db;
-
-  return db;
+/** Une seule ecriture a la fois ; aucune requete exterieure ne rejoint le commit. */
+export function writeTransaction<T>(work: (tx: SQLite.SQLiteDatabase) => Promise<T>): Promise<T> {
+  const task = writes.then(async () => {
+    const db = await database();
+    let result!: T;
+    await db.withExclusiveTransactionAsync(async (tx) => {
+      result = await work(tx);
+    });
+    return result;
+  });
+  writes = task.catch(() => undefined);
+  return task;
 }
 
 /**
@@ -113,10 +140,19 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
       PRAGMA user_version = 1;
     `);
   }
+
+  if (version < 2) {
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS scans_history ON scans (event_id, scanned_at DESC, id DESC);
+      PRAGMA user_version = 2;
+    `);
+  }
 }
 
 /** Ferme et oublie la base — utilise a la deconnexion. */
 export async function closeDatabase(): Promise<void> {
+  await writes;
+  if (opening) await opening;
   await instance?.closeAsync();
   instance = null;
 }
@@ -129,13 +165,13 @@ export async function readMeta(key: string): Promise<string | null> {
 }
 
 export async function writeMeta(key: string, value: string): Promise<void> {
-  const db = await database();
-
-  await db.runAsync(
-    'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
-    key,
-    value,
-  );
+  await writeTransaction(async (db) => {
+    await db.runAsync(
+      'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+      key,
+      value,
+    );
+  });
 }
 
 /**
@@ -146,7 +182,7 @@ export async function writeMeta(key: string, value: string): Promise<void> {
  * c'est le prix de la deconnexion, et l'ecran previent avant.
  */
 export async function wipeLocalData(): Promise<void> {
-  const db = await database();
-
-  await db.execAsync('DELETE FROM tickets; DELETE FROM scans; DELETE FROM events; DELETE FROM meta;');
+  await writeTransaction(async (db) => {
+    await db.execAsync('DELETE FROM tickets; DELETE FROM scans; DELETE FROM events; DELETE FROM meta;');
+  });
 }

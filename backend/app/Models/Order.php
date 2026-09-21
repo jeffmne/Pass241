@@ -401,7 +401,7 @@ class Order extends Model implements Payable
     {
         $stock = app(StockLedger::class);
 
-        foreach ($this->items as $item) {
+        foreach ($this->items->sortBy('ticket_type_id') as $item) {
             $ticketType = $item->ticketType
                 ?? TicketType::query()->acrossOrganizations()->find($item->ticket_type_id);
 

@@ -4,6 +4,7 @@ namespace App\Services\Ticketing;
 
 use App\Enums\OrderStatus;
 use App\Models\TicketType;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -27,6 +28,35 @@ use RuntimeException;
  */
 class StockLedger
 {
+    /**
+     * Un seul agregat pour l'affichage de tous les tarifs. Cet instantane vit
+     * uniquement sur ces modeles de presentation ; les achats relisent le
+     * stock sous verrou, sans cache partage ni retard d'invalidation.
+     *
+     * @param  Collection<int, TicketType>  $types
+     */
+    public function loadDisplayCounts(Collection $types): void
+    {
+        if ($types->isEmpty()) {
+            return;
+        }
+
+        $counts = DB::table('order_items')
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->whereIn('order_items.ticket_type_id', $types->modelKeys())
+            ->whereIn('orders.status', [OrderStatus::Paid->value, OrderStatus::PartiallyRefunded->value, OrderStatus::Pending->value])
+            ->select('order_items.ticket_type_id')
+            ->selectRaw('SUM(CASE WHEN orders.status IN (?, ?) THEN order_items.quantity ELSE 0 END) AS sold', [OrderStatus::Paid->value, OrderStatus::PartiallyRefunded->value])
+            ->selectRaw('SUM(CASE WHEN orders.status = ? AND orders.expires_at > ? THEN order_items.quantity ELSE 0 END) AS reserved', [OrderStatus::Pending->value, now()])
+            ->groupBy('order_items.ticket_type_id')
+            ->get()->keyBy('ticket_type_id');
+
+        foreach ($types as $type) {
+            $row = $counts->get($type->getKey());
+            $type->setDisplayStock((int) ($row?->sold ?? 0), (int) ($row?->reserved ?? 0));
+        }
+    }
+
     /**
      * Billets deja vendus.
      *
@@ -67,7 +97,17 @@ class StockLedger
     /** Ce qu'un acheteur peut encore prendre, maintenant. */
     public function available(TicketType $ticketType): int
     {
-        return max(0, $ticketType->quantity - $this->sold($ticketType) - $this->reserved($ticketType));
+        $occupied = (int) DB::table('order_items')
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->where('order_items.ticket_type_id', $ticketType->getKey())
+            ->where(function ($query) {
+                $query->whereIn('orders.status', [OrderStatus::Paid->value, OrderStatus::PartiallyRefunded->value])
+                    ->orWhere(fn ($pending) => $pending->where('orders.status', OrderStatus::Pending->value)
+                        ->where('orders.expires_at', '>', now()));
+            })
+            ->sum('order_items.quantity');
+
+        return max(0, $ticketType->quantity - $occupied);
     }
 
     /**

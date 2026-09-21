@@ -42,6 +42,16 @@ it('affiche le nom de l organisateur', function () {
         ->assertSee('Association test', escape: false);
 });
 
+it('ne permet pas de fermer le script JSON LD depuis le nom de l evenement', function () {
+    $name = '</script><script>alert(document.domain)</script>';
+    forOrganization($this->organization, fn () => $this->event->update(['name' => $name]));
+
+    $html = $this->get('/e/concert-afro-2026')->assertOk()->getContent();
+    expect($html)->not->toContain($name);
+    preg_match('/<script type="application\/ld\+json">(.*?)<\/script>/s', $html, $matches);
+    expect(json_decode($matches[1], true, flags: JSON_THROW_ON_ERROR)['name'])->toBe($name);
+});
+
 it('renvoie 404 sur un brouillon', function () {
     // Un brouillon ne doit pas fuiter, meme si quelqu'un devine son lien.
     $draft = forOrganization($this->organization, fn () => Event::factory()->create(['slug' => 'brouillon-secret']));

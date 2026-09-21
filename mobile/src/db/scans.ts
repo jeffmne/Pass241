@@ -1,6 +1,7 @@
 import type { LocalScan, ScanResultCode } from '../domain/types';
 import type { ScanOutcome } from '../domain/queue';
-import { database } from './database';
+import type { SQLiteDatabase } from 'expo-sqlite';
+import { database, writeTransaction } from './database';
 
 /**
  * La file locale des controles (sections 27.11, 27.12).
@@ -49,8 +50,7 @@ export async function recordScan(scan: {
   manual: boolean;
   holderName: string | null;
   ticketType: string | null;
-}): Promise<number> {
-  const db = await database();
+}, db: SQLiteDatabase): Promise<number> {
 
   const result = await db.runAsync(
     `INSERT INTO scans (event_id, ticket_id, reference, token, result, confirmed, scanned_at, manual, holder_name, ticket_type)
@@ -105,9 +105,7 @@ export async function applyOutcomes(outcomes: ScanOutcome[]): Promise<void> {
     return;
   }
 
-  const db = await database();
-
-  await db.withTransactionAsync(async () => {
+  await writeTransaction(async (db) => {
     for (const outcome of outcomes) {
       if (!outcome.confirmed || outcome.result === null) {
         continue;

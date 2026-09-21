@@ -5,6 +5,7 @@ Plateforme SaaS de billetterie, contrôle d'accès et collecte de fonds pour le 
 - Spécification produit : [CLAUDE.md](CLAUDE.md) et [docs/](docs/)
 - Avancement : [ROADMAP.md](ROADMAP.md)
 - Décisions techniques : [docs/00-decisions.md](docs/00-decisions.md)
+- Sécurité, performances, hors connexion et tests de charge : [guide de validation](docs/13-performance-resilience.md)
 
 ---
 

@@ -9,6 +9,7 @@ import type { AgentEvent } from '../domain/types';
 import { countTickets, savedEvents, saveEvents } from '../db/tickets';
 import { downloadTickets } from '../services/sync';
 import { useSession } from '../state/session';
+import { useNetwork } from '../state/network';
 import { colors, radius, spacing, typography } from '../theme';
 import type { RootStackParamList } from '../navigation';
 
@@ -33,6 +34,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Events'>;
 
 export function EventsScreen({ navigation }: Props) {
   const { token, agent, signOut } = useSession();
+  const { online } = useNetwork();
 
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [counts, setCounts] = useState<Record<number, number>>({});
@@ -51,7 +53,7 @@ export function EventsScreen({ navigation }: Props) {
     setEvents(stored);
     await refreshCounts(stored, setCounts);
 
-    if (!token) {
+    if (!token || !online) {
       setLoading(false);
 
       return;
@@ -70,14 +72,21 @@ export function EventsScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [online, token]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   async function open(event: AgentEvent) {
-    if (!token) return;
+    if (!token || preparing !== null) return;
+
+    // Les donnees deja preparees permettent d'ouvrir la porte immediatement.
+    // Le scanner synchronise en arriere-plan des que le reseau revient.
+    if (!online || (counts[event.id] ?? 0) > 0) {
+      navigation.navigate('Scan', { eventId: event.id, eventName: event.name });
+      return;
+    }
 
     setPreparing(event.id);
     setProgress(0);
@@ -94,6 +103,7 @@ export function EventsScreen({ navigation }: Props) {
        */
       if (!(caught instanceof NetworkError)) {
         setError(caught instanceof Error ? caught.message : 'Telechargement incomplet.');
+        return;
       }
     } finally {
       setPreparing(null);

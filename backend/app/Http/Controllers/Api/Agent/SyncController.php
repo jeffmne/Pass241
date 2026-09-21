@@ -53,6 +53,11 @@ class SyncController extends Controller
             'cursor' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        // Borne prise AVANT la lecture. Le mobile garde celle de la premiere
+        // page : une modification d'un billet deja parcouru sera relue au
+        // prochain tour, meme si le telechargement dure plusieurs minutes.
+        $syncedAt = now()->toIso8601String();
+
         // Portee levee pour le bloc : la ligne de commande est chargee par
         // relation, et une fermeture imbriquee n'en herite pas.
         $query = app(OrganizationContext::class)->withoutScope(fn () => Ticket::query()
@@ -84,7 +89,7 @@ class SyncController extends Controller
             'next_cursor' => $hasMore ? $tickets->last()?->getKey() : null,
             'has_more' => $hasMore,
             // Horodatage a renvoyer en `since` a la prochaine synchronisation.
-            'synced_at' => now()->toIso8601String(),
+            'synced_at' => $syncedAt,
         ]);
     }
 }

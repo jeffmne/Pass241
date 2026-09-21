@@ -29,7 +29,14 @@ class ProcessPaymentWebhook implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public readonly int $webhookId) {}
+    public int $tries = 5;
+
+    public array $backoff = [2, 5, 15, 30];
+
+    public function __construct(public readonly int $webhookId)
+    {
+        $this->onQueue('payments');
+    }
 
     public function handle(ConfirmPayment $confirmPayment, PayableResolver $payables): void
     {

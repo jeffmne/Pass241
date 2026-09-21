@@ -197,6 +197,35 @@ return [
     */
 
     'defaults' => [
+        // Le polling reseau ne monopolise pas les workers des callbacks.
+        'payment-checks' => [
+            'connection' => 'redis',
+            'queue' => ['payment-checks'],
+            'balance' => 'auto',
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
+            'maxTime' => 3600,
+            'maxJobs' => 1000,
+            'memory' => 128,
+            'tries' => 3,
+            'timeout' => 60,
+            'nice' => 0,
+        ],
+        // Les confirmations ne doivent pas attendre les rendus PDF et emails.
+        'payments' => [
+            'connection' => 'redis',
+            'queue' => ['payments'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
+            'maxTime' => 3600,
+            'maxJobs' => 1000,
+            'memory' => 128,
+            'tries' => 5,
+            'timeout' => 60,
+            'nice' => 0,
+        ],
         'supervisor-1' => [
             'connection' => 'redis',
             'queue' => ['default'],
@@ -214,6 +243,12 @@ return [
 
     'environments' => [
         'production' => [
+            'payment-checks' => ['maxProcesses' => (int) env('HORIZON_PAYMENT_CHECK_PROCESSES', 4)],
+            'payments' => [
+                'maxProcesses' => (int) env('HORIZON_PAYMENT_PROCESSES', 10),
+                'balanceMaxShift' => 1,
+                'balanceCooldown' => 3,
+            ],
             'supervisor-1' => [
                 'maxProcesses' => 10,
                 'balanceMaxShift' => 1,
@@ -222,6 +257,8 @@ return [
         ],
 
         'local' => [
+            'payment-checks' => ['maxProcesses' => 1],
+            'payments' => ['maxProcesses' => 2],
             'supervisor-1' => [
                 'maxProcesses' => 3,
             ],

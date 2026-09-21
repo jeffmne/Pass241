@@ -92,15 +92,12 @@ class CreateInvitations
             $event, $ticketType, $guests, $expiresAt, $actor
         ) {
             return DB::transaction(function () use ($event, $ticketType, $guests, $expiresAt, $actor) {
-                /*
-                 * Verification du stock avant d'ecrire quoi que ce soit.
-                 *
-                 * Ce n'est pas la garantie finale — deux lots simultanes
-                 * pourraient tous deux passer ce test. La garantie tient au
-                 * moment de l'acceptation, ou `StockLedger::commit` verifie
-                 * sous verrou (section 17.1). Ici, on evite simplement de
-                 * promettre des places manifestement absentes.
-                 */
+                // Les invitations et les achats partagent le meme verrou :
+                // aucun des deux chemins ne peut promettre la derniere place
+                // pendant que l'autre est en train de la reserver.
+                $ticketType = TicketType::query()->acrossOrganizations()
+                    ->where('event_id', $event->getKey())
+                    ->lockForUpdate()->findOrFail($ticketType->getKey());
                 $available = $this->stock->available($ticketType);
 
                 if ($available < count($guests)) {

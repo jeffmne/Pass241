@@ -1,9 +1,10 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '../components/ui';
+import { Button, ErrorNote } from '../components/ui';
 import { StatusStrip } from '../components/StatusStrip';
 import { VerdictPanel } from '../components/VerdictPanel';
 import type { ScanVerdict } from '../domain/types';
@@ -44,6 +45,14 @@ export function ScanScreen({ navigation, route }: Props) {
 
   const [permission, requestPermission] = useCameraPermissions();
   const [verdict, setVerdict] = useState<ScanVerdict | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const focused = useIsFocused();
+  const [active, setActive] = useState(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => setActive(state === 'active'));
+    return () => subscription.remove();
+  }, []);
 
   const busy = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,24 +79,31 @@ export function ScanScreen({ navigation, route }: Props) {
 
   const onScanned = useCallback(
     async (data: string) => {
-      if (busy.current) {
+      if (busy.current || !focused || !active) {
         return;
       }
 
       busy.current = true;
+      setError(null);
 
-      const result = await controlByToken(eventId, data);
+      try {
+        const result = await controlByToken(eventId, data);
 
-      setVerdict(result);
-      void sync.refreshPending();
+        setVerdict(result);
+        void sync.refreshPending();
 
-      // La remontee part tout de suite si le reseau est la, mais personne ne
-      // l'attend : le scanner est deja pret pour la personne suivante.
-      void sync.sync();
+        // La remontee part tout de suite si le reseau est la, mais personne ne
+        // l'attend : le scanner est deja pret pour la personne suivante.
+        void sync.sync();
 
-      timer.current = setTimeout(dismiss, VERDICT_MS);
+        timer.current = setTimeout(dismiss, VERDICT_MS);
+      } catch {
+        // Aucun verdict positif si SQLite n'a pas pu enregistrer le passage.
+        setError('Controle non enregistre. Reessayez avant de laisser entrer.');
+        busy.current = false;
+      }
     },
-    [dismiss, eventId, sync],
+    [active, dismiss, eventId, focused, sync],
   );
 
   if (!permission) {
@@ -110,16 +126,17 @@ export function ScanScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <StatusStrip sync={sync} />
+      <ErrorNote message={error} />
 
       <View style={styles.viewfinder}>
-        <CameraView
+        {focused && active ? <CameraView
           style={StyleSheet.absoluteFill}
           facing="back"
           barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
           // Coupee pendant l'affichage d'un verdict : inutile de faire tourner
           // la reconnaissance quand personne ne presente de billet.
           onBarcodeScanned={verdict ? undefined : ({ data }) => void onScanned(data)}
-        />
+        /> : null}
 
         {/* Repere de visee. Un cadre suffit : l'agent doit savoir ou pointer,
             pas apprendre a cadrer. */}

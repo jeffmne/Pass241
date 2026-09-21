@@ -1,4 +1,6 @@
 import * as Crypto from 'expo-crypto';
+import type { SQLiteDatabase } from 'expo-sqlite';
+import { writeTransaction } from '../db/database';
 
 import { decideLocally } from '../domain/validate';
 import type { ScanVerdict } from '../domain/types';
@@ -50,21 +52,23 @@ export async function controlByToken(
   scannedAt: Date = new Date(),
 ): Promise<ScanVerdict> {
   const hash = await hashToken(token);
-  const ticket = await findByTokenHash(eventId, hash);
-  const decision = decideLocally(ticket);
+  return writeTransaction(async (tx) => {
+    const ticket = await findByTokenHash(eventId, hash, tx);
+    const decision = decideLocally(ticket);
 
-  await persist({
-    eventId,
-    scannedAt,
-    decision,
-    ticketId: ticket?.id ?? null,
-    reference: ticket?.reference ?? null,
-    // Conserve le temps de prouver la signature au serveur, puis efface.
-    token,
-    manual: false,
+    await persist({
+      eventId,
+      scannedAt,
+      decision,
+      ticketId: ticket?.id ?? null,
+      reference: ticket?.reference ?? null,
+      // Conserve le temps de prouver la signature au serveur, puis efface.
+      token,
+      manual: false,
+    }, tx);
+
+    return decision.verdict;
   });
-
-  return decision.verdict;
 }
 
 /**
@@ -80,20 +84,22 @@ export async function controlByReference(
   reference: string,
   scannedAt: Date = new Date(),
 ): Promise<ScanVerdict> {
-  const ticket = await findByReference(eventId, reference);
-  const decision = decideLocally(ticket, { manual: true });
+  return writeTransaction(async (tx) => {
+    const ticket = await findByReference(eventId, reference, tx);
+    const decision = decideLocally(ticket, { manual: true });
 
-  await persist({
-    eventId,
-    scannedAt,
-    decision,
-    ticketId: ticket?.id ?? null,
-    reference: ticket?.reference ?? reference.trim().toUpperCase(),
-    token: null,
-    manual: true,
+    await persist({
+      eventId,
+      scannedAt,
+      decision,
+      ticketId: ticket?.id ?? null,
+      reference: ticket?.reference ?? reference.trim().toUpperCase(),
+      token: null,
+      manual: true,
+    }, tx);
+
+    return decision.verdict;
   });
-
-  return decision.verdict;
 }
 
 async function persist(params: {
@@ -104,7 +110,7 @@ async function persist(params: {
   reference: string | null;
   token: string | null;
   manual: boolean;
-}): Promise<void> {
+}, tx: SQLiteDatabase): Promise<void> {
   const at = params.scannedAt.toISOString();
 
   await recordScan({
@@ -117,13 +123,13 @@ async function persist(params: {
     manual: params.manual,
     holderName: params.decision.verdict.holderName,
     ticketType: params.decision.verdict.ticketType,
-  });
+  }, tx);
 
   /*
    * Le passage est marque localement des qu'il est accorde : sans cela, le
    * meme billet repasserait la meme porte tant que le reseau n'est pas revenu.
    */
   if (params.decision.marksUsed && params.ticketId !== null) {
-    await markUsedLocally(params.ticketId, at);
+    await markUsedLocally(params.ticketId, at, tx);
   }
 }

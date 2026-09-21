@@ -9,7 +9,7 @@
 {{-- Le rafraichissement automatique ne tourne QUE tant que la commande est en
      attente. Continuer a interroger le serveur pour une transaction close
      coute de la batterie et des donnees mobiles pour rien. --}}
-<div @if ($order->isPending()) wire:poll.5s="refreshStatus" @endif
+<div @if ($order->isPending()) wire:poll.10s.visible="refreshStatus" @endif
      class="mx-auto w-full max-w-2xl px-5 pt-28 pb-16 sm:px-6 sm:pt-32">
 
     <a href="{{ $event->publicUrl() }}"

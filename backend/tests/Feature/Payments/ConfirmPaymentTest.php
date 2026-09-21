@@ -71,6 +71,24 @@ it('marque la commande payee et emet un billet par unite', function () {
     expect(Ticket::query()->acrossOrganizations()->count())->toBe(3);
 });
 
+it('un ancien modele pending ne peut pas faire echouer un paiement confirme', function () {
+    $stale = ($this->makeOrder)(1);
+    $this->confirm->handle($stale, 'TX-success');
+
+    $result = $this->confirm->markFailed($stale, 'Ancien refus');
+
+    expect($result->status)->toBe(OrderStatus::Paid)
+        ->and($stale->fresh()->status)->toBe(OrderStatus::Paid);
+});
+
+it('reverifie une annulation sous verrou meme avec un ancien modele pending', function () {
+    $stale = ($this->makeOrder)(1);
+    Order::query()->acrossOrganizations()->whereKey($stale->id)->update(['status' => OrderStatus::Cancelled]);
+
+    expect(fn () => $this->confirm->handle($stale))->toThrow(RuntimeException::class);
+    expect(Ticket::query()->acrossOrganizations()->count())->toBe(0);
+});
+
 it('emet des billets valides au nom de l acheteur', function () {
     $order = ($this->makeOrder)(1);
 

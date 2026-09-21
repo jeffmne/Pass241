@@ -29,6 +29,14 @@ use Throwable;
  */
 class Checkout extends Component
 {
+    // Prive : reutilise dans une requete, jamais rehydrate depuis le client.
+    private ?\Illuminate\Database\Eloquent\Collection $displayTicketTypes = null;
+
+    private function displayTicketTypes(): \Illuminate\Database\Eloquent\Collection
+    {
+        return $this->displayTicketTypes ??= $this->event->publicTicketTypes();
+    }
+
     #[Locked]
     public Event $event;
 
@@ -49,7 +57,7 @@ class Checkout extends Component
     {
         $this->event = $event;
 
-        foreach ($event->publicTicketTypes() as $ticketType) {
+        foreach ($this->displayTicketTypes() as $ticketType) {
             $this->quantities[$ticketType->getKey()] = 0;
         }
     }
@@ -57,7 +65,7 @@ class Checkout extends Component
     protected function rules(): array
     {
         return [
-            'quantities' => ['array'],
+            'quantities' => ['array', 'max:100'],
             'quantities.*' => ['integer', 'min:0', 'max:100'],
             'firstName' => ['required', 'string', 'min:2', 'max:80'],
             'lastName' => ['required', 'string', 'min:2', 'max:80'],
@@ -233,14 +241,14 @@ class Checkout extends Component
     {
         // Toujours relu depuis l'evenement de la page : un identifiant venu
         // d'ailleurs ne peut pas se glisser dans le panier.
-        return $this->event->publicTicketTypes()
+        return $this->displayTicketTypes()
             ->firstWhere('id', $ticketTypeId);
     }
 
     public function render()
     {
         return view('livewire.public.checkout', [
-            'ticketTypes' => $this->event->publicTicketTypes(),
+            'ticketTypes' => $this->displayTicketTypes(),
             'providers' => PaymentProvider::cases(),
             'subtotal' => $this->subtotal(),
             'pspFee' => $this->pspFee(),

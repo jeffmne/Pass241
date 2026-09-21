@@ -27,7 +27,8 @@ use RuntimeException;
  * Rien n'est encaisse ici. La commande nait en PENDING avec une echeance, et
  * cette commande EST la reservation : ses billets sortent aussitot du stock
  * disponible, et y reviennent seuls a l'expiration (decision D-017). Il n'y a
- * aucun verrou a poser ni a relacher.
+ * aucun hold separe a maintenir. Les types sont verrouilles pendant la
+ * creation pour que deux acheteurs ne reservent jamais la meme place.
  */
 class CreateOrder
 {
@@ -56,6 +57,8 @@ class CreateOrder
         }
 
         $quantities = array_filter($quantities, fn (int $quantity) => $quantity > 0);
+        // Meme ordre que les confirmations, y compris pour un panier inverse.
+        ksort($quantities, SORT_NUMERIC);
 
         if ($quantities === []) {
             throw new RuntimeException('Choisissez au moins un billet.');
@@ -139,7 +142,7 @@ class CreateOrder
                 $order->items()->createMany($lines);
 
                 return $order;
-            });
+            }, attempts: 3);
 
             // Filet de securite : la commande doit basculer en echec meme si
             // aucun callback n'arrive (section 21.1). Le stock, lui, n'en
@@ -176,17 +179,26 @@ class CreateOrder
         $ticketType = TicketType::query()
             ->acrossOrganizations()
             ->where('event_id', $event->getKey())
+            ->lockForUpdate()
             ->find($ticketTypeId);
 
         // Le type doit appartenir a CET evenement. Sans cette verification, un
         // identifiant d'un autre evenement — voire d'une autre organisation —
         // pourrait etre glisse dans la requete et vendu au mauvais tarif.
-        return $ticketType ?? throw new RuntimeException('Ce billet n\'existe pas pour cet evenement.');
+        if (! $ticketType || ! $ticketType->is_visible) {
+            throw new RuntimeException('Ce billet n\'existe pas pour cet evenement.');
+        }
+
+        $ticketType->setRelation('event', $event);
+
+        return $ticketType;
     }
 
     private function assertPurchasable(TicketType $ticketType, int $quantity): void
     {
-        if (! $ticketType->isPurchasable()) {
+        $available = $ticketType->availableStock();
+
+        if (! $ticketType->isPurchasable($available)) {
             throw new RuntimeException(sprintf(
                 '« %s » : %s',
                 $ticketType->name,
@@ -201,8 +213,6 @@ class CreateOrder
                 $ticketType->max_per_order
             ));
         }
-
-        $available = $ticketType->availableStock();
 
         if ($quantity > $available) {
             throw new RuntimeException(sprintf(

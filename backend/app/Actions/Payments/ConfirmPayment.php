@@ -80,6 +80,10 @@ class ConfirmPayment
                     return $fresh ?? $payable;
                 }
 
+                if ($reason = $fresh->paymentRefusalReason()) {
+                    throw new RuntimeException($reason);
+                }
+
                 // Ce qui peut encore refuser : le stock d'une commande, dont la
                 // reservation a pu expirer entre la validation sur le telephone
                 // et l'arrivee du callback (section 17.1).
@@ -134,7 +138,26 @@ class ConfirmPayment
         }
 
         try {
-            $payable->applyPaymentFailed($reason);
+            // Un callback d'echec peut arriver pendant la confirmation. Le
+            // statut relu sous le meme verrou ne doit jamais retrograder un
+            // paiement acquis depuis la premiere lecture du modele.
+            $changed = DB::transaction(function () use ($payable, $reason) {
+                $fresh = $payable->lockedForPayment();
+
+                if (! $fresh || ! $fresh->isPaymentPending()) {
+                    return false;
+                }
+
+                $fresh->applyPaymentFailed($reason);
+
+                return true;
+            });
+
+            $payable->refresh();
+
+            if (! $changed) {
+                return $payable;
+            }
         } catch (Throwable $e) {
             report($e);
 

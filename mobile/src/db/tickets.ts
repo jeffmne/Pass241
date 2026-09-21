@@ -1,5 +1,6 @@
 import type { AgentEvent, LocalTicket, TicketStatus } from '../domain/types';
-import { database } from './database';
+import type { SQLiteDatabase } from 'expo-sqlite';
+import { database, writeTransaction } from './database';
 
 /**
  * Les billets, cote appareil.
@@ -62,11 +63,8 @@ export async function upsertTickets(
     return;
   }
 
-  const db = await database();
-
-  await db.withTransactionAsync(async () => {
-    for (const row of rows) {
-      await db.runAsync(
+  await writeTransaction(async (db) => {
+    const statement = await db.prepareAsync(
         `INSERT INTO tickets (id, event_id, reference, token_hash, holder_name, ticket_type, status, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
@@ -84,16 +82,22 @@ export async function upsertTickets(
              WHEN tickets.status = 'USED' AND excluded.status = 'ACTIVE' THEN 'USED'
              ELSE excluded.status
            END,
-           updated_at = excluded.updated_at`,
-        row.id,
-        eventId,
-        row.reference,
-        row.token_hash,
-        row.holder_name,
-        row.ticket_type,
-        row.status,
-        row.updated_at,
-      );
+           updated_at = excluded.updated_at`);
+    try {
+      for (const row of rows) {
+        await statement.executeAsync(
+          row.id,
+          eventId,
+          row.reference,
+          row.token_hash,
+          row.holder_name,
+          row.ticket_type,
+          row.status,
+          row.updated_at,
+        );
+      }
+    } finally {
+      await statement.finalizeAsync();
     }
   });
 }
@@ -102,8 +106,9 @@ export async function upsertTickets(
 export async function findByTokenHash(
   eventId: number,
   tokenHash: string,
+  tx?: SQLiteDatabase,
 ): Promise<LocalTicket | null> {
-  const db = await database();
+  const db = tx ?? await database();
 
   const row = await db.getFirstAsync<TicketRow>(
     'SELECT * FROM tickets WHERE event_id = ? AND token_hash = ?',
@@ -117,8 +122,9 @@ export async function findByTokenHash(
 export async function findByReference(
   eventId: number,
   reference: string,
+  tx?: SQLiteDatabase,
 ): Promise<LocalTicket | null> {
-  const db = await database();
+  const db = tx ?? await database();
 
   const row = await db.getFirstAsync<TicketRow>(
     'SELECT * FROM tickets WHERE event_id = ? AND reference = ?',
@@ -167,10 +173,8 @@ export async function searchLocalTickets(
 }
 
 /** Marque le passage localement, pour que le second scan refuse hors connexion. */
-export async function markUsedLocally(ticketId: number, usedAt: string): Promise<void> {
-  const db = await database();
-
-  await db.runAsync('UPDATE tickets SET status = ?, used_at = ? WHERE id = ?', 'USED', usedAt, ticketId);
+export async function markUsedLocally(ticketId: number, usedAt: string, tx: SQLiteDatabase): Promise<void> {
+  await tx.runAsync('UPDATE tickets SET status = ?, used_at = ? WHERE id = ?', 'USED', usedAt, ticketId);
 }
 
 export async function countTickets(eventId: number): Promise<number> {
@@ -186,9 +190,9 @@ export async function countTickets(eventId: number): Promise<number> {
 
 /** Les evenements autorises, conserves pour ouvrir l'application hors connexion. */
 export async function saveEvents(events: AgentEvent[]): Promise<void> {
-  const db = await database();
-
-  await db.withTransactionAsync(async () => {
+  await writeTransaction(async (db) => {
+    // Retire les affectations revoquees, sans effacer leurs scans en attente.
+    await db.runAsync('DELETE FROM events');
     for (const event of events) {
       await db.runAsync(
         `INSERT INTO events (id, name, starts_at, ends_at, venue, organization, entry_point_id, entry_point_name, tickets_count)

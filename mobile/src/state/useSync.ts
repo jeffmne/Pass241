@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { pendingCount } from '../db/scans';
 import { synchronise } from '../services/sync';
@@ -67,7 +68,7 @@ export function useSync(eventId: number | null): SyncState {
   }, [eventId]);
 
   const sync = useCallback(async () => {
-    if (eventId === null || !token || running.current || inFlight.has(eventId)) {
+    if (!online || AppState.currentState !== 'active' || eventId === null || !token || running.current || inFlight.has(eventId)) {
       return;
     }
 
@@ -94,7 +95,7 @@ export function useSync(eventId: number | null): SyncState {
       setSyncing(false);
       await refreshPending();
     }
-  }, [clockOffset, deviceId, eventId, refreshPending, token]);
+  }, [clockOffset, deviceId, eventId, online, refreshPending, token]);
 
   // Le retour du reseau est le meilleur moment pour vider la file.
   useEffect(() => {
@@ -108,9 +109,15 @@ export function useSync(eventId: number | null): SyncState {
 
     const timer = setInterval(() => {
       void sync();
-    }, INTERVAL_MS);
+    }, INTERVAL_MS + Math.floor(Math.random() * 5_000));
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void sync();
+    });
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
   }, [refreshPending, sync]);
 
   return { pending, syncing, lastSyncAt, overturned, error, sync, refreshPending };
