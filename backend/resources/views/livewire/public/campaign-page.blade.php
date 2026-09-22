@@ -169,6 +169,8 @@
                 </div>
             @endif
 
+            <x-countdown subject="campaign" :starts-at="$campaign->starts_at" :ends-at="$campaign->ends_at" :status="$campaign->status->value" />
+
             {{-- Organisateur et appel au don sur la meme rangee : « qui porte
                  cette collecte, et comment je contribue ». Empiles sur
                  telephone, cote a cote des qu'il y a la place. --}}

@@ -37,6 +37,8 @@
         @endif
     </header>
 
+    <x-countdown subject="poll" :starts-at="$poll->starts_at" :ends-at="$poll->ends_at" :status="$poll->status->value" class="mt-8" />
+
     {{-- Etat du scrutin, quand il n'est pas simplement ouvert --}}
     @unless ($open)
         <div role="status"

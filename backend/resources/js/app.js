@@ -13,6 +13,10 @@
  *    des qu'ils ont fini leur travail.
  */
 
+import { installCountdowns } from './countdown.js';
+
+installCountdowns(document, window);
+
 const root = document.documentElement;
 
 /* -------------------------------------------------------------------------

@@ -139,6 +139,8 @@
                 @endif
             </div>
 
+            <x-countdown :starts-at="$event->starts_at" :ends-at="$event->ends_at" :status="$event->status->value" />
+
             {{-- Organisateur et achat sur la meme rangee : c'est la reponse a
                  « qui organise, et comment j'y vais ». Empiles sur telephone,
                  cote a cote des qu'il y a la place. --}}
