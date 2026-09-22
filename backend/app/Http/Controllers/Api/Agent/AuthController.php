@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Access\AgentAccess;
 use App\Services\Audit\AuditLogger;
+use App\Support\AgentDevice;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -34,7 +35,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
-            'device_id' => ['required', 'string', 'max:120'],
+            'device_id' => ['required', 'string', 'max:120', 'regex:/\A[a-zA-Z0-9._:-]+\z/'],
             'device_name' => ['nullable', 'string', 'max:120'],
         ]);
 
@@ -91,11 +92,14 @@ class AuthController extends Controller
 
         // Un seul jeton par appareil : une reconnexion remplace le precedent
         // plutot que d'empiler des acces oublies.
-        $user->tokens()->where('name', $this->tokenName($data['device_id']))->delete();
+        $user->tokens()->where('name', AgentDevice::tokenName($data['device_id']))->delete();
+
+        $expiration = (int) config('sanctum.expiration', 1440);
 
         $token = $user->createToken(
-            $this->tokenName($data['device_id']),
+            AgentDevice::tokenName($data['device_id']),
             ['agent'],
+            expiresAt: $expiration > 0 ? now()->addMinutes($expiration) : null,
         );
 
         $user->forceFill(['last_login_at' => now()])->save();
@@ -129,10 +133,5 @@ class AuthController extends Controller
         $audit->log(AuditAction::Logout, $user, ['channel' => 'agent'], actor: $user);
 
         return response()->json(status: 204);
-    }
-
-    private function tokenName(string $deviceId): string
-    {
-        return 'agent-device:'.$deviceId;
     }
 }

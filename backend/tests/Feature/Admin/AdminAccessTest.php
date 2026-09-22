@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CommissionType;
 use App\Livewire\Admin\AuditTrail;
 use App\Livewire\Admin\Organizations;
 use App\Livewire\Admin\Overview;
@@ -103,6 +104,6 @@ it('refuse une action de la console, et pas seulement son ouverture', function (
 
     // Le taux n'a pas bouge : la commission de la billetterie reste a 5 %
     // (section 21.2).
-    expect(app(PlatformSettings::class)->commissionBasisPoints(App\Enums\CommissionType::Ticketing))
+    expect(app(PlatformSettings::class)->commissionBasisPoints(CommissionType::Ticketing))
         ->toBe(500);
 });

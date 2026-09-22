@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AuditAction;
+use App\Enums\PermissionName;
 use App\Enums\RoleName;
 use App\Models\AuditLog;
 use App\Models\Campaign;
@@ -207,7 +208,7 @@ it('refuse un export financier a qui ne voit pas les finances', function () {
 
     actAsOrganization($this->organization);
     // On lui accorde le droit d'exporter, mais pas celui de voir les finances.
-    $member->givePermissionTo(App\Enums\PermissionName::ExportsGenerate->value);
+    $member->givePermissionTo(PermissionName::ExportsGenerate->value);
     $this->actingAs($member->fresh());
 
     $this->get(route('exports.participants', [$this->event, 'csv']))->assertOk();

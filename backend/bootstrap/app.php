@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\EnsureAgentToken;
 use App\Http\Middleware\EnsureOrganizationContext;
 use App\Http\Middleware\EnsureSuperAdmin;
@@ -20,6 +21,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $trustedProxies = array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('TRUSTED_PROXIES', '')),
+        )));
+
+        if ($trustedProxies !== []) {
+            $middleware->trustProxies(at: $trustedProxies);
+        }
+
+        // Protection commune aux pages HTML, a l'API et aux reponses d'erreur.
+        $middleware->append(AddSecurityHeaders::class);
+
         $middleware->alias([
             'organization' => EnsureOrganizationContext::class,
             'super-admin' => EnsureSuperAdmin::class,

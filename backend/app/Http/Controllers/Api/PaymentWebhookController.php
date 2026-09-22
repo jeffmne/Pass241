@@ -31,6 +31,9 @@ use Illuminate\Support\Str;
  */
 class PaymentWebhookController extends Controller
 {
+    /** Un callback de paiement normal tient dans quelques kilo-octets. */
+    private const MAX_BODY_BYTES = 262_144;
+
     public function __invoke(Request $request, string $provider, PaymentManager $payments): JsonResponse
     {
         try {
@@ -38,6 +41,10 @@ class PaymentWebhookController extends Controller
         } catch (\InvalidArgumentException) {
             // Provider inconnu : on ne dit pas lesquels existent.
             return response()->json(['status' => 'ignored'], 202);
+        }
+
+        if (strlen($request->getContent()) > self::MAX_BODY_BYTES) {
+            return response()->json(['status' => 'payload_too_large'], 413);
         }
 
         /*
@@ -65,7 +72,10 @@ class PaymentWebhookController extends Controller
                 // tous les messages invalides sur une meme cle.
                 'event_id' => 'invalid:'.Str::uuid()->toString(),
                 'signature_valid' => false,
-                'payload' => $request->all(),
+                // Une empreinte suffit a rapprocher deux tentatives. Conserver
+                // le corps arbitraire d'un attaquant exposerait inutilement la
+                // base aux donnees sensibles et au remplissage de stockage.
+                'payload' => $this->invalidPayloadFingerprint($request),
                 'outcome' => 'Signature invalide.',
                 'ip_address' => $request->ip(),
             ]);
@@ -139,5 +149,23 @@ class PaymentWebhookController extends Controller
         ProcessPaymentWebhook::dispatch($webhook->getKey());
 
         return response()->json($acknowledgement ?? ['status' => 'accepted'], 200);
+    }
+
+    /** @return array<string, mixed> */
+    private function invalidPayloadFingerprint(Request $request): array
+    {
+        $body = $request->getContent();
+        $keys = array_slice(array_keys($request->all()), 0, 25);
+
+        return [
+            '_forensic' => [
+                'sha256' => hash('sha256', $body),
+                'bytes' => strlen($body),
+                'keys' => array_map(
+                    fn (string|int $key): string => mb_substr((string) $key, 0, 80),
+                    $keys,
+                ),
+            ],
+        ];
     }
 }

@@ -10,7 +10,6 @@ use App\Support\Money;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 /*
  * Frais du prestataire de paiement (decision D-023).

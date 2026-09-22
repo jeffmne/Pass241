@@ -30,7 +30,6 @@ use Livewire\WithPagination;
 class AuditTrail extends Component
 {
     use SuperAdminOnly;
-
     use WithPagination;
 
     public string $action = '';

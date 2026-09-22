@@ -30,7 +30,6 @@ use Livewire\WithPagination;
 class Settlements extends Component
 {
     use SuperAdminOnly;
-
     use WithPagination;
 
     public string $filter = 'all';

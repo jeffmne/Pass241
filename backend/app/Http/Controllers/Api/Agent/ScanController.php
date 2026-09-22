@@ -6,10 +6,12 @@ use App\Actions\Access\ValidateTicket;
 use App\Http\Controllers\Controller;
 use App\Models\AccessScan;
 use App\Services\Access\AgentAccess;
+use App\Support\AgentDevice;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Laravel\Sanctum\PersonalAccessToken;
 use Throwable;
 
 /**
@@ -72,6 +74,15 @@ class ScanController extends Controller
         ], [
             'scans.max' => 'Lot trop volumineux : envoyez-le en plusieurs fois.',
         ]);
+
+        $currentToken = $agent->currentAccessToken();
+
+        abort_unless(
+            $currentToken instanceof PersonalAccessToken
+                && AgentDevice::matches($currentToken, $data['device_id']),
+            403,
+            'Cet appareil ne correspond pas au jeton de session.',
+        );
 
         $results = [];
 

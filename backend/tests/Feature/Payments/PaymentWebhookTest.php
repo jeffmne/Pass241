@@ -111,7 +111,19 @@ it('conserve les messages non authentifies', function () {
     $webhook = PaymentWebhook::firstOrFail();
 
     expect($webhook->signature_valid)->toBeFalse()
-        ->and($webhook->outcome)->toBe('Signature invalide.');
+        ->and($webhook->outcome)->toBe('Signature invalide.')
+        ->and($webhook->payload['_forensic']['sha256'])->toHaveLength(64)
+        ->and($webhook->payload)->not->toHaveKey('order_reference');
+});
+
+it('refuse un webhook demesure avant de le conserver', function () {
+    $this->postJson('/api/webhooks/payments/fake', [
+        'padding' => str_repeat('x', 262_144),
+    ], [
+        'X-Pass241-Signature' => 'signature-forgee',
+    ])->assertStatus(413);
+
+    expect(PaymentWebhook::count())->toBe(0);
 });
 
 it('n emet qu un seul jeu de billets quand le meme message est rejoue', function () {

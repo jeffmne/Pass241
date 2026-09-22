@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Campaign;
 use App\Models\Event;
 use App\Support\Tenancy\OrganizationContext;
 
@@ -38,7 +39,7 @@ it('ouvre les autres ecrans rattaches a un evenement', function () {
 });
 
 it('ouvre les ecrans rattaches a une collecte', function () {
-    $campaign = forOrganization($this->organization, fn () => App\Models\Campaign::factory()
+    $campaign = forOrganization($this->organization, fn () => Campaign::factory()
         ->published()
         ->create());
 

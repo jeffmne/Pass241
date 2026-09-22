@@ -50,7 +50,9 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Un telephone d'agent peut etre perdu. Les jetons d'appareil ont donc une
+    // duree de vie finie, configurable sans redeployer le code.
+    'expiration' => (int) env('SANCTUM_TOKEN_EXPIRATION', 1440),
 
     /*
     |--------------------------------------------------------------------------

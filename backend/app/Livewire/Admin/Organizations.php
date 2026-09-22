@@ -22,7 +22,6 @@ use Livewire\WithPagination;
 class Organizations extends Component
 {
     use SuperAdminOnly;
-
     use WithPagination;
 
     public string $search = '';

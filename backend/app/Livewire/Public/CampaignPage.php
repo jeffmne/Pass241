@@ -6,6 +6,7 @@ use App\Models\Campaign;
 use App\Models\Donation;
 use App\Services\Fundraising\CampaignProgress;
 use App\Services\Ticketing\QrRenderer;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -75,7 +76,7 @@ class CampaignPage extends Component
      * organisation. Il n'y a aucune fuite possible, la requete etant bornee aux
      * dons de CETTE campagne.
      *
-     * @return \Illuminate\Support\Collection<int, Donation>
+     * @return Collection<int, Donation>
      */
     private function history()
     {

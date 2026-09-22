@@ -3,11 +3,13 @@
 use App\Actions\Campaigns\PublishCampaign;
 use App\Actions\Donations\RefundDonation;
 use App\Actions\Settlements\SettleFunds;
+use App\Enums\CampaignStatus;
 use App\Enums\PayoutState;
 use App\Models\Campaign;
 use App\Models\Commission;
 use App\Models\Donation;
 use App\Models\Settlement;
+use App\Notifications\SettlementSent;
 use App\Services\Settlement\SettlementLedger;
 use App\Support\Tenancy\OrganizationContext;
 use Illuminate\Support\Facades\Notification;
@@ -128,7 +130,7 @@ it('reverse une collecte echue', function () {
 
     forOrganization($this->organization, fn () => $this->campaign->forceFill([
         'ends_at' => now()->subDays(3),
-        'status' => App\Enums\CampaignStatus::Expired->value,
+        'status' => CampaignStatus::Expired->value,
     ])->save());
 
     expect(($this->settle)())->not->toBeNull();
@@ -184,7 +186,7 @@ it('previent l organisateur que son reversement est parti', function () {
 
     Notification::assertSentTo(
         $this->organization,
-        App\Notifications\SettlementSent::class,
+        SettlementSent::class,
     );
 });
 
